@@ -40,6 +40,11 @@ export function asNode(node: LintValue): ILintNode {
   return node as ILintNode;
 }
 
+/** Reads a lint value as the runtime node type, for the plugin API calls. */
+export function toLintNode(node: LintValue): Deno.lint.Node {
+  return node as Deno.lint.Node;
+}
+
 /** The Program node of a source unit, when the runtime exposes it. */
 export function programOf(sourceCode: Deno.lint.SourceCode): ILintNode {
   const holder = sourceCode as { ast?: LintValue };

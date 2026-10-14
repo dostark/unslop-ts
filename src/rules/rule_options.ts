@@ -30,6 +30,14 @@ export const NoAnyEscapeOptions = z.object({
 
 export const NoOptions = z.object({}).strict();
 
+export const RequireSafetyCommentOptions = z.object({
+  markers: z.array(z.string()).default(["SAFETY"]),
+}).strict();
+
+export const NoRuntimeTypeofOptions = z.object({
+  allowInTypeGuards: z.boolean().default(true),
+}).strict();
+
 /** Implementation ids with a known option schema. A catalog id absent here is rejected. */
 export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -38,4 +46,7 @@ export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-any-escape": NoAnyEscapeOptions,
   "exaix/no-pass-through-type-alias": NoOptions,
   "exaix/no-object-parameters": NoOptions,
+  "exaix/require-safety-comment": RequireSafetyCommentOptions,
+  "exaix/no-runtime-typeof": NoRuntimeTypeofOptions,
+  "exaix/no-conditional-empty-object-spread": NoOptions,
 };

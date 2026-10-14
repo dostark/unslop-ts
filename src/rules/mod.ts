@@ -9,6 +9,11 @@
 
 import { createNoChainedTypeAssertions } from "./no_chained_type_assertions.ts";
 import {
+  createNoConditionalEmptyObjectSpread,
+  createNoRuntimeTypeof,
+  createRequireSafetyComment,
+} from "./evidence_rules.ts";
+import {
   createNoAnyEscape,
   createNoExplicitUnknown,
   createNoObjectParameters,
@@ -24,4 +29,7 @@ export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
   "exaix/no-any-escape": { create: createNoAnyEscape },
   "exaix/no-pass-through-type-alias": { create: createNoPassThroughTypeAlias },
   "exaix/no-object-parameters": { create: createNoObjectParameters },
+  "exaix/require-safety-comment": { create: createRequireSafetyComment },
+  "exaix/no-runtime-typeof": { create: createNoRuntimeTypeof },
+  "exaix/no-conditional-empty-object-spread": { create: createNoConditionalEmptyObjectSpread },
 };
