@@ -18,7 +18,7 @@ const BOTH_TAGS_FIXTURE = `/**
  * @description Temporary fixture for the tag-selection test.
  */
 
-export const value: Record<string, unknown> = {};
+export const value: Promise<Response> = fetch('x');
 // ==========
 `;
 
@@ -41,7 +41,7 @@ Deno.test("--tags type-safety reports type-safety rules and hides others", async
 
   const result = await runChecker(["--tags=type-safety"], file);
 
-  assertStringIncludes(result.output, "[record-unknown]");
+  assertStringIncludes(result.output, "[promise-response-return]");
   assert(!result.output.includes("[decorative-comment]"), "decorative-comment must be hidden under --tags=type-safety");
 });
 
@@ -53,7 +53,10 @@ Deno.test("--tags comments reports comment rules and hides type-safety rules", a
   const result = await runChecker(["--tags=comments"], file);
 
   assertStringIncludes(result.output, "[decorative-comment]");
-  assert(!result.output.includes("[record-unknown]"), "record-unknown must be hidden under --tags=comments");
+  assert(
+    !result.output.includes("[promise-response-return]"),
+    "promise-response-return must be hidden under --tags=comments",
+  );
 });
 
 Deno.test("--tags prints a per-tag count in the summary", async () => {

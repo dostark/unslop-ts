@@ -29,14 +29,6 @@ const HEADER = "/**\n * @module Sample\n * @path packages/x/src/sample.ts\n * @d
 
 const CASES: IRuleCase[] = [
   // type-safety
-  { id: "explicit-any-array", invalid: "export const a: any[] = [];\n", valid: "export const a: string[] = [];\n" },
-  { id: "explicit-unknown", invalid: "export const a: unknown = {};\n", valid: "export const a: string = '';\n" },
-  {
-    id: "explicit-unknown-array",
-    invalid: "export const a: unknown[] = [];\n",
-    valid: "export const a: string[] = [];\n",
-  },
-  { id: "unknown-type-alias", invalid: "export type A = unknown;\n", valid: "export type A = string;\n" },
   {
     id: "promise-response-alias",
     invalid: "export type A = Promise<Response>;\n",
@@ -56,27 +48,6 @@ const CASES: IRuleCase[] = [
     id: "deno-lint-no-explicit-any",
     invalid: "// deno-lint-ignore no-explicit-any\nexport const a = 1;\n",
     valid: "export const a = 1;\n",
-  },
-  { id: "explicit-any-cast", invalid: "export const a = b as any;\n", valid: "export const a = b as string;\n" },
-  {
-    id: "typeof-cast",
-    invalid: "export const a = b as typeof c as string;\n",
-    valid: "export const a = b as string;\n",
-  },
-  {
-    id: "record-any",
-    invalid: "export const a: Record<string, any> = {};\n",
-    valid: "export const a: Record<string, string> = {};\n",
-  },
-  {
-    id: "record-unknown",
-    invalid: "export const a: Record<string, unknown> = {};\n",
-    valid: "export const a: Record<string, string> = {};\n",
-  },
-  {
-    id: "index-signature-unknown",
-    invalid: "export interface I { [key: string]: unknown }\n",
-    valid: "export interface I { [key: string]: string }\n",
   },
 
   // imports

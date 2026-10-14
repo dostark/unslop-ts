@@ -8,8 +8,20 @@
  */
 
 import { createNoChainedTypeAssertions } from "./no_chained_type_assertions.ts";
+import {
+  createNoAnyEscape,
+  createNoExplicitUnknown,
+  createNoObjectParameters,
+  createNoPassThroughTypeAlias,
+  createNoUnsafeDictionary,
+} from "./type_safety_rules.ts";
 import type { IPluginRule } from "./types.ts";
 
 export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
   "exaix/no-chained-type-assertions": { create: createNoChainedTypeAssertions },
+  "exaix/no-explicit-unknown": { create: createNoExplicitUnknown },
+  "exaix/no-unsafe-dictionary": { create: createNoUnsafeDictionary },
+  "exaix/no-any-escape": { create: createNoAnyEscape },
+  "exaix/no-pass-through-type-alias": { create: createNoPassThroughTypeAlias },
+  "exaix/no-object-parameters": { create: createNoObjectParameters },
 };

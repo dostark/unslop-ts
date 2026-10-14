@@ -41,3 +41,6 @@ Rule ideas come from [anti-slop](https://github.com/dmmulroy/anti-slop) (MIT, co
 rules are reimplemented on the Deno ESTree. Ported test cases keep their upstream names and
 carry the MIT notice. A skipped or changed upstream case carries its reason next to the
 case in the test file.
+
+MIT notice (anti-slop): Copyright (c) its authors, MIT License. The type environment and
+the type-safety rules are reimplementations; the licence text is not copied here.

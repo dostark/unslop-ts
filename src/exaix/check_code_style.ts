@@ -50,8 +50,7 @@ const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
   "max-params": z.object({ max: z.number().int().positive().default(7) }).strict(),
   "long-comment": z.object({ maxLines: z.number().int().positive().default(3) }).strict(),
   "test-inline-multiline-fixture": z.object({ minLines: z.number().int().positive().default(7) }).strict(),
-  "typeof-cast": z.object({ allowedTargets: z.array(z.string()).default(["globalThis.fetch"]) }).strict(),
-  "edition-leak": z.object({
+    "edition-leak": z.object({
     soloTier: z.number().int().default(0),
     teamTier: z.number().int().default(1),
     enterpriseTier: z.number().int().default(2),
@@ -109,12 +108,6 @@ function ruleEnabled(catalog: ICatalog, ruleName: string, repoPath: string): "er
   if (settings.severity === "warn" && ruleName === "dynamic-import" && strictImports) return "error";
   return settings.severity;
 }
-
-/** Catalog option values the rules array reads, so no threshold stays a literal. */
-const TYPEOF_ALLOWED_TARGETS = ruleSettings(CATALOG, "typeof-cast").options.allowedTargets ?? [];
-const TYPEOF_ALLOWED_PATTERN = (Array.isArray(TYPEOF_ALLOWED_TARGETS) ? TYPEOF_ALLOWED_TARGETS : [])
-  .map((target) => String(target).replace(/\./g, "\\."))
-  .join("|");
 
 interface Rule {
   name: string;
@@ -828,29 +821,6 @@ const rules: Rule[] = [
       `${LAYOUT.testsRoot}fixtures/ and load them from the test file.`,
   },
   {
-    name: "explicit-any-array",
-    regex: /:\s*any\[\]/,
-    message: "Using 'any[]' as a type is forbidden; use a specific type instead.",
-  },
-  {
-    name: "explicit-unknown",
-    // Catch ': unknown' but skip 'catch(e: unknown)'
-    // Uses lookbehind for catch and matches various terminators
-    regex: /(?<!catch\s*\(\s*[a-zA-Z_$]\w*\s*):\s*unknown\b(?!\s*\[)/,
-    message: "Using 'unknown' as an explicit type is forbidden; name the shape with an interface or type alias.",
-  },
-  {
-    name: "explicit-unknown-array",
-    regex: /:\s*unknown\[\]/,
-    message: "Using 'unknown[]' as a type is forbidden; use a specific type instead.",
-  },
-  {
-    name: "unknown-type-alias",
-    regex: /^\s*(?:export\s+)?type\s+[A-Za-z_$][\w$]*\s*=\s*unknown\s*;/,
-    message:
-      "Type aliases that rename raw 'unknown' are prohibited; define a real shape or narrow from 'unknown' where needed.",
-  },
-  {
     name: "promise-response-alias",
     regex: /^\s*(?:export\s+)?type\s+[A-Za-z_$][\w$]*\s*=\s*(?:\([^\)]*\)\s*=>\s*)?Promise\s*<\s*Response\s*>\s*;/,
     message: "Type aliases that mask 'Promise<Response>' are prohibited; define a specific response type instead.",
@@ -865,32 +835,6 @@ const rules: Rule[] = [
     name: "deno-lint-no-explicit-any",
     regex: /\/\/\s*deno-lint-ignore\s+no-explicit-any/,
     message: "Using '// deno-lint-ignore no-explicit-any' is not allowed; address the typing issue explicitly.",
-  },
-  {
-    name: "explicit-any-cast",
-    regex: /\bas\s+any\b/,
-    message: "Casting to 'any' (e.g. 'foo as any') is forbidden.",
-  },
-  {
-    name: "typeof-cast",
-    regex: new RegExp(`\\bas\\s+typeof\\s+(?!(?:${TYPEOF_ALLOWED_PATTERN})\\b)([a-zA-Z_]\\w*)\\s+(?!\\&)`),
-    message:
-      "Casting via 'as typeof <var>' is treated as an 'any' escape and is forbidden. Exceptions: 'as typeof globalThis.fetch' in tests, and intersection types like 'as typeof Deno & {...}'.",
-  },
-  {
-    name: "record-any",
-    regex: /Record<\s*string\s*,\s*any\s*>/,
-    message: "'Record<string, any>' is weak and prohibited; define a more specific type.",
-  },
-  {
-    name: "record-unknown",
-    regex: /Record<\s*string\s*,\s*unknown\s*>/,
-    message: "'Record<string, unknown>' is prohibited; define a specific interface or type alias instead.",
-  },
-  {
-    name: "index-signature-unknown",
-    regex: /\{\s*\[\s*key\s*:\s*string\s*\]\s*:\s*unknown\s*\}/,
-    message: "'{ [key: string]: unknown }' is prohibited; define a specific interface describing the expected shape.",
   },
   {
     name: "promise-response-return",
@@ -991,64 +935,6 @@ function parseExclusionComment(line: string, ruleName: string): { code: string; 
     return { code: match[1], rationale: match[2] };
   }
   return null;
-}
-
-interface IQuoteState {
-  inSingle: boolean;
-  inDouble: boolean;
-  inBacktick: boolean;
-  escaped: boolean;
-}
-
-/** Advances quote state for a character inside a quoted region. Returns true when handled. */
-function advanceQuotedRegion(char: string, state: IQuoteState): boolean {
-  if (state.escaped) {
-    state.escaped = false;
-    return true;
-  }
-  if (state.inSingle) {
-    if (char === "\\") state.escaped = true;
-    else if (char === "'") state.inSingle = false;
-    return true;
-  }
-  if (state.inDouble) {
-    if (char === "\\") state.escaped = true;
-    else if (char === '"') state.inDouble = false;
-    return true;
-  }
-  if (state.inBacktick) {
-    if (char === "\\") state.escaped = true;
-    else if (char === "`") state.inBacktick = false;
-    return true;
-  }
-  return false;
-}
-
-/** Replaces the contents of string/template literals and trailing comments with spaces. */
-function stripQuotedStringsAndComments(line: string): string {
-  let result = "";
-  const state: IQuoteState = { inSingle: false, inDouble: false, inBacktick: false, escaped: false };
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (advanceQuotedRegion(char, state)) {
-      result += " ";
-      continue;
-    }
-    if (char === "/" && line[i + 1] === "/") {
-      break;
-    }
-    if (char === "'" || char === '"' || char === "`") {
-      if (char === "'") state.inSingle = true;
-      else if (char === '"') state.inDouble = true;
-      else state.inBacktick = true;
-      result += " ";
-      continue;
-    }
-    result += char;
-  }
-
-  return result;
 }
 
 // Matches a run of 4+ repeated separator/decoration characters anywhere on a comment
@@ -1742,9 +1628,7 @@ function evaluateStyleRuleLine(
   if ((rule.name === "import-inside-statement" || rule.name === "dynamic-import") && isCommentOnlyLine(line)) {
     return;
   }
-  const lineToTest = ["explicit-unknown", "explicit-unknown-array", "index-signature-unknown"].includes(rule.name)
-    ? stripQuotedStringsAndComments(line)
-    : line;
+  const lineToTest = line;
   const masking = resolveMasking(rule, severity, lineToTest, idx, ctx);
   if (rule.name === "test-inline-multiline-fixture") {
     if (ctx.multilineFixtureExemptLines.has(idx + 1)) return;

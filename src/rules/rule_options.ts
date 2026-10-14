@@ -14,7 +14,28 @@ export const NoChainedTypeAssertionsOptions = z.object({
   allowNeverAnyMockInTests: z.boolean().default(true),
 }).strict();
 
+export const NoExplicitUnknownOptions = z.object({
+  allowCatchBinding: z.boolean().default(true),
+  allowTypePredicateSubject: z.boolean().default(true),
+}).strict();
+
+export const NoUnsafeDictionaryOptions = z.object({
+  forbiddenValueTypes: z.array(z.string()).default(["unknown", "any", "object", "{}"]),
+}).strict();
+
+export const NoAnyEscapeOptions = z.object({
+  allowedTypeofTargets: z.array(z.string()).default(["globalThis.fetch"]),
+  allowAnyInTests: z.boolean().default(true),
+}).strict();
+
+export const NoOptions = z.object({}).strict();
+
 /** Implementation ids with a known option schema. A catalog id absent here is rejected. */
 export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-chained-type-assertions": NoChainedTypeAssertionsOptions,
+  "exaix/no-explicit-unknown": NoExplicitUnknownOptions,
+  "exaix/no-unsafe-dictionary": NoUnsafeDictionaryOptions,
+  "exaix/no-any-escape": NoAnyEscapeOptions,
+  "exaix/no-pass-through-type-alias": NoOptions,
+  "exaix/no-object-parameters": NoOptions,
 };

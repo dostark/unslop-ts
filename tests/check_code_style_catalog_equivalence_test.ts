@@ -20,8 +20,9 @@ Deno.test("catalog covers exactly the implemented script rules", () => {
 });
 
 Deno.test("checkSource findings are stable for the committed catalog", () => {
-  const source = "export const a: unknown = {};\nexport const b: unknown[] = [];\n";
+  const source = "export type A = Promise<" + "Response>;\nexport function f(): Promise<" +
+    "Response> {\n  return fetch('x');\n}\n";
   const rules = checkSource(PROD, source, parseCatalog(catalogJson)).map((f) => f.rule).sort();
-  assertEquals(rules.includes("explicit-unknown"), true);
-  assertEquals(rules.includes("explicit-unknown-array"), true);
+  assertEquals(rules.includes("promise-response-alias"), true);
+  assertEquals(rules.includes("promise-response-return"), true);
 });
