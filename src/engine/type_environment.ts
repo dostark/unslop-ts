@@ -40,6 +40,9 @@ export function asNode(node: LintValue): ILintNode {
   return node as ILintNode;
 }
 
+/** The ESTree `Identifier` node type, shared so the literal appears once. */
+export const NODE_IDENTIFIER = "Identifier";
+
 /** Reads a lint value as the runtime node type, for the plugin API calls. */
 export function toLintNode(node: LintValue): Deno.lint.Node {
   return node as Deno.lint.Node;

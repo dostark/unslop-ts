@@ -20,6 +20,7 @@ import {
   createNoPassThroughTypeAlias,
   createNoUnsafeDictionary,
 } from "./type_safety_rules.ts";
+import { createNoBooleanAssert } from "./test_assertion_rules.ts";
 import type { IPluginRule } from "./types.ts";
 
 export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
@@ -32,4 +33,5 @@ export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
   "exaix/require-safety-comment": { create: createRequireSafetyComment },
   "exaix/no-runtime-typeof": { create: createNoRuntimeTypeof },
   "exaix/no-conditional-empty-object-spread": { create: createNoConditionalEmptyObjectSpread },
+  "exaix/no-boolean-assert": { create: createNoBooleanAssert },
 };

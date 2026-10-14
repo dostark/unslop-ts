@@ -38,6 +38,11 @@ export const NoRuntimeTypeofOptions = z.object({
   allowInTypeGuards: z.boolean().default(true),
 }).strict();
 
+export const NoBooleanAssertOptions = z.object({
+  methods: z.array(z.string()).default(["includes", "startsWith", "endsWith"]),
+  assertFunctions: z.array(z.string()).default(["assert", "assertEquals", "assertStrictEquals"]),
+}).strict();
+
 /** Implementation ids with a known option schema. A catalog id absent here is rejected. */
 export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -49,4 +54,5 @@ export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/require-safety-comment": RequireSafetyCommentOptions,
   "exaix/no-runtime-typeof": NoRuntimeTypeofOptions,
   "exaix/no-conditional-empty-object-spread": NoOptions,
+  "exaix/no-boolean-assert": NoBooleanAssertOptions,
 };
