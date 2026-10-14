@@ -25,6 +25,14 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+/** Per-rule option schemas for script-engine rules, owned by the script that implements them. */
+export type ScriptRuleSchemas = Record<string, z.ZodTypeAny>;
+
+/** Loader context. `scriptRuleSchemas` is null when the caller only needs plugin-rule validation. */
+export interface ICatalogLoadOptions {
+  readonly scriptRuleSchemas: ScriptRuleSchemas | null;
+}
+
 export interface IResolvedRuleSettings {
   readonly severity: RuleSeverity;
   readonly scope: RuleScope;
@@ -112,18 +120,36 @@ function validateRuleTags(id: string, entry: IRuleEntry, catalog: ICatalog): voi
   }
 }
 
-function validateRuleOptions(id: string, entry: IRuleEntry): void {
-  const schema = RULE_OPTION_SCHEMAS[id];
+function optionSchemaFor(
+  id: string,
+  entry: IRuleEntry,
+  scriptSchemas: ScriptRuleSchemas | null,
+): z.ZodTypeAny | null {
+  if (entry.engine === "plugin") {
+    const schema = RULE_OPTION_SCHEMAS[id];
+    if (!schema) {
+      throw new CatalogError(`rules.${id}`, "no plugin rule implementation is registered for this id");
+    }
+    return schema;
+  }
+  if (!scriptSchemas) return null;
+  return scriptSchemas[id] ?? null;
+}
+
+function validateRuleOptions(id: string, entry: IRuleEntry, schema: z.ZodTypeAny | null): void {
+  if (!schema) return;
   const options = schema.safeParse(entry.options ?? {});
   if (!options.success) {
     throw new CatalogError(`rules.${id}.options`, options.error.issues[0]?.message ?? "invalid options");
   }
 }
 
-function validateRuleEntry(id: string, entry: IRuleEntry, catalog: ICatalog): void {
-  if (!(id in RULE_OPTION_SCHEMAS)) {
-    throw new CatalogError(`rules.${id}`, "no rule implementation is registered for this id");
-  }
+function validateRuleEntry(
+  id: string,
+  entry: IRuleEntry,
+  catalog: ICatalog,
+  scriptSchemas: ScriptRuleSchemas | null,
+): void {
   if (entry.engine === "plugin" && entry.severity === "warn") {
     throw new CatalogError(`rules.${id}.severity`, "plugin rules support only 'error' or 'off'");
   }
@@ -134,7 +160,7 @@ function validateRuleEntry(id: string, entry: IRuleEntry, catalog: ICatalog): vo
     throw new CatalogError(`rules.${id}.tags`, "a rule needs at least one tag");
   }
   validateRuleTags(id, entry, catalog);
-  validateRuleOptions(id, entry);
+  validateRuleOptions(id, entry, optionSchemaFor(id, entry, scriptSchemas));
 }
 
 function validateVocabularyUsage(catalog: ICatalog): void {
@@ -147,13 +173,16 @@ function validateVocabularyUsage(catalog: ICatalog): void {
 }
 
 /** Validates `input` and returns the typed catalog, or throws a {@link CatalogError}. */
-export function parseCatalog(input: JsonValue): ICatalog {
+export function parseCatalog(
+  input: JsonValue,
+  options: ICatalogLoadOptions = { scriptRuleSchemas: null },
+): ICatalog {
   const parsed = CatalogSchema.safeParse(input);
   if (!parsed.success) {
     throw new CatalogError(issuePath(parsed.error, "catalog"), parsed.error.issues[0]?.message ?? "invalid catalog");
   }
   for (const [id, entry] of Object.entries(parsed.data.rules)) {
-    validateRuleEntry(id, entry, parsed.data);
+    validateRuleEntry(id, entry, parsed.data, options.scriptRuleSchemas);
   }
   validateVocabularyUsage(parsed.data);
   return parsed.data;
