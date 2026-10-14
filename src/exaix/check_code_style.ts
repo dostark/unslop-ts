@@ -27,6 +27,15 @@ import {
   type ScriptRuleSchemas,
 } from "@exaix/lint-rules";
 import styleRuleCatalog from "../../../../scripts/config/style_rule_catalog.json" with { type: "json" };
+import {
+  escapeRegExp,
+  LAYOUT,
+  RE_PACKAGE_NAME_CAPTURE,
+  RE_PACKAGE_ROOT_ENTRYPOINT,
+  RE_PACKAGE_SRC_CAPTURE,
+  RE_PACKAGE_TEST_HELPERS,
+  RE_PACKAGE_TESTS_CAPTURE,
+} from "./repo_layout.ts";
 
 /** Resolves the repository root from `--root=` or the working directory. */
 function resolveRepoRoot(): string {
@@ -46,10 +55,10 @@ const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
     soloTier: z.number().int().default(0),
     teamTier: z.number().int().default(1),
     enterpriseTier: z.number().int().default(2),
-    soloPrefixes: z.array(z.string()).default(["packages/", "apps/"]),
-    teamPrefixes: z.array(z.string()).default(["exaix-team/"]),
-    enterprisePrefixes: z.array(z.string()).default(["exaix-enterprise/"]),
-    teamAppPaths: z.array(z.string()).default(["apps/daemon/src/bootstrap_team.ts"]),
+    soloPrefixes: z.array(z.string()).default([LAYOUT.packageRoot, LAYOUT.appRoot]),
+    teamPrefixes: z.array(z.string()).default([LAYOUT.teamRoot]),
+    enterprisePrefixes: z.array(z.string()).default([LAYOUT.enterpriseRoot]),
+    teamAppPaths: z.array(z.string()).default([LAYOUT.teamAppBootstrap]),
   }).strict(),
 };
 
@@ -130,18 +139,11 @@ const ROOT_OWNED_PARENT_EXPORT_ALIASES = new Set([
 ]);
 
 const RETIRED_ROOT_HEADER_RELATED_FILES = new Set([
-  "src/services/core/db.ts",
+  ...LAYOUT.retiredRootHeaderRelatedFiles,
 ]);
 
 const RETIRED_ROOT_PACKAGE_IMPORT_PATHS = new Set([
-  "src/services/core/db.ts",
-  "src/services/tool/tool_validation_reporter.ts",
-  "src/services/tool/cli_confirmation_interceptor.ts",
-  "src/services/tool/notification_queue_confirmation_interceptor.ts",
-  "src/services/tool/output_validator.ts",
-  "src/services/tool/tool_reflector.ts",
-  "src/services/tool/tool_registry.ts",
-  "src/services/utils/json_repair.ts",
+  ...LAYOUT.retiredRootImportPaths,
 ]);
 
 function isPackageEntrypoint(path: string): boolean {
@@ -149,7 +151,7 @@ function isPackageEntrypoint(path: string): boolean {
 }
 
 function isPackageRootEntrypoint(path: string): boolean {
-  return /^packages\/[^/]+\/(mod|index)\.ts$/.test(path);
+  return RE_PACKAGE_ROOT_ENTRYPOINT.test(path);
 }
 
 function isSamePackageReExport(line: string): boolean {
@@ -158,7 +160,7 @@ function isSamePackageReExport(line: string): boolean {
 }
 
 function isTestingCompatibilityShim(path: string): boolean {
-  return path.startsWith("tests/helpers/") || /^packages\/[^/]+\/tests\/helpers\//.test(path);
+  return path.startsWith(LAYOUT.rootTestHelpers) || RE_PACKAGE_TEST_HELPERS.test(path);
 }
 
 function parseHeaderRelatedFiles(headerText: string): string[] {
@@ -188,17 +190,17 @@ function isRepoRelativeSpecifier(specifier: string): boolean {
 
 /** True when repoPath is a functional, deployable production module (not a test file). */
 function isProductionModulePath(repoPath: string): boolean {
-  const isProductionRoot = repoPath.startsWith("packages/") ||
-    repoPath.startsWith("exaix-team/") ||
-    repoPath.startsWith("apps/");
-  const isTestFile = repoPath.includes("/tests/") ||
+  const isProductionRoot = repoPath.startsWith(LAYOUT.packageRoot) ||
+    repoPath.startsWith(LAYOUT.teamRoot) ||
+    repoPath.startsWith(LAYOUT.appRoot);
+  const isTestFile = repoPath.includes(LAYOUT.testsSegment) ||
     repoPath.endsWith("_test.ts") ||
     repoPath.endsWith(".test.ts");
   // Test-infrastructure modules are NOT deployable production code: the @exaix/testing
   // package and any `*/testing/` compatibility shim exist to provide test helpers and may
   // legitimately bridge to tests/. They never ship in a production deploy.
-  const isTestInfra = repoPath.startsWith("packages/testing/") ||
-    repoPath.includes("/testing/");
+  const isTestInfra = repoPath.startsWith(LAYOUT.testingPackageRoot) ||
+    repoPath.includes(LAYOUT.testingSegment);
   return isProductionRoot && !isTestFile && !isTestInfra;
 }
 
@@ -214,7 +216,7 @@ export function isProductionToTestsImport(repoPath: string, specifier: string): 
   if (!isRepoRelativeSpecifier(specifier)) return false; // bare alias / URL — not a tests/ path
   // Resolve the specifier against the importing file's directory; flag if it lands in tests/.
   const resolved = specifier.startsWith(".") ? normalize(join(dirname(repoPath), specifier)) : specifier;
-  return resolved === "tests" || resolved.startsWith("tests/");
+  return resolved === "tests" || resolved.startsWith(LAYOUT.testsRoot);
 }
 
 /** How many preceding source lines to scan for the enclosing `editionType` guard. */
@@ -229,8 +231,7 @@ function isTeamDynamicImportLine(line: string): boolean {
  *  including their Team-edition counterparts under exaix-team/, which are the same dispatch
  *  mechanism for the Team app and carry the same edition-gated dynamic `@exaix-team/*` import. */
 function isEditionDispatchEntry(repoPath: string): boolean {
-  return repoPath.startsWith("apps/daemon/") || repoPath.startsWith("apps/exactl/") ||
-    repoPath.startsWith("exaix-team/apps/daemon/") || repoPath.startsWith("exaix-team/apps/exactl/");
+  return LAYOUT.editionAppPrefixes.some((prefix) => repoPath.startsWith(prefix));
 }
 
 /**
@@ -288,10 +289,10 @@ export const EDITION_TIERS: IEditionTiers = {
   soloTier: Number(EDITION_TIER_OPTIONS.soloTier ?? 0),
   teamTier: Number(EDITION_TIER_OPTIONS.teamTier ?? 1),
   enterpriseTier: Number(EDITION_TIER_OPTIONS.enterpriseTier ?? 2),
-  soloPrefixes: stringListOption(EDITION_TIER_OPTIONS.soloPrefixes, ["packages/", "apps/"]),
-  teamPrefixes: stringListOption(EDITION_TIER_OPTIONS.teamPrefixes, ["exaix-team/"]),
-  enterprisePrefixes: stringListOption(EDITION_TIER_OPTIONS.enterprisePrefixes, ["exaix-enterprise/"]),
-  teamAppPaths: stringListOption(EDITION_TIER_OPTIONS.teamAppPaths, ["apps/daemon/src/bootstrap_team.ts"]),
+  soloPrefixes: stringListOption(EDITION_TIER_OPTIONS.soloPrefixes, [LAYOUT.packageRoot, LAYOUT.appRoot]),
+  teamPrefixes: stringListOption(EDITION_TIER_OPTIONS.teamPrefixes, [LAYOUT.teamRoot]),
+  enterprisePrefixes: stringListOption(EDITION_TIER_OPTIONS.enterprisePrefixes, [LAYOUT.enterpriseRoot]),
+  teamAppPaths: stringListOption(EDITION_TIER_OPTIONS.teamAppPaths, [LAYOUT.teamAppBootstrap]),
 };
 
 /**
@@ -338,8 +339,8 @@ export function isEditionLeakImport(
   const sourceTier = editionTierOfPath(repoPath, EDITION_TIERS);
   if (sourceTier === null) return false;
   if (
-    repoPath.includes("/tests/") ||
-    repoPath.includes("/testing/") ||
+    repoPath.includes(LAYOUT.testsSegment) ||
+    repoPath.includes(LAYOUT.testingSegment) ||
     repoPath.endsWith("_test.ts") ||
     repoPath.endsWith(".test.ts")
   ) {
@@ -401,13 +402,13 @@ function discoverPublicPackageAliases(): IPublicPackageAlias[] {
       }
 
       const entryPath = normalize(mappedPath.replace(/^\.\//, ""));
-      if (!entryPath.startsWith("packages/") && !entryPath.startsWith("exaix-team/")) {
+      if (!entryPath.startsWith(LAYOUT.packageRoot) && !entryPath.startsWith(LAYOUT.teamRoot)) {
         continue;
       }
 
       // Root packages are two segments deep (packages/<name>/...); exaix-team's own
       // packages/apps are one level deeper (exaix-team/{packages,apps}/<name>/...).
-      const rootSegments = entryPath.startsWith("exaix-team/") ? 3 : 2;
+      const rootSegments = entryPath.startsWith(LAYOUT.teamRoot) ? 3 : 2;
       const segments = entryPath.split("/");
       const packageName = segments[rootSegments - 1];
       if (!packageName || segments.length <= rootSegments) {
@@ -502,7 +503,7 @@ function discoverRootTestingShimExports(): Map<string, ITestingShimExportInfo> {
       if (!entry.isFile || !entry.name.endsWith(".ts")) continue;
 
       const absolutePath = join(helpersDir, entry.name);
-      const repoPath = `tests/helpers/${entry.name}`;
+      const repoPath = `${LAYOUT.rootTestHelpers}${entry.name}`;
       const source = Deno.readTextFileSync(absolutePath);
 
       for (const match of source.matchAll(exportRegex)) {
@@ -525,7 +526,7 @@ function resolveRepoImportPath(importerRepoPath: string, importPath: string): st
   if (importPath.startsWith(".")) {
     return normalize(join(dirname(importerRepoPath), importPath));
   }
-  if (importPath.startsWith("packages/") || importPath.startsWith("tests/")) {
+  if (importPath.startsWith(LAYOUT.packageRoot) || importPath.startsWith(LAYOUT.testsRoot)) {
     return normalize(importPath);
   }
 
@@ -533,7 +534,7 @@ function resolveRepoImportPath(importerRepoPath: string, importPath: string): st
 }
 
 function getPackageTestingAliasForTestImport(normalizedImport: string): { packageName: string; alias: string } | null {
-  const match = normalizedImport.match(/^packages\/([^/]+)\/tests\//);
+  const match = normalizedImport.match(RE_PACKAGE_TESTS_CAPTURE);
   if (!match) {
     return null;
   }
@@ -561,7 +562,7 @@ if (args.has("--help") || args.has("-h")) {
 
 Usage:
 
-  deno run packages/lint-rules/src/exaix/check_code_style.ts [options] [paths...]
+  deno run ${LAYOUT.packageRoot}lint-rules/${LAYOUT.srcRoot}exaix/check_code_style.ts [options] [paths...]
 
 Options:
   --help, -h          Show this help message
@@ -607,23 +608,7 @@ const LAYER_LEAK_FRAMEWORK = new Set([
 ]);
 
 /** Known bridge files — exempt from layer-leak checks. */
-const LAYER_LEAK_EXEMPT = new Set([
-  "packages/execution/src/git_audit_service.ts",
-  "packages/execution/src/execution_context_service.ts",
-  "packages/core/src/planning/plan_executor.ts",
-  // Mirrors plan_executor.ts's createAgentExecutor construction pattern (see this file's own
-  // IAgentComposerConstructionDeps docstring): builds a fresh, per-call PathResolver/
-  // ToolRegistry/AgentComposer/OutputValidator with call-time parameters (traceId, portal
-  // target_path) that don't exist until runWithStrategy is invoked — a DI-injected pre-built
-  // instance would violate the documented invariant that AgentComposer's mutable
-  // planWrittenFiles state must never survive past one call.
-  "packages/flow/src/agent_composer_adapter.ts",
-  // agent_runner.ts builds a PortalPermissionsService per request from the request-matched
-  // portal object (resolvePlanningGate finds `config.portals` by `request.portal` alias at
-  // call time), the same legitimately-per-call construction pattern as the two entries above —
-  // a boot-time DI-injected service would either duplicate that lookup or pin the wrong portal.
-  "packages/execution/src/agent_runner.ts",
-]);
+const LAYER_LEAK_EXEMPT = new Set(LAYOUT.layerLeakExempt.map((entry) => entry.path));
 
 /**
  * Structural AST analysis: detect when a file in package P value-imports
@@ -773,11 +758,13 @@ function reportLayerConstantLeaks(
 }
 
 function checkLayerLeaks(sourceFile: ts.SourceFile, repoPath: string): void {
-  if (!repoPath.startsWith("packages/")) return;
-  if (repoPath.includes("/tests/") || repoPath.includes("/testing/") || repoPath.endsWith("_test.ts")) return;
+  if (!repoPath.startsWith(LAYOUT.packageRoot)) return;
+  if (
+    repoPath.includes(LAYOUT.testsSegment) || repoPath.includes(LAYOUT.testingSegment) || repoPath.endsWith("_test.ts")
+  ) return;
   if (LAYER_LEAK_EXEMPT.has(repoPath)) return;
 
-  const pkgMatch = repoPath.match(/^packages\/([^/]+)/);
+  const pkgMatch = repoPath.match(RE_PACKAGE_NAME_CAPTURE);
   if (!pkgMatch) return;
   const myPackage = pkgMatch[1];
 
@@ -837,7 +824,8 @@ const rules: Rule[] = [
     regex:
       /^\s*(?:const|let|var)\s+(?:markdown|yaml|json|input|payload|text|content)\s*=\s*(?:[A-Za-z_$][\w$]*\s*)?`[^`]*$/,
     message:
-      "Avoid inline multiline structured text fixtures in test files. Move YAML, markdown, JSON, or other multi-line test inputs into a package-local fixture under tests/fixtures/ and load them from the test file.",
+      "Avoid inline multiline structured text fixtures in test files. Move YAML, markdown, JSON, or other multi-line test inputs into a package-local fixture under " +
+      `${LAYOUT.testsRoot}fixtures/ and load them from the test file.`,
   },
   {
     name: "explicit-any-array",
@@ -930,8 +918,8 @@ const rules: Rule[] = [
     // Skip lines that start with 'type ' or 'export type ' (named type alias definitions are the
     // recommended solution, not a violation)
     regex: /^(?!\s*(?:export\s+)?type\s+).*"\w+"\s*\|\s*"\w+"/,
-    message:
-      "Avoid magic string unions (e.g., '\"a\" | \"b\"'). Define a TypeScript 'enum' in packages/core/src/types/enums.ts or use a shared named union type instead.",
+    message: "Avoid magic string unions (e.g., '\"a\" | \"b\"'). Define a TypeScript 'enum' in " +
+      `${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}types/enums.ts or use a shared named union type instead.`,
   },
   // NOTE: the former [mit-team-import] regex rule (packages/ must not import packages-team/)
   // is superseded by the [edition-leak] check in checkFile(), which enforces the full tier
@@ -1122,7 +1110,7 @@ function reportCommentViolation(
 const EPHEMERAL_TEST_FILENAME_PATTERN = /(?:^|[_.-])phase[-_]?(\d+)(?:[_.-]|$)/i;
 
 function checkTestFileName(repoPath: string): void {
-  const isTestFile = repoPath.includes("/tests/") || repoPath.endsWith("_test.ts") ||
+  const isTestFile = repoPath.includes(LAYOUT.testsSegment) || repoPath.endsWith("_test.ts") ||
     repoPath.endsWith(".test.ts");
   if (!isTestFile) return;
   const basename = repoPath.slice(repoPath.lastIndexOf("/") + 1);
@@ -1293,7 +1281,7 @@ function checkModuleHeader(path: string, repoPath: string, lines: string[], head
     else warnCount++;
     return;
   }
-  if (path.includes("/tests/")) return;
+  if (path.includes(LAYOUT.testsSegment)) return;
 
   const headerLines = lines.slice(0, 15).join("\n");
   for (const tag of ["@module", "@path", "@description"]) {
@@ -1303,7 +1291,7 @@ function checkModuleHeader(path: string, repoPath: string, lines: string[], head
     }
   }
 
-  if (repoPath.startsWith("packages/")) {
+  if (repoPath.startsWith(LAYOUT.packageRoot)) {
     for (const relatedFile of parseHeaderRelatedFiles(headerLines)) {
       if (!RETIRED_ROOT_HEADER_RELATED_FILES.has(relatedFile)) continue;
       console.log(
@@ -1318,7 +1306,7 @@ function checkModuleHeader(path: string, repoPath: string, lines: string[], head
 
 /** Maintenance-script header checks (CODE_STYLE.md 12). */
 function checkScriptHeader(path: string, lines: string[], headerLines: string): void {
-  if (!path.includes("/scripts/") || path.includes("/tests/")) return;
+  if (!path.includes(LAYOUT.scriptsSegment) || path.includes(LAYOUT.testsSegment)) return;
   if (!lines[0].startsWith("#!/usr/bin/env -S deno run -A")) {
     console.log(
       `ERROR [script-shebang] ${path}:1 – Maintenance scripts must start with '#!/usr/bin/env -S deno run -A'.`,
@@ -1334,7 +1322,7 @@ function checkScriptHeader(path: string, lines: string[], headerLines: string): 
   const fileName = path.split("/").pop() || "";
   if (fileName.startsWith("debug_") || fileName.startsWith("tmp_")) {
     console.log(
-      `ERROR [script-placement] ${path}:1 – Debug or temporary scripts must be located outside the 'scripts/' directory.`,
+      `ERROR [script-placement] ${path}:1 – Debug or temporary scripts must be located outside the '${LAYOUT.scriptsRoot}' directory.`,
     );
     errorCount++;
   }
@@ -1424,8 +1412,8 @@ function reportPackagePurityViolations(repoPath: string, line: string, trimmedLi
 
 /** Package module purity (CODE_STYLE.md 13): no runtime infrastructure in package src/. */
 function checkPackagePurity(repoPath: string, lines: string[]): void {
-  const match = repoPath.match(/^packages\/([^/]+)\/src\//);
-  if (!match || match[1] === "core" || repoPath.startsWith("packages/mcp/server/")) return;
+  const match = repoPath.match(RE_PACKAGE_SRC_CAPTURE);
+  if (!match || match[1] === "core" || repoPath.startsWith(LAYOUT.mcpServerPrefix)) return;
 
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
@@ -1499,7 +1487,9 @@ function scanTemplateRun(lines: string[], startIdx: number): ITemplateRun {
 function reportTuiOnlyViolations(path: string, line: string, idx: number, tuiDepth: number): void {
   if (line.match(/import\b.*?\bfrom\s+["'](?:\.\.\/)+cli\//)) {
     console.log(
-      `ERROR [tui-boundary-cli] ${path}:${idx + 1} – TUI modules must not import from 'apps/exactl/src/'.`,
+      `ERROR [tui-boundary-cli] ${path}:${
+        idx + 1
+      } – TUI modules must not import from '${LAYOUT.appRoot}exactl/${LAYOUT.srcRoot}'.`,
     );
     errorCount++;
   }
@@ -1507,7 +1497,7 @@ function reportTuiOnlyViolations(path: string, line: string, idx: number, tuiDep
     console.log(
       `ERROR [tui-boundary-services] ${path}:${
         idx + 1
-      } – TUI modules must not import from retired 'src/services/' (now 'packages/core/src/services/').`,
+      } – TUI modules must not import from retired '${LAYOUT.srcRoot}services/' (now '${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}services/').`,
     );
     errorCount++;
   }
@@ -1515,7 +1505,7 @@ function reportTuiOnlyViolations(path: string, line: string, idx: number, tuiDep
     console.log(
       `ERROR [tui-boundary-config] ${path}:${
         idx + 1
-      } – TUI modules must not import from retired 'src/config/' (now 'packages/core/src/config/').`,
+      } – TUI modules must not import from retired '${LAYOUT.srcRoot}config/' (now '${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}config/').`,
     );
     errorCount++;
   }
@@ -1524,7 +1514,7 @@ function reportTuiOnlyViolations(path: string, line: string, idx: number, tuiDep
     console.log(
       `ERROR [tui-boundary-helpers] ${path}:${
         idx + 1
-      } – TUI modules must not import from retired 'src/helpers/' (now 'packages/tui/src/helpers/').`,
+      } – TUI modules must not import from retired '${LAYOUT.srcRoot}helpers/' (now '${LAYOUT.packageRoot}tui/${LAYOUT.srcRoot}helpers/').`,
     );
     errorCount++;
   }
@@ -1532,12 +1522,12 @@ function reportTuiOnlyViolations(path: string, line: string, idx: number, tuiDep
 
 /** TUI boundary isolation (CODE_STYLE.md 8) plus the core-to-TUI-helpers guard. */
 function checkTuiBoundary(path: string, lines: string[]): void {
-  const isTuiFile = path.includes("/apps/tui/src/") || path.includes("/apps/tui/tests/");
-  const tuiSegments = path.split("/apps/tui/src/")[1]?.split("/").filter(Boolean) ||
-    path.split("/apps/tui/tests/")[1]?.split("/").filter(Boolean) || [];
+  const isTuiFile = path.includes(LAYOUT.tuiSrcSegment) || path.includes(LAYOUT.tuiTestsSegment);
+  const tuiSegments = path.split(LAYOUT.tuiSrcSegment)[1]?.split("/").filter(Boolean) ||
+    path.split(LAYOUT.tuiTestsSegment)[1]?.split("/").filter(Boolean) || [];
   const tuiDepth = tuiSegments.length - 1;
-  const isTuiTest = path.includes("/tests/tui/") || path.includes("/apps/tui/tests/") ||
-    path.includes("/packages/tui/tests/");
+  const isTuiTest = path.includes(LAYOUT.tuiTestDirSegment) || path.includes(LAYOUT.tuiTestsSegment) ||
+    path.includes(LAYOUT.tuiPackageTestsSegment);
 
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
@@ -1547,7 +1537,7 @@ function checkTuiBoundary(path: string, lines: string[]): void {
       console.log(
         `ERROR [core-boundary-tui-helpers] ${path}:${
           idx + 1
-        } – Non-TUI modules must not import from 'apps/tui/src/helpers/'.`,
+        } – Non-TUI modules must not import from '${LAYOUT.appRoot}tui/${LAYOUT.srcRoot}helpers/'.`,
       );
       errorCount++;
     }
@@ -1556,10 +1546,10 @@ function checkTuiBoundary(path: string, lines: string[]): void {
 
 /** CLI boundary isolation (CODE_STYLE.md 9) plus the core-to-CLI-helpers guard. */
 function checkCliBoundary(path: string, lines: string[]): void {
-  const isCliBoundaryFile = path.includes("/apps/exactl/src/commands/") ||
-    path.includes("/apps/exactl/src/handlers/") ||
-    path.includes("/apps/exactl/src/command_builders/");
-  const isCliFile = path.includes("/apps/exactl/src/");
+  const isCliBoundaryFile = path.includes(`${LAYOUT.appRoot}exactl/${LAYOUT.srcRoot}commands/`) ||
+    path.includes(`${LAYOUT.appRoot}exactl/${LAYOUT.srcRoot}handlers/`) ||
+    path.includes(`${LAYOUT.appRoot}exactl/${LAYOUT.srcRoot}command_builders/`);
+  const isCliFile = path.includes(`${LAYOUT.appRoot}exactl/${LAYOUT.srcRoot}`);
 
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
@@ -1568,7 +1558,7 @@ function checkCliBoundary(path: string, lines: string[]): void {
         console.log(
           `ERROR [cli-boundary-services] ${path}:${
             idx + 1
-          } – CLI command/handler/formatter/builder modules must not import from retired 'src/services/' (now 'packages/core/src/services/') except retired 'src/services/adapters/' (now 'packages/core/src/services/adapters/').`,
+          } – CLI command/handler/formatter/builder modules must not import from retired '${LAYOUT.srcRoot}services/' (now '${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}services/') except retired '${LAYOUT.srcRoot}services/adapters/' (now '${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}services/adapters/').`,
         );
         errorCount++;
       }
@@ -1576,16 +1566,23 @@ function checkCliBoundary(path: string, lines: string[]): void {
         console.log(
           `ERROR [cli-boundary-config] ${path}:${
             idx + 1
-          } – CLI command/handler/formatter/builder modules must not import from retired 'src/config/service.ts' (now 'packages/core/src/config/service.ts').`,
+          } – CLI command/handler/formatter/builder modules must not import from retired '${LAYOUT.srcRoot}config/service.ts' (now '${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}config/service.ts').`,
         );
         errorCount++;
       }
     }
-    if (!isCliFile && line.match(/import\b.*?\bfrom\s+["'].*?apps\/exactl\/src\/helpers\//)) {
+    if (
+      !isCliFile &&
+      line.match(
+        new RegExp(
+          `import\\b.*?\\bfrom\\s+["'].*?${escapeRegExp(LAYOUT.appRoot)}exactl/${escapeRegExp(LAYOUT.srcRoot)}helpers/`,
+        ),
+      )
+    ) {
       console.log(
         `ERROR [core-boundary-cli-helpers] ${path}:${
           idx + 1
-        } – Non-CLI modules must not import from 'apps/exactl/src/helpers/'.`,
+        } – Non-CLI modules must not import from '${LAYOUT.appRoot}exactl/${LAYOUT.srcRoot}helpers/'.`,
       );
       errorCount++;
     }
@@ -1773,7 +1770,7 @@ function evaluateStyleRules(ctx: IStyleRuleContext): void {
 }
 
 function packageBoundaryLabel(isTestFile: boolean, packageRoot: string): string {
-  return isTestFile ? `Package tests under '${packageRoot}/tests/'` : `Package module '${packageRoot}'`;
+  return isTestFile ? `Package tests under '${packageRoot}/${LAYOUT.testsRoot}'` : `Package module '${packageRoot}'`;
 }
 
 interface ICrossPackageImport {
@@ -1786,10 +1783,10 @@ interface ICrossPackageImport {
 
 /** Reports a relative import that reaches code in another package. */
 function reportCrossPackageImport(repoPath: string, idx: number, info: ICrossPackageImport): void {
-  const isCrossPackage = info.normalizedImport.startsWith("packages/") &&
+  const isCrossPackage = info.normalizedImport.startsWith(LAYOUT.packageRoot) &&
     !info.normalizedImport.startsWith(`${info.packageRoot}/`) &&
-    !(info.isTestFile && info.normalizedImport.includes("/tests/")) &&
-    !(info.packageRoot === "packages/testing" && info.normalizedImport.startsWith("packages/ai/tests/"));
+    !(info.isTestFile && info.normalizedImport.includes(LAYOUT.testsSegment)) &&
+    !(info.packageRoot === LAYOUT.testingPackageRootBare && info.normalizedImport.startsWith(LAYOUT.aiTestAllow));
   if (!isCrossPackage) return;
   console.log(
     `ERROR [package-boundary] ${repoPath}:${
@@ -1801,31 +1798,31 @@ function reportCrossPackageImport(repoPath: string, idx: number, info: ICrossPac
 
 /** Reports package-boundary violations for a relative import inside a package. */
 function reportPackageBoundary(repoPath: string, line: string, idx: number): void {
-  if (!repoPath.startsWith("packages/")) return;
+  if (!repoPath.startsWith(LAYOUT.packageRoot)) return;
   const match = line.match(/from\s+["']([^"']+)["']/) || line.match(/^\s*import\s+["']([^"']+)["']/);
   const importPath = match?.[1];
   if (!importPath || !importPath.startsWith("..")) return;
   const normalizedImport = normalize(join(dirname(repoPath), importPath));
   const packageRoot = repoPath.split("/").slice(0, 2).join("/");
-  const isTestFile = repoPath.includes("/tests/");
+  const isTestFile = repoPath.includes(LAYOUT.testsSegment);
   const label = packageBoundaryLabel(isTestFile, packageRoot);
 
-  if (normalizedImport.startsWith("src/")) {
-    if (repoPath.startsWith("packages/mcp/server/") || repoPath.startsWith("packages/mcp/tests/")) return;
+  if (normalizedImport.startsWith(LAYOUT.srcRoot)) {
+    if (repoPath.startsWith(LAYOUT.mcpServerPrefix) || repoPath.startsWith(LAYOUT.mcpTestsPrefix)) return;
     console.log(
       `ERROR [package-boundary] ${repoPath}:${
         idx + 1
-      } – ${label} must not import from the retired root src/ directory: '${importPath}'. Use @exaix/ package aliases instead.`,
+      } – ${label} must not import from the retired root ${LAYOUT.srcRoot} directory: '${importPath}'. Use @exaix/ package aliases instead.`,
     );
     errorCount++;
     return;
   }
-  if (normalizedImport.startsWith("tests/") && !normalizedImport.startsWith("tests/helpers/")) {
+  if (normalizedImport.startsWith(LAYOUT.testsRoot) && !normalizedImport.startsWith(LAYOUT.rootTestHelpers)) {
     if (!isTestFile) return;
     console.log(
       `ERROR [package-boundary] ${repoPath}:${
         idx + 1
-      } – Package tests under '${packageRoot}/tests/' must not import test fixtures from the root tests/ directory: '${importPath}'.`,
+      } – Package tests under '${packageRoot}/${LAYOUT.testsRoot}' must not import test fixtures from the root ${LAYOUT.testsRoot} directory: '${importPath}'.`,
     );
     errorCount++;
     return;
@@ -1859,7 +1856,7 @@ function reportPackageTestingImport(
 ): void {
   const info = getPackageTestingAliasForTestImport(normalizedImport);
   if (!info) return;
-  const owningRoot = `packages/${info.packageName}/tests/`;
+  const owningRoot = `${LAYOUT.packageRoot}${info.packageName}/${LAYOUT.testsRoot}`;
   if (repoPath.startsWith(owningRoot)) return;
   console.log(
     `ERROR [package-testing-import] ${repoPath}:${
@@ -1928,7 +1925,7 @@ function reportEditionLeak(repoPath: string, line: string, lines: string[], idx:
   console.log(
     `ERROR [edition-leak] ${repoPath}:${
       idx + 1
-    } – Lower-edition module must not import a higher edition: '${line.trim()}'. A Solo build must not reference Team/Enterprise code. Use a type-only import for types, or an edition-gated (editionType-guarded) dynamic import() in a dispatch entry; otherwise extract the shared contract into packages/core.`,
+    } – Lower-edition module must not import a higher edition: '${line.trim()}'. A Solo build must not reference Team/Enterprise code. Use a type-only import for types, or an edition-gated (editionType-guarded) dynamic import() in a dispatch entry; otherwise extract the shared contract into ${LAYOUT.packageRoot}core.`,
   );
   errorCount++;
 }
@@ -1941,20 +1938,20 @@ function reportProductionToTestsImport(repoPath: string, line: string, idx: numb
   console.log(
     `ERROR [package-tests-boundary] ${repoPath}:${
       idx + 1
-    } – Functional deployable module must not import from the tests/ folder: '${importPath}'. Move shared code into a package under packages/ (test code is excluded from a deployed workspace).`,
+    } – Functional deployable module must not import from the ${LAYOUT.testsRoot} folder: '${importPath}'. Move shared code into a package under ${LAYOUT.packageRoot} (test code is excluded from a deployed workspace).`,
   );
   errorCount++;
 }
 
 /** Reports a package module importing a retired root implementation path. */
 function reportPackageSrcBoundary(repoPath: string, line: string, idx: number): void {
-  if (!repoPath.startsWith("packages/")) return;
+  if (!repoPath.startsWith(LAYOUT.packageRoot)) return;
   const match = line.match(/from\s+["']([^"']+)["']/) || line.match(/^\s*import\s+["']([^"']+)["']/);
   const importPath = match?.[1];
   if (!importPath) return;
   let normalizedImport: string | null = null;
   if (importPath.startsWith(".")) normalizedImport = normalize(join(dirname(repoPath), importPath));
-  else if (importPath.startsWith("src/")) normalizedImport = normalize(importPath);
+  else if (importPath.startsWith(LAYOUT.srcRoot)) normalizedImport = normalize(importPath);
   if (normalizedImport === null || !RETIRED_ROOT_PACKAGE_IMPORT_PATHS.has(normalizedImport)) return;
   const packageRoot = repoPath.split("/").slice(0, 2).join("/");
   console.log(
@@ -2127,7 +2124,7 @@ function collectImportNames(path: string, trimmed: string, idx: number, state: I
     for (const raw of namedMatch[1].replace(/}.*/, "").split(",")) {
       const parts = raw.trim().split(/\s+as\s+/);
       const name = parts.pop()?.trim();
-      const isCompatShim = path.endsWith("/packages/core/src/parsing/markdown.ts");
+      const isCompatShim = path.endsWith(LAYOUT.markdownCompatSuffix);
       if (!isCompatShim && parts.length > 0 && /^I[A-Z]/.test(parts[0].trim())) {
         console.log(
           `ERROR [no-interface-rename-on-import] ${path}:${idx + 1} – Renaming interface '${
@@ -2456,6 +2453,7 @@ export function checkSource(repoPath: string, text: string, catalog: ICatalog): 
     warnCount = savedWarnings;
   }
   return captured
+    .flatMap((entry) => entry.split("\n"))
     .map((line) => line.match(FINDING_LINE))
     .filter((match): match is RegExpMatchArray => match !== null)
     .map((match) => ({
@@ -2467,11 +2465,73 @@ export function checkSource(repoPath: string, text: string, catalog: ICatalog): 
     }));
 }
 
-async function main() {
-  // Request read permission for the repo root if not already granted
-  await Deno.permissions.request({ name: "read", path: REPO_ROOT });
+/** The tags a rule declares in the catalog (empty when the id is unknown). */
+function ruleTags(catalog: ICatalog, ruleName: string): readonly string[] {
+  return catalog.rules[ruleName]?.tags ?? [];
+}
 
-  const manualPaths = Deno.args.filter((arg) => !arg.startsWith("-"));
+/** Parses `--tags=` or `--tags <list>`. Exits 2 on an unknown tag. */
+function parseTagFilter(catalog: ICatalog): Set<string> | null {
+  const equalsArg = Deno.args.find((arg) => arg.startsWith("--tags="));
+  let raw: string | undefined = equalsArg?.slice("--tags=".length);
+  if (raw === undefined) {
+    const index = Deno.args.indexOf("--tags");
+    if (index !== -1) raw = Deno.args[index + 1];
+  }
+  if (raw === undefined) return null;
+  const tags = raw.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+  const known = new Set(Object.keys(catalog.tagVocabulary));
+  for (const tag of tags) {
+    if (!known.has(tag)) {
+      console.error(`Unknown tag '${tag}'. Known tags: ${[...known].sort().join(", ")}.`);
+      Deno.exit(2);
+    }
+  }
+  return new Set(tags);
+}
+
+/** True when a captured finding line's rule carries at least one selected tag. */
+function findingMatchesTags(catalog: ICatalog, line: string, tags: Set<string>): boolean {
+  const match = line.match(FINDING_LINE);
+  if (!match) return false;
+  return ruleTags(catalog, match[2]).some((tag) => tags.has(tag));
+}
+
+/** Prints the tag-filtered findings and per-tag counts. Exits 1 on any error. */
+function emitTaggedFindings(buffered: string[], tags: Set<string>): void {
+  errorCount = 0;
+  warnCount = 0;
+  const perTag = new Map<string, { errors: number; warnings: number }>();
+  for (const tag of tags) perTag.set(tag, { errors: 0, warnings: 0 });
+
+  for (const line of buffered) {
+    if (!findingMatchesTags(CATALOG, line, tags)) continue;
+    console.log(line);
+    const match = line.match(FINDING_LINE);
+    const isError = match?.[1] === "ERROR";
+    if (isError) errorCount++;
+    else warnCount++;
+    for (const tag of ruleTags(CATALOG, match?.[2] ?? "")) {
+      if (!tags.has(tag)) continue;
+      const counts = perTag.get(tag)!;
+      if (isError) counts.errors++;
+      else counts.warnings++;
+    }
+  }
+
+  const summary = [...tags].sort().map((tag) => {
+    const counts = perTag.get(tag)!;
+    return `${tag}: ${counts.errors} error(s), ${counts.warnings} warning(s)`;
+  }).join("; ");
+  console.log(
+    `\nstyle check completed (tags: ${[...tags].sort().join(",")}): ${errorCount} error(s), ${warnCount} warning(s)`,
+  );
+  console.log(`per-tag: ${summary}`);
+  if (errorCount > 0) Deno.exit(1);
+}
+
+/** Walks the requested paths and runs every enabled rule over each file. */
+async function runAllChecks(manualPaths: string[]): Promise<void> {
   if (manualPaths.length > 0) {
     for (const p of manualPaths) {
       const fullPath = p.startsWith("/") ? p : join(Deno.cwd(), p);
@@ -2495,21 +2555,49 @@ async function main() {
         console.error(`Error checking path ${p}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-  } else {
-    for await (
-      const entry of walk(REPO_ROOT, {
-        includeDirs: false,
-        exts: [".ts", ".tsx"],
-        followSymlinks: false,
-        skip: IGNORE_GLOBS,
-      })
-    ) {
-      if (!entry.isFile) {
-        continue;
-      }
-      await checkFile(entry.path);
-    }
+    return;
   }
+
+  for await (
+    const entry of walk(REPO_ROOT, {
+      includeDirs: false,
+      exts: [".ts", ".tsx"],
+      followSymlinks: false,
+      skip: IGNORE_GLOBS,
+    })
+  ) {
+    if (!entry.isFile) {
+      continue;
+    }
+    await checkFile(entry.path);
+  }
+}
+
+async function main() {
+  // Request read permission for the repo root if not already granted
+  await Deno.permissions.request({ name: "read", path: REPO_ROOT });
+
+  const tagIndex = Deno.args.indexOf("--tags");
+  const tagValueIndex = tagIndex !== -1 ? tagIndex + 1 : -1;
+  const manualPaths = Deno.args.filter((arg, i) => !arg.startsWith("-") && i !== tagValueIndex);
+
+  const tagFilter = parseTagFilter(CATALOG);
+  if (tagFilter) {
+    const captured: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      captured.push(args.map((arg) => String(arg)).join(" "));
+    };
+    try {
+      await runAllChecks(manualPaths);
+    } finally {
+      console.log = originalLog;
+    }
+    emitTaggedFindings(captured, tagFilter);
+    return;
+  }
+
+  await runAllChecks(manualPaths);
 
   console.log(`\nstyle check completed: ${errorCount} error(s), ${warnCount} warning(s)`);
   if (errorCount > 0) {

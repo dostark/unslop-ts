@@ -88,9 +88,19 @@ const RuleEntrySchema = z.object({
 
 const IgnoreSchema = z.object({ glob: z.string(), reason: z.string() }).strict();
 
+const LayoutSchema = z.record(
+  z.string(),
+  z.union([
+    z.string(),
+    z.array(z.string()),
+    z.array(z.object({ path: z.string(), reason: z.string() }).strict()),
+  ]),
+);
+
 const CatalogSchema = z.object({
   version: z.string(),
   scopes: ScopesSchema,
+  layout: LayoutSchema.optional(),
   tagVocabulary: z.record(z.string(), TagEntrySchema),
   rules: z.record(z.string(), RuleEntrySchema),
   ignore: z.array(IgnoreSchema).optional(),

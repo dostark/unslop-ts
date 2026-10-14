@@ -25,6 +25,7 @@
 import ts from "typescript";
 import { walk } from "@std/fs";
 import { join, relative } from "@std/path";
+import { LAYOUT } from "./repo_layout.ts";
 
 // CLI flags
 
@@ -58,7 +59,7 @@ if (args.has("--help") || args.has("-h")) {
   console.log(`Magic Value Detector
 
 Usage:
-  deno run -A packages/lint-rules/src/exaix/check_magic_values.ts [options]
+  deno run -A ${LAYOUT.packageRoot}lint-rules/${LAYOUT.srcRoot}exaix/check_magic_values.ts [options]
 
 Options:
   --no-numbers, --strings-only  Skip number literal checks (strings only)
@@ -180,7 +181,7 @@ const SCORE_PER_DISTINCT_FILE = 5;
 const SCORE_EXISTING_CONSTANT_BONUS = 40;
 
 function isTestFilePath(filePath: string): boolean {
-  return filePath.includes("/tests/") || filePath.endsWith("_test.ts") || filePath.endsWith("_test.tsx");
+  return filePath.includes(LAYOUT.testsSegment) || filePath.endsWith("_test.ts") || filePath.endsWith("_test.tsx");
 }
 
 function isConstantOrEnumFilePath(filePath: string): boolean {
@@ -574,13 +575,14 @@ async function main(): Promise<void> {
         // not extractable magic values (mirrors check_code_style's catalog self-exemption).
         /check_magic_values\.ts$/,
         /check_code_style\.ts$/,
+        /repo_layout\.ts$/,
       ],
     })
   ) {
-    if (entry.path.includes("/.copilot/")) continue;
-    if (entry.path.includes("/scripts/")) continue;
+    if (entry.path.includes(LAYOUT.copilotSegment)) continue;
+    if (entry.path.includes(LAYOUT.scriptsSegment)) continue;
     if (!includeTests && isTestFilePath(entry.path)) continue;
-    if (entry.path.includes("/tests/fixtures/")) continue;
+    if (entry.path.includes(LAYOUT.fixturesSegment)) continue;
     tsFiles.push(entry.path);
   }
 

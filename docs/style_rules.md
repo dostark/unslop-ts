@@ -27,211 +27,99 @@ deno run -A packages/lint-rules/src/exaix/check_code_style.ts --convert-warnings
 
 ---
 
-## Type Safety
+<!-- BEGIN GENERATED RULE REFERENCE -->
 
-| Tag                           | Severity | Rule (CODE_STYLE.md) | What it detects                                             |
-| ----------------------------- | -------- | -------------------- | ----------------------------------------------------------- |
-| `[explicit-any-array]`        | error    | §1                   | `: any[]` type annotation                                   |
-| `[explicit-unknown]`          | error    | §1                   | `: unknown` as a stored type (outside `catch`)              |
-| `[explicit-unknown-array]`    | error    | §1                   | `: unknown[]` type annotation                               |
-| `[unknown-type-alias]`        | error    | §1                   | Type alias that renames raw `unknown`                       |
-| `[promise-response-alias]`    | error    | §1                   | Type alias that masks `Promise<Response>`                   |
-| `[promise-response-return]`   | error    | §1                   | `Promise<Response>` as a return type                        |
-| `[ts-suppression-pragmas]`    | error    | §1                   | `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` pragmas     |
-| `[deno-lint-no-explicit-any]` | error    | §1                   | `// deno-lint-ignore no-explicit-any` comment               |
-| `[explicit-any-cast]`         | error    | §1                   | `as any` cast (production files only)                       |
-| `[typeof-cast]`               | error    | §1                   | `as typeof <var>` cast (except `globalThis.fetch` in tests) |
-| `[record-any]`                | error    | §1                   | `Record<string, any>` type                                  |
-| `[record-unknown]`            | error    | §1                   | `Record<string, unknown>` type                              |
-| `[index-signature-unknown]`   | error    | §1                   | `{ [key: string]: unknown }` index signature                |
+## Rule reference
 
----
+| Rule                                   | Engine | Severity | Scope | Tags                             | Limits                                                                                      |
+| -------------------------------------- | ------ | -------- | ----- | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `cli-boundary-config`                  | script | error    | all   | `boundary`, `cli`                | —                                                                                           |
+| `cli-boundary-services`                | script | error    | all   | `boundary`, `cli`                | —                                                                                           |
+| `concrete-cross-domain`                | script | warn     | prod  | `boundary`, `di`                 | —                                                                                           |
+| `core-boundary-cli-helpers`            | script | error    | all   | `boundary`, `cli`, `package`     | —                                                                                           |
+| `core-boundary-tui-helpers`            | script | error    | all   | `boundary`, `tui`, `package`     | —                                                                                           |
+| `decorative-comment`                   | script | warn     | all   | `comments`                       | —                                                                                           |
+| `deno-lint-no-explicit-any`            | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `dynamic-import`                       | script | warn     | all   | `imports`                        | —                                                                                           |
+| `edition-conditional-outside-composer` | script | error    | prod  | `edition`, `boundary`            | —                                                                                           |
+| `edition-leak`                         | script | error    | prod  | `edition`, `boundary`            | Reads source text; check:edition-graph is its resolved-graph double check.                  |
+| `ephemeral-comment`                    | script | warn     | all   | `comments`                       | —                                                                                           |
+| `exaix/no-chained-type-assertions`     | plugin | error    | all   | `type-safety`, `deslop`          | Imported aliases are not resolved; only syntactic assertions in this file are seen.         |
+| `explicit-any-array`                   | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `explicit-any-cast`                    | script | error    | prod  | `type-safety`                    | —                                                                                           |
+| `explicit-unknown`                     | script | error    | all   | `type-safety`                    | Reads line text after stripping strings and comments, so imported aliases are not resolved. |
+| `explicit-unknown-array`               | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `exported-interface-naming`            | script | error    | all   | `di`                             | —                                                                                           |
+| `exported-interface-placement`         | script | error    | all   | `di`, `module-structure`         | —                                                                                           |
+| `import-inside-statement`              | script | error    | all   | `imports`                        | —                                                                                           |
+| `import-placement`                     | script | error    | all   | `imports`, `module-structure`    | Line-based; a multi-line type re-export can be read as a type definition.                   |
+| `index-signature-unknown`              | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `inline-type-import`                   | script | error    | all   | `imports`                        | —                                                                                           |
+| `layer-constant-leak`                  | script | warn     | prod  | `boundary`                       | AST-based over this file only; dynamic imports and re-exports are not followed.             |
+| `long-comment`                         | script | warn     | all   | `comments`                       | —                                                                                           |
+| `magic-union-type`                     | script | error    | prod  | `magic-values`                   | —                                                                                           |
+| `max-params`                           | script | error    | all   | `complexity`, `module-structure` | —                                                                                           |
+| `module-header`                        | script | warn     | all   | `module-structure`               | —                                                                                           |
+| `module-header-tag`                    | script | error    | all   | `module-structure`               | —                                                                                           |
+| `no-interface-rename-on-import`        | script | error    | all   | `imports`, `di`                  | —                                                                                           |
+| `package-boundary`                     | script | error    | prod  | `package`, `boundary`            | —                                                                                           |
+| `package-canonical-import`             | script | error    | prod  | `package`, `imports`             | —                                                                                           |
+| `package-concrete-logger-type`         | script | warn     | prod  | `package`, `di`                  | —                                                                                           |
+| `package-entrypoint-root-src-reexport` | script | error    | all   | `imports`, `package`             | —                                                                                           |
+| `package-instantiates-event-logger`    | script | error    | prod  | `package`, `di`                  | —                                                                                           |
+| `package-related-files-boundary`       | script | error    | prod  | `package`, `boundary`            | —                                                                                           |
+| `package-src-boundary`                 | script | error    | prod  | `package`, `boundary`            | —                                                                                           |
+| `package-subpath-promotion`            | script | error    | prod  | `package`, `boundary`            | —                                                                                           |
+| `package-testing-import`               | script | error    | test  | `package`, `test-quality`        | —                                                                                           |
+| `package-uses-config-reader`           | script | warn     | prod  | `package`, `di`                  | —                                                                                           |
+| `promise-response-alias`               | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `promise-response-return`              | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `re-export-imported`                   | script | error    | all   | `imports`                        | —                                                                                           |
+| `record-any`                           | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `record-unknown`                       | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `script-placement`                     | script | error    | all   | `scripts`                        | —                                                                                           |
+| `script-shebang`                       | script | error    | all   | `scripts`                        | —                                                                                           |
+| `script-usage`                         | script | error    | all   | `scripts`                        | —                                                                                           |
+| `test-inline-multiline-fixture`        | script | warn     | test  | `test-quality`                   | —                                                                                           |
+| `ts-suppression-pragmas`               | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `tui-boundary-cli`                     | script | error    | all   | `boundary`, `tui`                | —                                                                                           |
+| `tui-boundary-config`                  | script | error    | all   | `boundary`, `tui`                | —                                                                                           |
+| `tui-boundary-helpers`                 | script | error    | all   | `boundary`, `tui`                | —                                                                                           |
+| `tui-boundary-services`                | script | error    | all   | `boundary`, `tui`                | —                                                                                           |
+| `typeof-cast`                          | script | error    | all   | `type-safety`                    | —                                                                                           |
+| `unknown-type-alias`                   | script | error    | all   | `type-safety`                    | —                                                                                           |
 
-## Import Rules
+## Tag index
 
-| Tag                                      | Severity | Rule | What it detects                                                            |
-| ---------------------------------------- | -------- | ---- | -------------------------------------------------------------------------- |
-| `[import-inside-statement]`              | error    | §3   | `import(...)` nested inside a function, condition, or loop                 |
-| `[dynamic-import]`                       | warn     | §3   | `import(...)` without a rationale comment above it                         |
-| `[inline-type-import]`                   | error    | §3   | `import("./foo").IFoo` inside a type annotation                            |
-| `[re-export-imported]`                   | error    | §3   | Re-exporting an imported entity outside `mod.ts` / `index.ts`              |
-| `[package-entrypoint-root-src-reexport]` | error    | §3   | Package entrypoint (`mod.ts`) re-exporting from retired root `src/*` paths |
-| `[no-interface-rename-on-import]`        | error    | §3   | Aliasing an `I`-prefixed interface on import (e.g., `IFoo as Foo`)         |
-| `[import-placement]`                     | error    | §7   | Import declared after an interface/type or after functional code           |
+| Tag                | Description                                                    | Rules                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `boundary`         | Cross-boundary import rules.                                   | `edition-conditional-outside-composer`, `edition-leak`, `tui-boundary-cli`, `tui-boundary-services`, `tui-boundary-config`, `tui-boundary-helpers`, `core-boundary-tui-helpers`, `cli-boundary-services`, `cli-boundary-config`, `core-boundary-cli-helpers`, `package-boundary`, `package-src-boundary`, `package-related-files-boundary`, `package-subpath-promotion`, `concrete-cross-domain`, `layer-constant-leak` |
+| `cli`              | CLI isolation boundary (CODE_STYLE.md 9).                      | `cli-boundary-services`, `cli-boundary-config`, `core-boundary-cli-helpers`                                                                                                                                                                                                                                                                                                                                             |
+| `comments`         | Comment discipline (CODE_STYLE.md 16).                         | `long-comment`, `ephemeral-comment`, `decorative-comment`                                                                                                                                                                                                                                                                                                                                                               |
+| `complexity`       | Function and method size limits (CODE_STYLE.md 11).            | `max-params`                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `deslop`           | Rule idea taken from maharshi365/deslop or dmmulroy/anti-slop. | `exaix/no-chained-type-assertions`                                                                                                                                                                                                                                                                                                                                                                                      |
+| `di`               | Dependency injection and interfaces (CODE_STYLE.md 5).         | `no-interface-rename-on-import`, `exported-interface-naming`, `exported-interface-placement`, `package-instantiates-event-logger`, `package-concrete-logger-type`, `package-uses-config-reader`, `concrete-cross-domain`                                                                                                                                                                                                |
+| `edition`          | Edition tier import boundary.                                  | `edition-conditional-outside-composer`, `edition-leak`                                                                                                                                                                                                                                                                                                                                                                  |
+| `imports`          | Import shape and placement rules (CODE_STYLE.md 3).            | `import-inside-statement`, `dynamic-import`, `inline-type-import`, `re-export-imported`, `package-entrypoint-root-src-reexport`, `no-interface-rename-on-import`, `import-placement`, `package-canonical-import`                                                                                                                                                                                                        |
+| `magic-values`     | No magic numbers or strings (CODE_STYLE.md 2).                 | `magic-union-type`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `module-structure` | Module headers and placement (CODE_STYLE.md 7).                | `import-placement`, `module-header`, `module-header-tag`, `exported-interface-placement`, `max-params`                                                                                                                                                                                                                                                                                                                  |
+| `package`          | Package structure and purity.                                  | `package-entrypoint-root-src-reexport`, `core-boundary-tui-helpers`, `core-boundary-cli-helpers`, `package-boundary`, `package-src-boundary`, `package-related-files-boundary`, `package-subpath-promotion`, `package-testing-import`, `package-canonical-import`, `package-instantiates-event-logger`, `package-concrete-logger-type`, `package-uses-config-reader`                                                    |
+| `scripts`          | Utility script headers (CODE_STYLE.md 12).                     | `script-shebang`, `script-usage`, `script-placement`                                                                                                                                                                                                                                                                                                                                                                    |
+| `test-quality`     | Rules on test code and fixtures.                               | `package-testing-import`, `test-inline-multiline-fixture`                                                                                                                                                                                                                                                                                                                                                               |
+| `tui`              | TUI isolation boundary (CODE_STYLE.md 8).                      | `tui-boundary-cli`, `tui-boundary-services`, `tui-boundary-config`, `tui-boundary-helpers`, `core-boundary-tui-helpers`                                                                                                                                                                                                                                                                                                 |
+| `type-safety`      | Rules that keep type evidence (CODE_STYLE.md 1).               | `explicit-any-array`, `explicit-unknown`, `explicit-unknown-array`, `unknown-type-alias`, `promise-response-alias`, `promise-response-return`, `ts-suppression-pragmas`, `deno-lint-no-explicit-any`, `explicit-any-cast`, `typeof-cast`, `record-any`, `record-unknown`, `index-signature-unknown`, `exaix/no-chained-type-assertions`                                                                                 |
 
----
+## Analysis boundaries
 
-## Magic Values
+| Rule                               | Limits                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| `edition-leak`                     | Reads source text; check:edition-graph is its resolved-graph double check.                  |
+| `exaix/no-chained-type-assertions` | Imported aliases are not resolved; only syntactic assertions in this file are seen.         |
+| `explicit-unknown`                 | Reads line text after stripping strings and comments, so imported aliases are not resolved. |
+| `import-placement`                 | Line-based; a multi-line type re-export can be read as a type definition.                   |
+| `layer-constant-leak`              | AST-based over this file only; dynamic imports and re-exports are not followed.             |
 
-| Tag                  | Severity | Rule | What it detects                                                    |
-| -------------------- | -------- | ---- | ------------------------------------------------------------------ |
-| `[magic-union-type]` | error    | §2   | Inline string literal union (e.g. `"a" \| "b"`) in production code |
-
-> **Related:** [CODE_STYLE.md §2](../../../CODE_STYLE.md#no-magic-values) also covers
-> `configurable()` wrapping guidelines for tunable `DEFAULT_*` constants (in any
-> package) and the `check:config-keys` CI gate that prevents duplicate config
-> keys across all packages. Use `resolveConfigurableBounds(key)` in schemas
-> instead of importing separate MIN/MAX named constants.
-
----
-
-## Module Structure
-
-| Tag                              | Severity | Rule | What it detects                                                        |
-| -------------------------------- | -------- | ---- | ---------------------------------------------------------------------- |
-| `[module-header]`                | warn     | §7   | File has no descriptive header comment                                 |
-| `[module-header-tag]`            | error    | §7   | Header is missing a mandatory tag (`@module`, `@path`, `@description`) |
-| `[exported-interface-naming]`    | error    | §5   | Exported interface name does not start with a capital `I`              |
-| `[exported-interface-placement]` | error    | §5   | Exported interface declared after functional code                      |
-| `[max-params]`                   | error    | §11  | Function or method with more than 7 parameters                         |
-
----
-
-## Comment Discipline
-
-| Tag                    | Severity | Rule | What it detects                                                                                                  |
-| ---------------------- | -------- | ---- | ---------------------------------------------------------------------------------------------------------------- |
-| `[long-comment]`       | warn     | §16  | Block comment or line-comment run longer than 3 lines outside the header                                         |
-| `[ephemeral-comment]`  | warn     | §16  | Comment contains a calendar date or mentions a phase/step number, GAP identifier, pre/post-gap, or prior attempt |
-| `[decorative-comment]` | warn     | §16  | Comment line uses a repeated-punctuation separator or dash-wrapped text                                          |
-
-All three escalate to `error` under `--convert-warnings-to-errors`. Date
-detection applies to every comment, including inline and module-header
-comments; the other checks exempt the module's own leading header comment.
-
----
-
-## Edition Boundary
-
-| Tag                                      | Severity | What it detects                                                                                                                                                                                                         |
-| ---------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[edition-conditional-outside-composer]` | error    | `edition ===` / `EXAIX_EDITION` outside the edition composer                                                                                                                                                            |
-| `[edition-leak]`                         | error    | Lower-edition module imports a higher edition (Solo → Team/Enterprise, Team → Enterprise); exempt only: type-only imports, and `editionType`-guarded dynamic `import("@exaix-team/...")` in `apps/daemon`/`apps/exactl` |
-
-> `[edition-leak]` supersedes the former `[mit-team-import]` rule (which only covered `packages/` → Team).
-> It is the enforceable bundle guarantee for the **source-run deploy** — every upper-edition reference
-> must be type-only or `editionType`-guarded-dynamic, so a Solo run never loads Team code. (`deno compile`
-> binaries still bundle Team code regardless; see CODE_STYLE.md → Edition Tier Import Boundary.)
->
-> **Companion graph gate (`scripts/check_edition_graph.ts`, task `check:edition-graph`).** Because
-> `[edition-leak]` is a source-text regex rule, a bug in its parsing — a specifier shape it fails to
-> match, a guard it mis-reads — could let a real leak through silently. The graph gate is an
-> independent, AST-grounded double-check: it resolves the daemon + exactl module graphs via
-> `deno info --json` and fails on any **static (non-dynamic) runtime `code` edge** into a higher
-> edition tier. It mirrors the static rule's exemptions exactly (edition-gated dynamic edges and
-> type-only edges are not leaks), so the two gates agree on a clean tree (verified 0). It runs in
-> CI Gate 3b, in `scripts/ci.ts check`, and in the pre-commit hook, right after `check:style`.
-
----
-
-## Package & Tests Boundary
-
-| Tag                       | Severity | What it detects                                                                 |
-| ------------------------- | -------- | ------------------------------------------------------------------------------- |
-| [package-tests-boundary]` | error    | A deployable module (`packages/`, `exaix-team/`, `apps/`) imports from `tests/` |
-
----
-
-## Scripts
-
-| Tag                  | Severity | Rule | What it detects                                              |
-| -------------------- | -------- | ---- | ------------------------------------------------------------ |
-| `[script-shebang]`   | error    | §12  | Script in `scripts/` missing `#!/usr/bin/env -S deno run -A` |
-| `[script-usage]`     | error    | §12  | Script header missing a `Usage:` section                     |
-| `[script-placement]` | error    | §12  | Debug/temp script (`debug_*`, `tmp_*`) inside `scripts/`     |
-
----
-
-## TUI Boundary
-
-| Tag                           | Severity | Rule | What it detects                                                     |
-| ----------------------------- | -------- | ---- | ------------------------------------------------------------------- |
-| `[tui-boundary-cli]`          | error    | §8   | TUI module importing from `apps/exactl/src/`                        |
-| `[tui-boundary-services]`     | error    | §8   | TUI module importing from retired `src/services/` (except adapters) |
-| `[tui-boundary-config]`       | error    | §8   | TUI module importing from retired `src/config/`                     |
-| `[tui-boundary-helpers]`      | error    | §8   | TUI module importing from retired `src/helpers/`                    |
-| `[core-boundary-tui-helpers]` | error    | §8   | Non-TUI module importing from `apps/tui/src/helpers/`               |
-
----
-
-## CLI Boundary
-
-| Tag                           | Severity | Rule | What it detects                                                                     |
-| ----------------------------- | -------- | ---- | ----------------------------------------------------------------------------------- |
-| `[cli-boundary-services]`     | error    | §9   | CLI command/handler/formatter importing from retired `src/services/` (not adapters) |
-| `[cli-boundary-config]`       | error    | §9   | CLI command/handler/formatter importing from `packages/core/src/config/service.ts`  |
-| `[core-boundary-cli-helpers]` | error    | §9   | Non-CLI module importing from `apps/exactl/src/helpers/`                            |
-
----
-
-## Package Boundaries
-
-These tags enforce that files under `packages/<name>/` remain self-contained.
-See [CODE_STYLE.md §4](../../../CODE_STYLE.md#package-test-boundaries) for the test
-boundary rules and [§13](../../../CODE_STYLE.md#package-module-purity) for the
-module purity rules.
-
-| Tag                                   | Severity | What it detects                                                                                |
-| ------------------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `[package-boundary]`                  | error    | Package file importing from `src/`, `tests/`, or another package via relative path             |
-| `[package-src-boundary]`              | error    | Package file importing a retired root implementation path                                      |
-| `[package-related-files-boundary]`    | error    | Package module `@related-files` header pointing at a retired root path                         |
-| `[package-subpath-promotion]`         | error    | Parent package entrypoint (`mod.ts`) re-exporting a canonical subpackage surface               |
-| `[package-testing-import]`            | error    | Test file deep-importing from `packages/<name>/tests/` when `@exaix/<name>/testing` exists     |
-| `[package-canonical-import]`          | error    | File importing a package path that should use a declared `@exaix/...` alias instead            |
-| `[package-instantiates-event-logger]` | error    | Package `src/` file calling `new EventLogger(` (see §13 — package module purity)               |
-| `[package-concrete-logger-type]`      | warn     | Package `src/` file importing concrete `EventLogger` class instead of `IEventLogger` (see §13) |
-| `[package-uses-config-reader]`        | warn     | Package `src/` file calling `getValidatedEnvOverrides()` or `new ConfigService(` (see §13)     |
-
----
-
-## Test Quality
-
-| Tag                               | Severity | What it detects                                                                  |
-| --------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| `[test-inline-multiline-fixture]` | warn     | Inline multiline YAML/Markdown/JSON fixture in a test file (move to `fixtures/`) |
-
----
-
-## Cross-Domain Dependency Analysis
-
-Two structural AST checks — no hardcoded symbol names. Both use the TypeScript compiler API
-to parse imports and walk the AST.
-
-### Concrete class instantiation
-
-| Tag                       | Severity | Rule | What it detects                                                                              |
-| ------------------------- | -------- | ---- | -------------------------------------------------------------------------------------------- |
-| `[concrete-cross-domain]` | warn     | §15  | File value-imports a class from a different domain package and instantiates it via `new X()` |
-
-Detects when a package-pure file bypasses DI by importing and `new`-ing a concrete class from
-another domain package. The fix is to accept an interface via constructor injection instead.
-
-**Current results**: 11 warnings — `ExecutionLoop` (3), `FlowRunner` (3), `RequestProcessor` (3),
-`PortalKnowledgeService` (1), `ToolRegistry` (1).
-
-### Bare constant import
-
-| Tag                     | Severity | Rule | What it detects                                                                                            |
-| ----------------------- | -------- | ---- | ---------------------------------------------------------------------------------------------------------- |
-| `[layer-constant-leak]` | warn     | §15  | File value-imports a constant-like symbol from a different domain package (not used as class, enum, or fn) |
-
-Detects raw constants (`DEFAULT_GIT_*`, `GIT_CMD_*`, `DEFAULT_MCP_*`, etc.) imported across
-domain boundaries — low-level values that belong behind the service that owns them.
-
-**Current results**: 18 warnings across several files.
-
-### How both checks work
-
-1. Parse all import declarations; build a map of imported names → source packages
-2. Names used as `new X(...)` → emit `[concrete-cross-domain]`
-3. Names used as `X.Y` (property access) or `X(...)` (function call) → removed from constant set
-4. Remaining names → emit `[layer-constant-leak]`
-
-**Exempt packages**: `@exaix/core/*`, `@exaix/schemas`, `@exaix/ai`, `@exaix/cli`, `@exaix/tui`,
-`@exaix/testing`.
-
-**Full rule and remediation**: [CODE_STYLE.md §15](../../../CODE_STYLE.md#layer-aware-constant-imports).
+<!-- END GENERATED RULE REFERENCE -->
 
 ---
 
