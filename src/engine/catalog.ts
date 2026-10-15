@@ -97,10 +97,13 @@ const LayoutSchema = z.record(
   ]),
 );
 
+const WholeTreeSchema = z.record(z.string(), z.unknown());
+
 const CatalogSchema = z.object({
   version: z.string(),
   scopes: ScopesSchema,
   layout: LayoutSchema.optional(),
+  wholeTree: WholeTreeSchema.optional(),
   tagVocabulary: z.record(z.string(), TagEntrySchema),
   rules: z.record(z.string(), RuleEntrySchema),
   ignore: z.array(IgnoreSchema).optional(),

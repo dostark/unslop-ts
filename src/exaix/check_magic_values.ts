@@ -712,6 +712,7 @@ async function main(): Promise<void> {
         /check_magic_values\.ts$/,
         /check_code_style\.ts$/,
         /repo_layout\.ts$/,
+        /[/\\]whole_tree[/\\]/,
       ],
     })
   ) {
