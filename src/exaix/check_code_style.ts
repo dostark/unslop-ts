@@ -49,6 +49,12 @@ const REPO_ROOT = resolveRepoRoot();
 /** Option schemas for the script rules that read catalog options. */
 const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
   "max-params": z.object({ max: z.number().int().positive().default(7) }).strict(),
+  "duplicate-constant": z.object({
+    namePattern: z.string().default("^[A-Z][A-Z0-9_]*$"),
+    allow: z.array(
+      z.object({ name: z.string(), files: z.array(z.string()), reason: z.string() }).strict(),
+    ).default([]),
+  }).strict(),
   "duplicate-type": z.object({
     minProperties: z.number().int().positive().default(2),
     allow: z.array(
@@ -1016,6 +1022,7 @@ const rules: Rule[] = [
 
 /** Script rule ids implemented as inline checks (not in the `rules` array). */
 const INLINE_SCRIPT_RULE_IDS = [
+  "duplicate-constant",
   "duplicate-type",
   "no-interface-rename-on-import",
   "import-placement",

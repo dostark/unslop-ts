@@ -299,7 +299,7 @@ for (const testCase of CASES) {
 }
 
 // Whole-tree script rules have dedicated test files rather than a per-file case.
-const WHOLE_TREE_RULE_IDS = new Set(["duplicate-type"]);
+const WHOLE_TREE_RULE_IDS = new Set(["duplicate-constant", "duplicate-type"]);
 
 Deno.test("every implemented script rule id has a named case", () => {
   const withCases = new Set(CASES.map((c) => c.id));

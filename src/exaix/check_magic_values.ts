@@ -24,7 +24,7 @@
 
 import ts from "typescript";
 import { walk } from "@std/fs";
-import { join, relative } from "@std/path";
+import { globToRegExp, join, relative } from "@std/path";
 import { classifyPath, type PathClass } from "@exaix/lint-rules";
 import { LAYOUT } from "./repo_layout.ts";
 import catalogJson from "../../../../scripts/config/style_rule_catalog.json" with { type: "json" };
@@ -691,6 +691,33 @@ export function validateConstantAllowEntries(
   return stale;
 }
 
+const DUPLICATE_UNITS: Array<{ path: string; text: string }> = [];
+
+/** Whole-tree duplicate-constant pass, run after the per-file checks. */
+function runDuplicateConstantPass(): number {
+  const options = (catalogJson.rules["duplicate-constant"]?.options ?? {}) as IDuplicateConstantOptions;
+  const include = (catalogJson.rules["duplicate-constant"]?.include ?? []) as string[];
+  const units = DUPLICATE_UNITS.filter((unit) =>
+    unit.path.startsWith(LAYOUT.packageRoot) || unit.path.startsWith(LAYOUT.appRoot)
+  )
+    .filter((unit) =>
+      include.length === 0 ||
+      include.some((glob) => globToRegExp(glob, { extended: true, globstar: true }).test(unit.path))
+    );
+  let count = 0;
+  for (const duplicate of findDuplicateConstants(units, options)) {
+    console.log(
+      `ERROR [duplicate-constant] ${duplicate.laterFile} – '${duplicate.name}' duplicates ${duplicate.firstFile}. Keep one owner and import it.`,
+    );
+    count++;
+  }
+  for (const name of validateConstantAllowEntries(units, options)) {
+    console.log(`ERROR [duplicate-constant] the allow entry '${name}' matches no current duplicate.`);
+    count++;
+  }
+  return count;
+}
+
 async function main(): Promise<void> {
   const counters = new Map<string, ValueAccumulator>();
   const reusableLiteralKeys = new Set<string>();
@@ -725,6 +752,7 @@ async function main(): Promise<void> {
 
   for (const filePath of tsFiles) {
     const source = await Deno.readTextFile(filePath);
+    DUPLICATE_UNITS.push({ path: relative(REPO_ROOT, filePath), text: source });
     const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true);
     const isCanonicalDefinitionFile = isConstantOrEnumFilePath(filePath);
 
@@ -739,6 +767,7 @@ async function main(): Promise<void> {
   }
 
   const violations = sortViolations(detectViolations(counters, reusableLiteralKeys));
+  const duplicateCount = runDuplicateConstantPass();
 
   if (violations.length > 0) {
     console.error("❌ Magic value violations detected:\n");
@@ -748,6 +777,7 @@ async function main(): Promise<void> {
   }
 
   console.log("✅ No magic value violations detected");
+  if (duplicateCount > 0) Deno.exit(1);
 }
 
 if (import.meta.main) {
