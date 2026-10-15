@@ -135,6 +135,44 @@ deno run -A packages/lint-rules/src/exaix/check_code_style.ts --convert-warnings
 
 ---
 
+## Configuring rules
+
+Every rule setting lives in `scripts/config/style_rule_catalog.json`. `parseCatalog` validates
+the file and rejects an unknown key with its JSON path. The fields per rule:
+
+| Field                 | Meaning                                                                                     | Example                                |
+| --------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `engine`              | Which engine runs the rule: `script` (the Exaix checker) or `plugin` (the Deno lint plugin) | `"plugin"`                             |
+| `severity`            | `error`, `warn`, or `off`. An `off` entry needs a `reason`                                  | `"error"`                              |
+| `scope`               | `prod`, `test`, or `all`; `classifyPath` decides the file's class                           | `"test"`                               |
+| `include` / `exclude` | Optional path globs that narrow where the rule runs                                         | `["packages/*/src/**"]`                |
+| `options`             | Typed options for the rule, validated by its schema                                         | `{ "max": 15 }`                        |
+| `exclusionCodes`      | Codes a `style-exclude:<CODE> - <reason>` comment may use                                   | `{ "SMALL_FIXTURE_OK": "..." }`        |
+| `tags`                | Catalog tags from `tagVocabulary`, used by `--tags` and `lint:tags`                         | `["type-safety", "deslop"]`            |
+| `limits`              | What the rule cannot see; rendered in Analysis boundaries                                   | `"Imported aliases are not resolved."` |
+| `optIn`               | The rule runs only when selected (`EXAIX_LINT_RULES`)                                       | `true`                                 |
+
+**Precedence:** `severity: off` wins, then `exclude`, then `include`, then `scope`. A fixture
+path is always skipped. A `warn` fails the gate only under `--convert-warnings-to-errors`.
+
+**Change a setting:** edit the catalog and regenerate the reference with
+`deno task docs:style-rules`. **Add an exclusion code:** add it to the rule's `exclusionCodes`
+with a reason. **Add an allowlist entry:** use the rule's `allow` option in `options`, and keep
+every entry matching a current finding. **Add a catalog tag:** add it to `tagVocabulary`
+first, then reference it in a rule's `tags`.
+
+Catalog tags are Exaix's own selection axis for `--tags` and `lint:tags`. They are distinct
+from Deno's `lint.rules.tags`; the `lint:tags` task sets `EXAIX_LINT_RULES=tag:<name>` and
+Deno's `--rules-tags=` disables the built-in rules.
+
+## Updating from upstream
+
+1. Pin the new anti-slop commit in this file and the README.
+1. Diff its rules and tests against the pinned commit.
+1. Port the changed cases, keeping upstream case names, and record each skipped or changed case's reason next to it.
+1. Adjust the reimplementation and run the rule tests.
+1. Update the README's Credits section with the new commit.
+
 ## Exclusion Comments
 
 Warnings (not errors) may be suppressed with a `// style-exclude:<CODE> - <rationale>` comment
