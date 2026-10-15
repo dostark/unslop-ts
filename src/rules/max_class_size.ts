@@ -5,7 +5,7 @@
  *   Indicators ported from scripts/check_god_objects.ts.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, scripts/check_god_objects.ts]
+ * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/tests/max_class_size_test.ts]
  */
 
 import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/type_environment.ts";
@@ -67,13 +67,23 @@ export function collectClassIndicators(
   let maxMethodLines = 0;
   walk(classNode, (node) => {
     if (node.type === "MethodDefinition") {
+      if (node.kind === "constructor") {
+        if (!seenConstructor) {
+          seenConstructor = true;
+          ctorParams = paramCount(node);
+        }
+        return;
+      }
+      // ts-morph's MethodDeclaration excludes get/set accessors, so the port does too.
+      if (node.kind !== "method") return;
       methodCount++;
       const span = lineSpan(node, text);
       if (span > maxMethodLines) maxMethodLines = span;
-      if (!seenConstructor && node.kind === "constructor") {
-        seenConstructor = true;
-        ctorParams = paramCount(node);
-      }
+    } else if (node.type === "Property" && node.method === true) {
+      // Object-literal method shorthand is a MethodDeclaration in the TypeScript AST.
+      methodCount++;
+      const span = lineSpan(node, text);
+      if (span > maxMethodLines) maxMethodLines = span;
     } else if (node.type === "PropertyDefinition") {
       fieldCount++;
     }

@@ -4,7 +4,7 @@
  * @description Cyclomatic-complexity limit as a plugin rule on the Deno ESTree.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, tests/scripts/measure_complexity_babel_parity_test.ts]
+ * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/tests/max_cyclomatic_complexity_test.ts]
  */
 
 import { asNode, type ILintNode, isNodeLike, walk } from "../engine/type_environment.ts";

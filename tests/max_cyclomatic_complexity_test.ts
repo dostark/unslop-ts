@@ -3,7 +3,7 @@
  * @path packages/lint-rules/tests/max_cyclomatic_complexity_test.ts
  * @description Golden-value parity for the ESTree cyclomatic-complexity rule.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/max_cyclomatic_complexity.ts, tests/scripts/measure_complexity_babel_parity_test.ts]
+ * @related-files [packages/lint-rules/src/rules/max_cyclomatic_complexity.ts, tests/scripts/rule_ceiling_ratchet_test.ts]
  */
 
 import { assert, assertEquals } from "@std/assert";
@@ -71,4 +71,16 @@ Deno.test("a default switch case adds no decision, matching the old gate", () =>
 
 Deno.test("a nullish-coalescing expression adds no decision, matching the old gate", () => {
   assertEquals(messages("function f(a: number | null): number {\n  return a ?? 0;\n}", { max: 1 }), []);
+});
+
+Deno.test("a nested arrow body does not add to the outer function, matching the old gate", () => {
+  const source = "function component(items: string[]): string[] {\n  return items.map((i) => i);\n}";
+  assertEquals(messages(source, { max: 1 }), []);
+});
+
+Deno.test("a class method body counts its own decisions (golden run() value 2)", () => {
+  const source = "class Service {\n  ready = false;\n  run(): void {\n    if (this.ready) return;\n  }\n}";
+  const found = messages(source, { max: 1 });
+  assertEquals(found.length, 1);
+  assert(found[0].includes("2"), found[0]);
 });
