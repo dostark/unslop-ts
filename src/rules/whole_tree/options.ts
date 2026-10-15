@@ -12,6 +12,9 @@ import catalogJson from "../../../../../scripts/config/style_rule_catalog.json" 
 /** Settings for the constant-restatement rule. */
 export type IConstantRestatementSettings = typeof catalogJson.wholeTree.constantRestatement;
 
+/** Settings for the unused-exports rule. */
+export type IUnusedExportsSettings = typeof catalogJson.wholeTree.unusedExports;
+
 /** The catalog `wholeTree` section. */
 export type IWholeTreeSettings = typeof catalogJson.wholeTree;
 
