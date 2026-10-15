@@ -39,9 +39,14 @@ export function createLintPlugin(name: string, catalog: ICatalog): Deno.lint.Plu
     const entry = catalog.rules[id];
     if (!entry) continue;
     const settings = ruleSettings(catalog, id);
-    if (settings.severity === "off") continue;
     const key = id.startsWith(`${name}/`) ? id.slice(name.length + 1) : id;
-    if (selection && !isSelected(selection, id, key, entry.tags)) continue;
+    const selected = selection !== null && isSelected(selection, id, key, entry.tags);
+    if (settings.severity === "off") {
+      // An `off` rule runs only when it is opt-in AND explicitly selected.
+      if (!(entry.optIn === true && selected)) continue;
+    } else if (selection && !selected) {
+      continue;
+    }
 
     rules[key] = {
       create(context) {
