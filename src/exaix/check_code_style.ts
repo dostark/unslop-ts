@@ -69,6 +69,126 @@ export function classifyRepoPath(repoPath: string): PathClass {
   return classifyPath(repoPath, CATALOG.scopes);
 }
 
+interface ITypeUnit {
+  readonly path: string;
+  readonly text: string;
+}
+
+interface ITypeAllowEntry {
+  readonly name: string;
+  readonly files: readonly string[];
+  readonly reason: string;
+}
+
+interface IDuplicateTypeOptions {
+  readonly minProperties?: number;
+  readonly allow?: readonly ITypeAllowEntry[];
+}
+
+interface IDuplicateType {
+  readonly name: string;
+  readonly firstFile: string;
+  readonly laterFile: string;
+}
+
+interface ITypeShape {
+  readonly name: string;
+  readonly members: string[];
+}
+
+const DEFAULT_MIN_PROPERTIES = 2;
+const GROUP_SEPARATOR = "\u0000";
+const MEMBER_SEPARATOR = "\u0001";
+
+/** Whitespace-normalized text for one type member. */
+function memberSignature(member: ts.TypeElement): string {
+  return member.getText().replace(/\s+/g, " ").trim();
+}
+
+function canonicalMembers(members: readonly string[]): string {
+  return [...members].sort().join(MEMBER_SEPARATOR);
+}
+
+/** The name and member signatures of an interface or object type alias, or null. */
+function typeShapeOf(statement: ts.Statement): ITypeShape | null {
+  if (ts.isInterfaceDeclaration(statement)) {
+    return { name: statement.name.text, members: statement.members.map(memberSignature) };
+  }
+  if (ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type)) {
+    return { name: statement.name.text, members: statement.type.members.map(memberSignature) };
+  }
+  return null;
+}
+
+/** The `interface NAME` / `type NAME = { ... }` member sets at the top level of a unit. */
+function topLevelTypes(unit: ITypeUnit, minProperties: number): Map<string, string> {
+  const result = new Map<string, string>();
+  const source = ts.createSourceFile(unit.path, unit.text, ts.ScriptTarget.Latest, true);
+  for (const statement of source.statements) {
+    const shape = typeShapeOf(statement);
+    if (shape === null || shape.members.length < minProperties) continue;
+    result.set(shape.name, canonicalMembers(shape.members));
+  }
+  return result;
+}
+
+function groupTypes(units: readonly ITypeUnit[], minProperties: number): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  for (const unit of units) {
+    for (const [name, signature] of topLevelTypes(unit, minProperties)) {
+      const key = `${name}${GROUP_SEPARATOR}${signature}`;
+      const files = groups.get(key) ?? [];
+      if (!files.includes(unit.path)) files.push(unit.path);
+      groups.set(key, files);
+    }
+  }
+  return groups;
+}
+
+/** Duplicate `interface`/object-type members with the same name across separate files. */
+export function findDuplicateTypes(
+  units: readonly ITypeUnit[],
+  options: IDuplicateTypeOptions,
+): IDuplicateType[] {
+  const minProperties = options.minProperties ?? DEFAULT_MIN_PROPERTIES;
+  const allow = options.allow ?? [];
+  const groups = groupTypes(units, minProperties);
+
+  const duplicates: IDuplicateType[] = [];
+  for (const [key, files] of groups) {
+    if (files.length < 2) continue;
+    const [name] = key.split(GROUP_SEPARATOR);
+    const sorted = [...files].sort();
+    const first = sorted[0];
+    for (const later of sorted.slice(1)) {
+      const allowed = allow.some((entry) =>
+        entry.name === name && entry.files.includes(first) && entry.files.includes(later)
+      );
+      if (!allowed) duplicates.push({ name, firstFile: first, laterFile: later });
+    }
+  }
+  return duplicates;
+}
+
+/** Names allow entries that no longer match a current duplicate. */
+export function validateTypeAllowEntries(
+  units: readonly ITypeUnit[],
+  options: IDuplicateTypeOptions,
+): string[] {
+  const minProperties = options.minProperties ?? DEFAULT_MIN_PROPERTIES;
+  const groups = groupTypes(units, minProperties);
+  const stale: string[] = [];
+  for (const entry of options.allow ?? []) {
+    const matches = [...groups.entries()].some(([key, files]) =>
+      key.split(GROUP_SEPARATOR)[0] === entry.name &&
+      entry.files.every((file) => files.includes(file)) &&
+      files.length >= 2
+    );
+    if (!matches) stale.push(entry.name);
+  }
+  return stale;
+}
+
 /** `style-exclude:CODE` reasons, read from each rule's `exclusionCodes` catalog entry. */
 const exclusionDict: Record<string, Record<string, { reason: string }>> = Object.fromEntries(
   Object.entries(CATALOG.rules)
