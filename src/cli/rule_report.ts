@@ -99,6 +99,7 @@ export async function runDenoLint(rule: string, roots: readonly string[]): Promi
     stderr: "null",
   });
   const { stdout } = await command.output();
+  // SAFETY: `deno lint --json` emits exactly this diagnostic shape.
   const report = JSON.parse(new TextDecoder().decode(stdout)) as ILintReport;
   return (report.diagnostics ?? []).filter((diagnostic) => diagnostic.code === rule);
 }
