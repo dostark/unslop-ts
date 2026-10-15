@@ -20,7 +20,11 @@ import {
   createNoPassThroughTypeAlias,
   createNoUnsafeDictionary,
 } from "./type_safety_rules.ts";
-import { createNoBooleanAssert } from "./test_assertion_rules.ts";
+import {
+  createNoBooleanAssert,
+  createNoConstantSubstringAssert,
+  createNoRepeatedAssertCall,
+} from "./test_assertion_rules.ts";
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
 import { createIgnoreNeedsReason } from "./ignore_needs_reason.ts";
@@ -37,6 +41,8 @@ export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
   "exaix/no-runtime-typeof": { create: createNoRuntimeTypeof },
   "exaix/no-conditional-empty-object-spread": { create: createNoConditionalEmptyObjectSpread },
   "exaix/no-boolean-assert": { create: createNoBooleanAssert },
+  "exaix/no-repeated-assert-call": { create: createNoRepeatedAssertCall },
+  "exaix/no-constant-substring-assert": { create: createNoConstantSubstringAssert },
   "exaix/max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
   "exaix/require-optional-wrapper": { create: createRequireOptionalWrapper },
   "exaix/ignore-needs-reason": { create: createIgnoreNeedsReason },

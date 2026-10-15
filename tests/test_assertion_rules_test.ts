@@ -72,3 +72,108 @@ Deno.test("no-boolean-assert methods option adds a method", () => {
   assertEquals(reports("assertEquals(set.has(x), true);"), false);
   assertEquals(reports("assertEquals(set.has(x), true);", TEST, { options: { methods: ["includes", "has"] } }), true);
 });
+
+const REPEATED_RULE = "exaix/no-repeated-assert-call";
+const SUBSTRING_RULE = "exaix/no-constant-substring-assert";
+
+function buildRuleCatalog(id: string, overrides: Record<string, JsonValue> = {}): Record<string, JsonValue> {
+  return {
+    version: "1",
+    scopes: TEST_SCOPES,
+    tagVocabulary: {
+      "test-quality": { description: "Rules on test code.", requiresScope: ["test"] },
+      deslop: { description: "Rule idea from deslop or anti-slop." },
+    },
+    rules: {
+      [id]: {
+        engine: "plugin",
+        severity: "error",
+        scope: "test",
+        tags: ["test-quality", "deslop"],
+        ...overrides,
+      },
+    },
+  };
+}
+
+function reportsWith(
+  id: string,
+  source: string,
+  filename = TEST,
+  overrides: Record<string, JsonValue> = {},
+): boolean {
+  const plugin = createLintPlugin("exaix", parseCatalog(buildRuleCatalog(id, overrides)));
+  return runPlugin(plugin, filename, source).length > 0;
+}
+
+function inBlock(body: string): string {
+  return `Deno.test("t", () => {\n${body}\n});\n`;
+}
+
+Deno.test("no-repeated-assert-call reports two adjacent assertions on the same call", () => {
+  const source = inBlock("assertEquals(f(x), 1);\nassertEquals(f(x), 2);");
+  assertEquals(reportsWith(REPEATED_RULE, source), true);
+});
+
+Deno.test("no-repeated-assert-call accepts a different first argument", () => {
+  const source = inBlock("assertEquals(f(x), 1);\nassertEquals(f(y), 2);");
+  assertEquals(reportsWith(REPEATED_RULE, source), false);
+});
+
+Deno.test("no-repeated-assert-call accepts the same call when not adjacent", () => {
+  const source = inBlock("assertEquals(f(x), 1);\nconst y = 1;\nassertEquals(f(x), 2);");
+  assertEquals(reportsWith(REPEATED_RULE, source), false);
+});
+
+Deno.test("no-repeated-assert-call compares the call text after normalizing whitespace", () => {
+  const source = inBlock("assertEquals(f(x), 1);\nassertEquals(f( x ), 2);");
+  assertEquals(reportsWith(REPEATED_RULE, source), true);
+});
+
+Deno.test("no-repeated-assert-call accepts the same call in two separate tests", () => {
+  const source = `Deno.test("a", () => {\n  assertEquals(f(x), 1);\n});\n` +
+    `Deno.test("b", () => {\n  assertEquals(f(x), 1);\n});\n`;
+  assertEquals(reportsWith(REPEATED_RULE, source), false);
+});
+
+Deno.test("no-repeated-assert-call assertPrefix option accepts a custom prefix", () => {
+  const source = inBlock("checkThing(f(x), 1);\ncheckThing(f(x), 2);");
+  assertEquals(reportsWith(REPEATED_RULE, source), false);
+  assertEquals(reportsWith(REPEATED_RULE, source, TEST, { options: { assertPrefix: "check" } }), true);
+});
+
+Deno.test("no-repeated-assert-call is not checked in a production file", () => {
+  const source = inBlock("assertEquals(f(x), 1);\nassertEquals(f(x), 2);");
+  assertEquals(reportsWith(REPEATED_RULE, source, PROD), false);
+});
+
+Deno.test("no-constant-substring-assert reports a substring assertion on an imported constant", () => {
+  const source = `import { THINGS } from "./t.ts";\n${inBlock('assert(THINGS.includes("X"));')}`;
+  assertEquals(reportsWith(SUBSTRING_RULE, source), true);
+});
+
+Deno.test("no-constant-substring-assert accepts a name that is not imported", () => {
+  const source = inBlock('assert(THINGS.includes("X"));');
+  assertEquals(reportsWith(SUBSTRING_RULE, source), false);
+});
+
+Deno.test("no-constant-substring-assert accepts an imported name that is not a constant", () => {
+  const source = `import { things } from "./t.ts";\n${inBlock('assert(things.includes("X"));')}`;
+  assertEquals(reportsWith(SUBSTRING_RULE, source), false);
+});
+
+Deno.test("no-constant-substring-assert reports assertStringIncludes on an imported constant", () => {
+  const source = `import { THINGS } from "./t.ts";\n${inBlock('assertStringIncludes(THINGS, "X");')}`;
+  assertEquals(reportsWith(SUBSTRING_RULE, source), true);
+});
+
+Deno.test("no-constant-substring-assert accepts a non-substring assertion on an imported constant", () => {
+  const source = `import { THINGS } from "./t.ts";\n${inBlock("assertEquals(THINGS, []);")}`;
+  assertEquals(reportsWith(SUBSTRING_RULE, source), false);
+});
+
+Deno.test("no-constant-substring-assert constantPattern option accepts a custom pattern", () => {
+  const source = `import { things } from "./t.ts";\n${inBlock('assert(things.includes("X"));')}`;
+  assertEquals(reportsWith(SUBSTRING_RULE, source), false);
+  assertEquals(reportsWith(SUBSTRING_RULE, source, TEST, { options: { constantPattern: "^things$" } }), true);
+});

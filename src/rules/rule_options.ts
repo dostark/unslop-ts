@@ -43,6 +43,14 @@ export const NoBooleanAssertOptions = z.object({
   assertFunctions: z.array(z.string()).default(["assert", "assertEquals", "assertStrictEquals"]),
 }).strict();
 
+export const NoRepeatedAssertCallOptions = z.object({
+  assertPrefix: z.string().default("assert"),
+}).strict();
+
+export const NoConstantSubstringAssertOptions = z.object({
+  constantPattern: z.string().default("^[A-Z][A-Z0-9_]*$"),
+}).strict();
+
 export const MaxCyclomaticComplexityOptions = z.object({
   max: z.number().int().positive().default(15),
 }).strict();
@@ -67,6 +75,8 @@ export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-runtime-typeof": NoRuntimeTypeofOptions,
   "exaix/no-conditional-empty-object-spread": NoOptions,
   "exaix/no-boolean-assert": NoBooleanAssertOptions,
+  "exaix/no-repeated-assert-call": NoRepeatedAssertCallOptions,
+  "exaix/no-constant-substring-assert": NoConstantSubstringAssertOptions,
   "exaix/max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
   "exaix/require-optional-wrapper": RequireOptionalWrapperOptions,
   "exaix/ignore-needs-reason": IgnoreNeedsReasonOptions,
