@@ -18,11 +18,19 @@ const DECISION_NODES = new Set([
   "ForOfStatement",
   "WhileStatement",
   "DoWhileStatement",
-  "SwitchCase",
   "CatchClause",
   "ConditionalExpression",
-  "LogicalExpression",
 ]);
+
+/**
+ * True when a node is one decision point. Matches `scripts/measure_complexity.ts`:
+ * a `SwitchCase` counts only with a test. A `LogicalExpression` counts only for `||` and `&&`.
+ */
+function isDecision(node: ILintNode): boolean {
+  if (node.type === "SwitchCase") return node.test !== null && node.test !== undefined;
+  if (node.type === "LogicalExpression") return node.operator === "||" || node.operator === "&&";
+  return DECISION_NODES.has(node.type);
+}
 
 /** Cyclomatic complexity of one function, excluding nested function bodies. */
 function complexityOf(fn: ILintNode): number {
@@ -32,7 +40,7 @@ function complexityOf(fn: ILintNode): number {
   const root = asNode(body);
   walk(root, (node) => {
     if (node !== root && FUNCTION_NODES.has(node.type)) return false;
-    if (DECISION_NODES.has(node.type)) complexity++;
+    if (isDecision(node)) complexity++;
     return true;
   });
   return complexity;

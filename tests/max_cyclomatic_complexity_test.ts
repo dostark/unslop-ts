@@ -63,3 +63,12 @@ Deno.test("a simple function is not reported under the default max", () => {
 Deno.test("a logical expression and a ternary each add one", () => {
   assertEquals(messages("function f(a: boolean): number {\n  return a && true ? 1 : 2;\n}", { max: 1 }).length, 1);
 });
+
+Deno.test("a default switch case adds no decision, matching the old gate", () => {
+  const source = "function f(a: number): number {\n  switch (a) {\n    default:\n      return 0;\n  }\n}";
+  assertEquals(messages(source, { max: 1 }), []);
+});
+
+Deno.test("a nullish-coalescing expression adds no decision, matching the old gate", () => {
+  assertEquals(messages("function f(a: number | null): number {\n  return a ?? 0;\n}", { max: 1 }), []);
+});

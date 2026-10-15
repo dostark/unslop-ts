@@ -7,6 +7,7 @@
  * @related-files [packages/lint-rules/src/engine/catalog.ts, packages/lint-rules/src/rules/mod.ts]
  */
 
+import { globToRegExp } from "@std/path";
 import { PLUGIN_RULE_IMPLEMENTATIONS } from "../rules/mod.ts";
 import { classifyPath, type ICatalog, PATH_CLASS, type PathClass, type RuleScope, ruleSettings } from "./catalog.ts";
 
@@ -26,6 +27,36 @@ function isSelected(selection: Set<string>, id: string, key: string, tags: strin
 function scopeAllows(scope: RuleScope, pathClass: PathClass): boolean {
   if (pathClass === PATH_CLASS.fixture) return false;
   return scope === "all" || scope === pathClass;
+}
+
+const compiledGlobs = new Map<string, RegExp>();
+
+function globRegex(glob: string): RegExp {
+  let regex = compiledGlobs.get(glob);
+  if (!regex) {
+    regex = globToRegExp(glob, { extended: true, globstar: true });
+    compiledGlobs.set(glob, regex);
+  }
+  return regex;
+}
+
+function matchesAnyGlob(repoPath: string, globs: readonly string[]): boolean {
+  return globs.some((glob) => globRegex(glob).test(repoPath));
+}
+
+/** The repository-relative path for a filename Deno lint reports as absolute. */
+function repoRelative(filename: string): string {
+  const cwd = Deno.cwd();
+  const prefix = cwd.endsWith("/") ? cwd : `${cwd}/`;
+  return filename.startsWith(prefix) ? filename.slice(prefix.length) : filename;
+}
+
+/** True when scope, include, and exclude all allow the rule on this path. */
+function allows(repoPath: string, pathClass: PathClass, settings: ReturnType<typeof ruleSettings>): boolean {
+  if (!scopeAllows(settings.scope, pathClass)) return false;
+  if (settings.include && !matchesAnyGlob(repoPath, settings.include)) return false;
+  if (settings.exclude && matchesAnyGlob(repoPath, settings.exclude)) return false;
+  return true;
 }
 
 export function createLintPlugin(name: string, catalog: ICatalog): Deno.lint.Plugin {
@@ -50,8 +81,9 @@ export function createLintPlugin(name: string, catalog: ICatalog): Deno.lint.Plu
 
     rules[key] = {
       create(context) {
-        const pathClass = classifyPath(context.filename, catalog.scopes);
-        if (!scopeAllows(settings.scope, pathClass)) return {};
+        const repoPath = repoRelative(context.filename);
+        const pathClass = classifyPath(repoPath, catalog.scopes);
+        if (!allows(repoPath, pathClass, settings)) return {};
         return implementation.create(context, {
           options: settings.options,
           isTestFile: pathClass === PATH_CLASS.test,
