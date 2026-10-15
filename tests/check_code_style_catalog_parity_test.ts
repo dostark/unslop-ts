@@ -135,6 +135,28 @@ Deno.test("the generic rule areas name no Exaix symbol", async () => {
   }
 });
 
+Deno.test("every catalog codeStyle target resolves to an existing heading", async () => {
+  const codeStyleDoc = await Deno.readTextFile(join(REPO_ROOT, "CODE_STYLE.md"));
+  const anchorsOf = (text: string) => new Set([...text.matchAll(/\{#([^}]+)\}/g)].map((m) => m[1]));
+  const docs: Record<string, Set<string>> = { "CODE_STYLE.md": anchorsOf(codeStyleDoc) };
+  for (const extra of ["packages/lint-rules/docs/style_guide.md", "packages/lint-rules/docs/style_rules.md"]) {
+    try {
+      docs[extra] = anchorsOf(await Deno.readTextFile(join(REPO_ROOT, extra)));
+    } catch {
+      // The guide is added by a later step; fall back to CODE_STYLE.md anchors.
+    }
+  }
+  for (const [id, entry] of Object.entries(catalog.rules)) {
+    const target = (entry as { codeStyle?: string }).codeStyle;
+    if (!target) continue;
+    const [doc, anchor] = target.split("#");
+    assert(anchor, `${id} has no anchor in its codeStyle target`);
+    const anchors = docs[doc];
+    assert(anchors, `${id} names an unknown doc: ${doc}`);
+    assert(anchors.has(anchor), `${id}: '${anchor}' does not resolve to a heading in ${doc}`);
+  }
+});
+
 Deno.test("the generated reference renders every tag", () => {
   for (const tag of Object.keys(catalog.tagVocabulary)) {
     assertStringIncludes(doc, `\`${tag}\``, `tag ${tag} is missing from the reference`);
