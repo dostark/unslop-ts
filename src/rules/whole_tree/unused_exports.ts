@@ -141,22 +141,31 @@ export async function collectScriptImportedNames(
 ): Promise<Set<string>> {
   const names = new Set<string>();
   const skip = walkSkipPatterns(settings);
-  for await (
-    const entry of walk(join(repoRoot, settings.scriptRoot), { includeDirs: false, exts: [".ts"], skip })
-  ) {
-    const repoPath = entry.path.startsWith(repoRoot + "/") ? entry.path.slice(repoRoot.length + 1) : entry.path;
-    if (isTestFilePath(repoPath, settings)) continue;
-    const sourceFile = ts.createSourceFile(repoPath, await Deno.readTextFile(entry.path), ts.ScriptTarget.Latest, true);
-    ts.forEachChild(sourceFile, (node) => {
-      if (!ts.isImportDeclaration(node) || !node.importClause) return;
-      const clause = node.importClause;
-      if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
-        for (const el of clause.namedBindings.elements) {
-          if (!el.isTypeOnly) names.add(el.name.text);
+  try {
+    for await (
+      const entry of walk(join(repoRoot, settings.scriptRoot), { includeDirs: false, exts: [".ts"], skip })
+    ) {
+      const repoPath = entry.path.startsWith(repoRoot + "/") ? entry.path.slice(repoRoot.length + 1) : entry.path;
+      if (isTestFilePath(repoPath, settings)) continue;
+      const sourceFile = ts.createSourceFile(
+        repoPath,
+        await Deno.readTextFile(entry.path),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      ts.forEachChild(sourceFile, (node) => {
+        if (!ts.isImportDeclaration(node) || !node.importClause) return;
+        const clause = node.importClause;
+        if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+          for (const el of clause.namedBindings.elements) {
+            if (!el.isTypeOnly) names.add(el.name.text);
+          }
         }
-      }
-      if (clause.name) names.add(clause.name.text);
-    });
+        if (clause.name) names.add(clause.name.text);
+      });
+    }
+  } catch {
+    // A checkout need not have a wiring-scripts root.
   }
   return names;
 }

@@ -15,6 +15,9 @@ export type IConstantRestatementSettings = typeof catalogJson.wholeTree.constant
 /** Settings for the unused-exports rule. */
 export type IUnusedExportsSettings = typeof catalogJson.wholeTree.unusedExports;
 
+/** Settings for the optional-parameter rule. */
+export type IOptionalParamsSettings = typeof catalogJson.wholeTree.optionalParams;
+
 /** The catalog `wholeTree` section. */
 export type IWholeTreeSettings = typeof catalogJson.wholeTree;
 
