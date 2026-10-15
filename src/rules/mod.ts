@@ -23,6 +23,7 @@ import {
 import { createNoBooleanAssert } from "./test_assertion_rules.ts";
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
+import { createIgnoreNeedsReason } from "./ignore_needs_reason.ts";
 import type { IPluginRule } from "./types.ts";
 
 export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
@@ -38,4 +39,5 @@ export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
   "exaix/no-boolean-assert": { create: createNoBooleanAssert },
   "exaix/max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
   "exaix/require-optional-wrapper": { create: createRequireOptionalWrapper },
+  "exaix/ignore-needs-reason": { create: createIgnoreNeedsReason },
 };

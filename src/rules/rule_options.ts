@@ -51,6 +51,10 @@ export const RequireOptionalWrapperOptions = z.object({
   wrapperType: z.string().default("Opt"),
 }).strict();
 
+export const IgnoreNeedsReasonOptions = z.object({
+  separator: z.string().default("--"),
+}).strict();
+
 /** Implementation ids with a known option schema. A catalog id absent here is rejected. */
 export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -65,4 +69,5 @@ export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-boolean-assert": NoBooleanAssertOptions,
   "exaix/max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
   "exaix/require-optional-wrapper": RequireOptionalWrapperOptions,
+  "exaix/ignore-needs-reason": IgnoreNeedsReasonOptions,
 };
