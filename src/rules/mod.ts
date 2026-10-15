@@ -26,6 +26,7 @@ import {
   createNoRepeatedAssertCall,
 } from "./test_assertion_rules.ts";
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
+import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
 import { createIgnoreNeedsReason } from "./ignore_needs_reason.ts";
 import type { IPluginRule } from "./types.ts";
@@ -44,6 +45,7 @@ export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
   "exaix/no-repeated-assert-call": { create: createNoRepeatedAssertCall },
   "exaix/no-constant-substring-assert": { create: createNoConstantSubstringAssert },
   "exaix/max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
+  "exaix/max-class-size": { create: createMaxClassSize },
   "exaix/require-optional-wrapper": { create: createRequireOptionalWrapper },
   "exaix/ignore-needs-reason": { create: createIgnoreNeedsReason },
 };

@@ -55,6 +55,11 @@ export const MaxCyclomaticComplexityOptions = z.object({
   max: z.number().int().positive().default(15),
 }).strict();
 
+export const MaxClassSizeOptions = z.object({
+  minClassLines: z.number().int().positive().default(200),
+  threshold: z.number().nonnegative().default(60),
+}).strict();
+
 export const RequireOptionalWrapperOptions = z.object({
   wrapperType: z.string().default("Opt"),
 }).strict();
@@ -78,6 +83,7 @@ export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-repeated-assert-call": NoRepeatedAssertCallOptions,
   "exaix/no-constant-substring-assert": NoConstantSubstringAssertOptions,
   "exaix/max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
+  "exaix/max-class-size": MaxClassSizeOptions,
   "exaix/require-optional-wrapper": RequireOptionalWrapperOptions,
   "exaix/ignore-needs-reason": IgnoreNeedsReasonOptions,
 };
