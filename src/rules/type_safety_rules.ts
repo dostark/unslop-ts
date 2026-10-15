@@ -77,6 +77,18 @@ function isInsideTypeParameter(node: ILintNode): boolean {
   return false;
 }
 
+/** True when `node` is the constraint of a generic type parameter, as upstream allows. */
+function isTypeParameterConstraint(node: ILintNode): boolean {
+  let current = node;
+  let parent = parentOf(current);
+  while (parent) {
+    if (parent.type === "TSTypeParameter") return parent.constraint === current;
+    current = parent;
+    parent = parentOf(current);
+  }
+  return false;
+}
+
 export function createNoExplicitUnknown(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
   const allowCatch = ctx.options.allowCatchBinding !== false;
   const allowPredicate = ctx.options.allowTypePredicateSubject !== false;
@@ -122,6 +134,7 @@ export function createNoUnsafeDictionary(context: Deno.lint.RuleContext, ctx: IP
       const node = asNode(rawNode);
       const name = typeReferenceName(node);
       if (name !== "Record" && name !== "Map") return;
+      if (isTypeParameterConstraint(node)) return;
       const value = typeArguments(node)[1];
       if (value && isForbiddenValue(value, forbidden, env)) report(rawNode, DICTIONARY_MESSAGE);
     },
