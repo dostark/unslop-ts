@@ -16,7 +16,7 @@
 
 import ts from "typescript";
 import { walk } from "@std/fs";
-import { dirname, globToRegExp, join, normalize } from "@std/path";
+import { dirname, globToRegExp, join, normalize, relative } from "@std/path";
 import { z } from "zod";
 import {
   classifyPath,
@@ -49,6 +49,12 @@ const REPO_ROOT = resolveRepoRoot();
 /** Option schemas for the script rules that read catalog options. */
 const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
   "max-params": z.object({ max: z.number().int().positive().default(7) }).strict(),
+  "duplicate-type": z.object({
+    minProperties: z.number().int().positive().default(2),
+    allow: z.array(
+      z.object({ name: z.string(), files: z.array(z.string()), reason: z.string() }).strict(),
+    ).default([]),
+  }).strict(),
   "long-comment": z.object({ maxLines: z.number().int().positive().default(3) }).strict(),
   "test-inline-multiline-fixture": z.object({ minLines: z.number().int().positive().default(7) }).strict(),
   "edition-leak": z.object({
@@ -1010,6 +1016,7 @@ const rules: Rule[] = [
 
 /** Script rule ids implemented as inline checks (not in the `rules` array). */
 const INLINE_SCRIPT_RULE_IDS = [
+  "duplicate-type",
   "no-interface-rename-on-import",
   "import-placement",
   "module-header",
@@ -1630,9 +1637,37 @@ function isCommentOnlyLine(line: string): boolean {
   return trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*");
 }
 
+const SOURCE_UNITS: Array<{ path: string; text: string }> = [];
+
 async function checkFile(path: string) {
   const text = await Deno.readTextFile(path);
+  SOURCE_UNITS.push({ path: relative(REPO_ROOT, path), text });
   checkFileFromText(path, text, CATALOG);
+}
+
+/** Whole-tree duplicate type-contract pass, run after the per-file checks. */
+function runDuplicateTypePass(): void {
+  const settings = ruleSettings(CATALOG, "duplicate-type");
+  const options = settings.options as {
+    minProperties?: number;
+    allow?: Array<{ name: string; files: string[]; reason: string }>;
+  };
+  const include = settings.include ?? [];
+  const prodUnits = SOURCE_UNITS.filter((unit) =>
+    classifyRepoPath(unit.path) === "prod" &&
+    (include.length === 0 || matchesAnyGlob(unit.path, include))
+  );
+  for (const duplicate of findDuplicateTypes(prodUnits, options)) {
+    console.log(
+      `ERROR [duplicate-type] ${duplicate.laterFile} – '${duplicate.name}' duplicates ${duplicate.firstFile}. Keep one owner and import it.`,
+    );
+    errorCount++;
+  }
+  for (const name of validateTypeAllowEntries(prodUnits, options)) {
+    console.log(`ERROR [duplicate-type] the allow entry '${name}' matches no current duplicate.`);
+    errorCount++;
+  }
+  if (SOURCE_UNITS.length > 0) console.log("✅ Duplicate type-contract pass complete.");
 }
 
 interface IStyleRuleContext {
@@ -2608,6 +2643,8 @@ async function main() {
   }
 
   await runAllChecks(manualPaths);
+  // The duplicate-type pass needs the whole tree, so it runs only on the unscoped run.
+  if (manualPaths.length === 0) runDuplicateTypePass();
 
   console.log(`\nstyle check completed: ${errorCount} error(s), ${warnCount} warning(s)`);
   if (errorCount > 0) {

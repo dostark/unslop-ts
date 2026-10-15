@@ -298,10 +298,13 @@ for (const testCase of CASES) {
   });
 }
 
+// Whole-tree script rules have dedicated test files rather than a per-file case.
+const WHOLE_TREE_RULE_IDS = new Set(["duplicate-type"]);
+
 Deno.test("every implemented script rule id has a named case", () => {
   const withCases = new Set(CASES.map((c) => c.id));
   const missing = [...Object.entries(catalog.rules)]
-    .filter(([id, entry]) => entry.engine === "script" && !withCases.has(id))
+    .filter(([id, entry]) => entry.engine === "script" && !withCases.has(id) && !WHOLE_TREE_RULE_IDS.has(id))
     .map(([id]) => id);
   assertEquals(missing, []);
 });
