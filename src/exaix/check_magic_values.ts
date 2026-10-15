@@ -25,7 +25,7 @@
 import ts from "typescript";
 import { walk } from "@std/fs";
 import { join, relative } from "@std/path";
-import { classifyPath } from "@exaix/lint-rules";
+import { classifyPath, type PathClass } from "@exaix/lint-rules";
 import { LAYOUT } from "./repo_layout.ts";
 import catalogJson from "../../../../scripts/config/style_rule_catalog.json" with { type: "json" };
 
@@ -184,8 +184,13 @@ const SCORE_PER_OCCURRENCE = 3;
 const SCORE_PER_DISTINCT_FILE = 5;
 const SCORE_EXISTING_CONSTANT_BONUS = 40;
 
+/** Classifies a repository-relative path with the shared catalog scopes. */
+export function classifyRepoPath(filePath: string): PathClass {
+  return classifyPath(filePath, CATALOG_SCOPES);
+}
+
 function isTestFilePath(filePath: string): boolean {
-  return classifyPath(filePath, CATALOG_SCOPES) === "test";
+  return classifyRepoPath(filePath) === "test";
 }
 
 function isConstantOrEnumFilePath(filePath: string): boolean {

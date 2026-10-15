@@ -23,6 +23,7 @@ import {
   type ICatalog,
   type JsonValue,
   parseCatalog,
+  type PathClass,
   ruleSettings,
   type ScriptRuleSchemas,
 } from "@exaix/lint-rules";
@@ -50,7 +51,7 @@ const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
   "max-params": z.object({ max: z.number().int().positive().default(7) }).strict(),
   "long-comment": z.object({ maxLines: z.number().int().positive().default(3) }).strict(),
   "test-inline-multiline-fixture": z.object({ minLines: z.number().int().positive().default(7) }).strict(),
-    "edition-leak": z.object({
+  "edition-leak": z.object({
     soloTier: z.number().int().default(0),
     teamTier: z.number().int().default(1),
     enterpriseTier: z.number().int().default(2),
@@ -62,6 +63,11 @@ const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
 };
 
 const CATALOG: ICatalog = parseCatalog(styleRuleCatalog, { scriptRuleSchemas: SCRIPT_RULE_SCHEMAS });
+
+/** Classifies a repository-relative path with the shared catalog scopes. */
+export function classifyRepoPath(repoPath: string): PathClass {
+  return classifyPath(repoPath, CATALOG.scopes);
+}
 
 /** `style-exclude:CODE` reasons, read from each rule's `exclusionCodes` catalog entry. */
 const exclusionDict: Record<string, Record<string, { reason: string }>> = Object.fromEntries(
