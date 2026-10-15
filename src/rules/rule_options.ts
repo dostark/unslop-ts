@@ -43,6 +43,10 @@ export const NoBooleanAssertOptions = z.object({
   assertFunctions: z.array(z.string()).default(["assert", "assertEquals", "assertStrictEquals"]),
 }).strict();
 
+export const MaxCyclomaticComplexityOptions = z.object({
+  max: z.number().int().positive().default(15),
+}).strict();
+
 /** Implementation ids with a known option schema. A catalog id absent here is rejected. */
 export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -55,4 +59,5 @@ export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "exaix/no-runtime-typeof": NoRuntimeTypeofOptions,
   "exaix/no-conditional-empty-object-spread": NoOptions,
   "exaix/no-boolean-assert": NoBooleanAssertOptions,
+  "exaix/max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
 };

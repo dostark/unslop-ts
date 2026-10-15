@@ -43,6 +43,29 @@ export function asNode(node: LintValue): ILintNode {
 /** The ESTree `Identifier` node type, shared so the literal appears once. */
 export const NODE_IDENTIFIER = "Identifier";
 
+/** True when a value is a node-like object with a string `type`. */
+export function isNodeLike(value: unknown): boolean {
+  return value !== null && typeof value === "object" && typeof (value as { type?: unknown }).type === "string";
+}
+
+const SKIP_KEYS = new Set(["parent", "range", "loc", "comments", "tokens"]);
+
+/** Depth-first walk. A visit that returns false prunes that node's children. */
+export function walk(node: ILintNode, visit: (node: ILintNode) => boolean | void): void {
+  if (visit(node) === false) return;
+  for (const key in node) {
+    if (SKIP_KEYS.has(key)) continue;
+    const value = node[key];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (isNodeLike(item)) walk(asNode(item), visit);
+      }
+    } else if (isNodeLike(value)) {
+      walk(asNode(value), visit);
+    }
+  }
+}
+
 /** Reads a lint value as the runtime node type, for the plugin API calls. */
 export function toLintNode(node: LintValue): Deno.lint.Node {
   return node as Deno.lint.Node;
