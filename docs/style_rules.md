@@ -44,7 +44,7 @@ deno run -A packages/lint-rules/src/exaix/check_code_style.ts --convert-warnings
 | `edition-conditional-outside-composer`     | script | error    | prod  | `edition`, `boundary`            | —                                                                                          |
 | `edition-leak`                             | script | error    | prod  | `edition`, `boundary`            | Reads source text; check:edition-graph is its resolved-graph double check.                 |
 | `ephemeral-comment`                        | script | warn     | all   | `comments`                       | —                                                                                          |
-| `exaix/ignore-needs-reason`                | plugin | off      | all   | `type-safety`, `deslop`          | Only ignores that name an exaix rule are checked.                                          |
+| `exaix/ignore-needs-reason`                | plugin | error    | all   | `type-safety`, `deslop`          | Only ignores that name an exaix rule are checked.                                          |
 | `exaix/max-cyclomatic-complexity`          | plugin | off      | prod  | `complexity`, `deslop`           | Counts one decision point per branch node; nested function bodies are excluded.            |
 | `exaix/no-any-escape`                      | plugin | off      | all   | `type-safety`, `deslop`          | The typeof target is compared as source text; only test files may use an allowed target.   |
 | `exaix/no-boolean-assert`                  | plugin | off      | test  | `test-quality`, `deslop`         | Only a direct call subject is matched; a message argument does not clear the report.       |
