@@ -25,7 +25,11 @@
 import ts from "typescript";
 import { walk } from "@std/fs";
 import { join, relative } from "@std/path";
+import { classifyPath } from "@exaix/lint-rules";
 import { LAYOUT } from "./repo_layout.ts";
+import catalogJson from "../../../../scripts/config/style_rule_catalog.json" with { type: "json" };
+
+const CATALOG_SCOPES = catalogJson.scopes as { test: string[]; fixture: string[] };
 
 // CLI flags
 
@@ -181,7 +185,7 @@ const SCORE_PER_DISTINCT_FILE = 5;
 const SCORE_EXISTING_CONSTANT_BONUS = 40;
 
 function isTestFilePath(filePath: string): boolean {
-  return filePath.includes(LAYOUT.testsSegment) || filePath.endsWith("_test.ts") || filePath.endsWith("_test.tsx");
+  return classifyPath(filePath, CATALOG_SCOPES) === "test";
 }
 
 function isConstantOrEnumFilePath(filePath: string): boolean {
@@ -554,6 +558,133 @@ function reportViolations(violations: Violation[]): void {
 }
 
 // Main
+
+interface IConstantAllowEntry {
+  readonly name: string;
+  readonly files: readonly string[];
+  readonly reason: string;
+}
+
+interface IDuplicateConstantOptions {
+  readonly namePattern?: string;
+  readonly allow?: readonly IConstantAllowEntry[];
+}
+
+interface ISourceUnit {
+  readonly path: string;
+  readonly text: string;
+}
+
+interface IDuplicateConstant {
+  readonly name: string;
+  readonly firstFile: string;
+  readonly laterFile: string;
+}
+
+/** Canonical text for a static literal value, or null when the value is not static. */
+function staticValue(node: ts.Node): string | null {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return `s:${node.text}`;
+  if (ts.isNumericLiteral(node)) return `n:${node.text}`;
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return "b:true";
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return "b:false";
+  if (ts.isArrayLiteralExpression(node)) {
+    const parts: string[] = [];
+    for (const element of node.elements) {
+      const value = staticValue(element);
+      if (value === null) return null;
+      parts.push(value);
+    }
+    return `a:[${parts.join(",")}]`;
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    const parts: string[] = [];
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return null;
+      const value = staticValue(property.initializer);
+      if (value === null) return null;
+      parts.push(`${property.name.text}=${value}`);
+    }
+    parts.sort();
+    return `o:{${parts.join(",")}}`;
+  }
+  return null;
+}
+
+/** The `const NAME = <static>` pairs declared at the top level of a unit. */
+function topLevelConstants(unit: ISourceUnit, namePattern: RegExp): Map<string, string> {
+  const result = new Map<string, string>();
+  const source = ts.createSourceFile(unit.path, unit.text, ts.ScriptTarget.Latest, true);
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    if (!(statement.declarationList.flags & ts.NodeFlags.Const)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+      const name = declaration.name.text;
+      if (!namePattern.test(name)) continue;
+      const value = staticValue(declaration.initializer);
+      if (value !== null) result.set(name, value);
+    }
+  }
+  return result;
+}
+
+/** Duplicate `const` names with the same static value across separate files. */
+export function findDuplicateConstants(
+  units: readonly ISourceUnit[],
+  options: IDuplicateConstantOptions,
+): IDuplicateConstant[] {
+  const pattern = new RegExp(options.namePattern ?? "^[A-Z][A-Z0-9_]*$");
+  const allow = options.allow ?? [];
+  const groups = new Map<string, string[]>();
+  for (const unit of units) {
+    for (const [name, value] of topLevelConstants(unit, pattern)) {
+      const key = `${name}\u0000${value}`;
+      const files = groups.get(key) ?? [];
+      if (!files.includes(unit.path)) files.push(unit.path);
+      groups.set(key, files);
+    }
+  }
+
+  const duplicates: IDuplicateConstant[] = [];
+  for (const [key, files] of groups) {
+    if (files.length < 2) continue;
+    const [name] = key.split("\u0000");
+    const sorted = [...files].sort();
+    const first = sorted[0];
+    for (const later of sorted.slice(1)) {
+      const allowed = allow.some((entry) =>
+        entry.name === name && entry.files.includes(first) && entry.files.includes(later)
+      );
+      if (!allowed) duplicates.push({ name, firstFile: first, laterFile: later });
+    }
+  }
+  return duplicates;
+}
+
+/** Names allow entries that no longer match a current duplicate. */
+export function validateConstantAllowEntries(
+  units: readonly ISourceUnit[],
+  options: IDuplicateConstantOptions,
+): string[] {
+  const pattern = new RegExp(options.namePattern ?? "^[A-Z][A-Z0-9_]*$");
+  const groups = new Map<string, string[]>();
+  for (const unit of units) {
+    for (const [name, value] of topLevelConstants(unit, pattern)) {
+      const key = `${name}\u0000${value}`;
+      const files = groups.get(key) ?? [];
+      if (!files.includes(unit.path)) files.push(unit.path);
+      groups.set(key, files);
+    }
+  }
+  const stale: string[] = [];
+  for (const entry of options.allow ?? []) {
+    const matches = [...groups.entries()].some(([key, files]) =>
+      key.split("\u0000")[0] === entry.name && entry.files.every((file) => files.includes(file)) && files.length >= 2
+    );
+    if (!matches) stale.push(entry.name);
+  }
+  return stale;
+}
 
 async function main(): Promise<void> {
   const counters = new Map<string, ValueAccumulator>();
