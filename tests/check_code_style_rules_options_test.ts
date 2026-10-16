@@ -83,3 +83,32 @@ Deno.test("a leading YAML comment block is exempt, like a module header", () => 
     0,
   );
 });
+
+Deno.test("the shipped TOML override raises the limit, and removing it reports the comment", () => {
+  const source = 'key = "value"\n# one\n# two\n# three\n# four\n# five\nother = "v"\n';
+  assertEquals(
+    checkSource("configs/probe.toml", source, parseCatalog(catalogJson)).filter((f) => f.rule === "long-comment")
+      .length,
+    0,
+  );
+  const withoutOverride = catalogWith((rules) => {
+    (rules["long-comment"] as Record<string, JsonValue>).options = {
+      maxLines: 3,
+      extensions: [".toml"],
+      overrides: {},
+    };
+  });
+  assertEquals(
+    checkSource("configs/probe.toml", source, withoutOverride).filter((f) => f.rule === "long-comment").length,
+    1,
+  );
+});
+
+Deno.test("a long JSONC line comment is reported", () => {
+  const source = '{\n  // one\n  // two\n  // three\n  // four\n  "a": 1\n}\n';
+  assertEquals(
+    checkSource("configs/probe.jsonc", source, parseCatalog(catalogJson)).filter((f) => f.rule === "long-comment")
+      .length,
+    1,
+  );
+});

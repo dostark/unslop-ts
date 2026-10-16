@@ -63,7 +63,8 @@ const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
   }).strict(),
   "long-comment": z.object({
     maxLines: z.number().int().positive().default(3),
-    extensions: z.array(z.string().min(2)).default([".ts", ".tsx", ".yaml", ".yml"]),
+    extensions: z.array(z.string().min(2)).default([".ts", ".tsx", ".yaml", ".yml", ".toml", ".jsonc"]),
+    overrides: z.record(z.string(), z.object({ maxLines: z.number().int().positive() })).default({}),
   }).strict(),
   "test-inline-multiline-fixture": z.object({ minLines: z.number().int().positive().default(7) }).strict(),
   "edition-leak": z.object({
@@ -1182,11 +1183,16 @@ function checkCommentDates(repoPath: string, text: string): void {
   }
 }
 
+/** Extensions whose comments start with `#`. */
+const HASH_COMMENT_EXTENSIONS = new Set([".yaml", ".yml", ".toml"]);
+/** Extensions whose comments use the TypeScript line and block forms. */
+const SLASH_COMMENT_EXTENSIONS = new Set([".jsonc"]);
+
 /**
- * Applies the comment-length rule to a YAML file, where a comment is a run of `#` lines.
+ * Applies the comment-length rule to a file whose comments start with `#`.
  * The leading block is exempt, as it is for a module header in TypeScript.
  */
-function checkYamlComments(repoPath: string, lines: string[], maxLines: number): void {
+function checkHashComments(repoPath: string, lines: string[], maxLines: number): void {
   let run: string[] = [];
   let runStart = 0;
   let seenContent = false;
@@ -2429,13 +2435,19 @@ function checkFileFromText(path: string, text: string, catalog: ICatalog): void 
   const longCommentMaxLines = Number(ruleSettings(catalog, "long-comment").options.maxLines ?? 3);
   const minFixtureLines = Number(ruleSettings(catalog, "test-inline-multiline-fixture").options.minLines ?? 7);
 
-  const commentExtensions = (ruleSettings(catalog, "long-comment").options.extensions ??
-    [".ts", ".tsx", ".yaml", ".yml"]) as string[];
+  const commentSettings = ruleSettings(catalog, "long-comment").options;
+  const commentExtensions =
+    (commentSettings.extensions ?? [".ts", ".tsx", ".yaml", ".yml", ".toml", ".jsonc"]) as string[];
+  const commentOverrides = (commentSettings.overrides ?? {}) as Record<string, { maxLines?: number }>;
   const extension = repoPath.slice(repoPath.lastIndexOf("."));
   if (extension !== ".ts" && extension !== ".tsx") {
     // Only the comment rules read a non-TypeScript file, so no TypeScript check sees it.
-    if (commentExtensions.includes(extension) && (extension === ".yaml" || extension === ".yml")) {
-      checkYamlComments(repoPath, lines, longCommentMaxLines);
+    if (!commentExtensions.includes(extension)) return;
+    const limit = Number(commentOverrides[extension]?.maxLines ?? longCommentMaxLines);
+    if (HASH_COMMENT_EXTENSIONS.has(extension)) {
+      checkHashComments(repoPath, lines, limit);
+    } else if (SLASH_COMMENT_EXTENSIONS.has(extension)) {
+      checkCommentDiscipline(repoPath, lines, new Set<number>(), limit);
     }
     return;
   }
