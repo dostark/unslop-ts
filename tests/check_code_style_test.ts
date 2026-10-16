@@ -4,7 +4,7 @@
  * @description Regression tests for the moved style checker, including test-file multiline fixture detection.
  */
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import { dirname, fromFileUrl, join } from "@std/path";
 
 const REPO_ROOT = join(dirname(fromFileUrl(import.meta.url)), "..", "..", "..");
@@ -471,7 +471,7 @@ export function run(): number {
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[long-comment]"), false, result.output);
+  assertFalse(result.output.includes("[long-comment]"), result.output);
 });
 
 Deno.test("check_code_style does not flag the module's own header comment for length", async () => {
@@ -495,7 +495,7 @@ export function run(): number {
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[long-comment]"), false, result.output);
+  assertFalse(result.output.includes("[long-comment]"), result.output);
 });
 
 Deno.test("check_code_style flags a comment referencing a phase or step number", async () => {
@@ -668,7 +668,7 @@ export const releaseNote = \`// Released on ${runtimeDate}.\`;
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[ephemeral-comment]"), false, result.output);
+  assertFalse(result.output.includes("[ephemeral-comment]"), result.output);
 });
 
 Deno.test("check_code_style allows natural language usage of the word gap", async () => {
@@ -691,7 +691,7 @@ export function run(): number {
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[ephemeral-comment]"), false, result.output);
+  assertFalse(result.output.includes("[ephemeral-comment]"), result.output);
 });
 
 Deno.test("check_code_style flags a decorative comment separator", async () => {
@@ -739,7 +739,7 @@ export function run(): number {
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[decorative-comment]"), false, result.output);
+  assertFalse(result.output.includes("[decorative-comment]"), result.output);
 });
 
 Deno.test("check_code_style allows a comment echoing a triple-equals code comparison", async () => {
@@ -762,7 +762,7 @@ export function run(): number {
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[decorative-comment]"), false, result.output);
+  assertFalse(result.output.includes("[decorative-comment]"), result.output);
 });
 
 Deno.test("check_code_style allows a comment quoting a markdown heading example", async () => {
@@ -785,7 +785,7 @@ export function run(): number {
 
   const result = await runCheckCodeStyle(filePath);
 
-  assertEquals(result.output.includes("[decorative-comment]"), false, result.output);
+  assertFalse(result.output.includes("[decorative-comment]"), result.output);
 });
 
 Deno.test("check_code_style does not exempt lines after a backtick inside a regex literal", async () => {
@@ -832,7 +832,7 @@ Deno.test("check_code_style exempts text inside a real multi-line template liter
   const result = await runCheckCodeStyle(filePath);
 
   assertEquals(result.code, 0, result.output);
-  assertEquals(result.output.includes("[promise-response-return]"), false, result.output);
+  assertFalse(result.output.includes("[promise-response-return]"), result.output);
 });
 
 Deno.test("check_code_style is not fooled by comment, escaped-string, or nested template backticks", async () => {
