@@ -524,6 +524,7 @@ function discoverPublicPackageAliases(): IPublicPackageAlias[] {
   const denoJsonPath = join(REPO_ROOT, "deno.json");
 
   try {
+    // SAFETY: deno.json is local config, and only its optional imports map is read.
     const denoJson = JSON.parse(Deno.readTextFileSync(denoJsonPath)) as {
       imports?: Record<string, string>;
     };
@@ -1491,6 +1492,19 @@ interface IMultilineFixtureLines {
   readonly warn: Set<number>;
 }
 
+/** A TOML section header or `schema_version:` opens a document, so it is a fixture at any size. */
+function isDocumentFixture(run: ITemplateRun): boolean {
+  return run.closed && run.firstNonEmptyLine !== null &&
+    (/^\[[A-Za-z_]/.test(run.firstNonEmptyLine) || /^schema_version:/.test(run.firstNonEmptyLine));
+}
+
+/** A YAML front-matter or comment opening that reaches the minimum size is a fixture worth warning about. */
+function isWarnableFixture(run: ITemplateRun, minFixtureLines: number): boolean {
+  return run.closed && !run.containsInterpolation && run.lineCount >= minFixtureLines &&
+    run.firstNonEmptyLine !== null &&
+    (run.firstNonEmptyLine.startsWith("---") || run.firstNonEmptyLine.startsWith("#"));
+}
+
 /** Scans multi-line template fixtures and classifies each opening line as exempt or warn. */
 function collectMultilineFixtureLines(lines: string[], minFixtureLines: number): IMultilineFixtureLines {
   const exempt = new Set<number>();
@@ -1502,18 +1516,13 @@ function collectMultilineFixtureLines(lines: string[], minFixtureLines: number):
     const line = lines[idx];
     if (!anyTemplateStartRegex.test(line) || /`[^`]*`/.test(line)) continue;
     const run = scanTemplateRun(lines, idx);
-    // A TOML section header or `schema_version:` opens a document, so it is a fixture at any size.
-    const looksLikeDocument = run.closed && run.firstNonEmptyLine !== null &&
-      (/^\[[A-Za-z_]/.test(run.firstNonEmptyLine) || /^schema_version:/.test(run.firstNonEmptyLine));
-    const shouldWarn = run.closed && !run.containsInterpolation && run.lineCount >= minFixtureLines &&
-      run.firstNonEmptyLine !== null &&
-      (run.firstNonEmptyLine.startsWith("---") || run.firstNonEmptyLine.startsWith("#"));
-    if (looksLikeDocument) {
-      warn.add(idx + 1);
+    const lineNumber = idx + 1;
+    if (isDocumentFixture(run)) {
+      warn.add(lineNumber);
     } else if (fixtureStartRegex.test(line)) {
-      if (!run.closed || run.containsInterpolation || run.lineCount < minFixtureLines) exempt.add(idx + 1);
-    } else if (shouldWarn) {
-      warn.add(idx + 1);
+      if (!run.closed || run.containsInterpolation || run.lineCount < minFixtureLines) exempt.add(lineNumber);
+    } else if (isWarnableFixture(run, minFixtureLines)) {
+      warn.add(lineNumber);
     }
   }
   return { exempt, warn };
@@ -1697,6 +1706,7 @@ async function checkFile(path: string) {
 /** Whole-tree duplicate type-contract pass, run after the per-file checks. */
 function runDuplicateTypePass(): void {
   const settings = ruleSettings(CATALOG, "duplicate-type");
+  // SAFETY: the catalog loader validates rule options against their schema before this read.
   const options = settings.options as {
     minProperties?: number;
     allow?: Array<{ name: string; files: string[]; reason: string }>;
@@ -2436,8 +2446,10 @@ function checkFileFromText(path: string, text: string, catalog: ICatalog): void 
   const minFixtureLines = Number(ruleSettings(catalog, "test-inline-multiline-fixture").options.minLines ?? 7);
 
   const commentSettings = ruleSettings(catalog, "long-comment").options;
+  // SAFETY: the catalog loader validates the comment extension list against its schema.
   const commentExtensions =
     (commentSettings.extensions ?? [".ts", ".tsx", ".yaml", ".yml", ".toml", ".jsonc"]) as string[];
+  // SAFETY: the catalog loader validates the comment override table against its schema.
   const commentOverrides = (commentSettings.overrides ?? {}) as Record<string, { maxLines?: number }>;
   const extension = repoPath.slice(repoPath.lastIndexOf("."));
   if (extension !== ".ts" && extension !== ".tsx") {
@@ -2643,6 +2655,7 @@ function emitTaggedFindings(buffered: string[], tags: Set<string>): void {
 
 /** Walks the requested paths and runs every enabled rule over each file. */
 async function runAllChecks(manualPaths: string[]): Promise<void> {
+  // SAFETY: the catalog loader validates the walk extension list against its schema.
   const walkExtensions = (ruleSettings(CATALOG, "long-comment").options.extensions ??
     [".ts", ".tsx"]) as string[];
 

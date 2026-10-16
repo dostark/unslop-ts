@@ -24,11 +24,12 @@
 
 import ts from "typescript";
 import { walk } from "@std/fs";
-import { globToRegExp, join, relative } from "@std/path";
+import { globToRegExp, relative } from "@std/path";
 import { classifyPath, type PathClass } from "@exaix/lint-rules";
 import { LAYOUT } from "./repo_layout.ts";
 import catalogJson from "../../../../scripts/config/style_rule_catalog.json" with { type: "json" };
 
+// SAFETY: the catalog loader validates the scopes section against its schema.
 const CATALOG_SCOPES = catalogJson.scopes as { test: string[]; fixture: string[] };
 
 // CLI flags
@@ -695,7 +696,9 @@ const DUPLICATE_UNITS: Array<{ path: string; text: string }> = [];
 
 /** Whole-tree duplicate-constant pass, run after the per-file checks. */
 function runDuplicateConstantPass(): number {
+  // SAFETY: the catalog loader validates the duplicate-constant options against their schema.
   const options = (catalogJson.rules["duplicate-constant"]?.options ?? {}) as IDuplicateConstantOptions;
+  // SAFETY: the catalog loader validates the duplicate-constant include list against its schema.
   const include = (catalogJson.rules["duplicate-constant"]?.include ?? []) as string[];
   const units = DUPLICATE_UNITS.filter((unit) =>
     unit.path.startsWith(LAYOUT.packageRoot) || unit.path.startsWith(LAYOUT.appRoot)
