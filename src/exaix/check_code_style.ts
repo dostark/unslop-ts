@@ -61,7 +61,10 @@ const SCRIPT_RULE_SCHEMAS: ScriptRuleSchemas = {
       z.object({ name: z.string(), files: z.array(z.string()), reason: z.string() }).strict(),
     ).default([]),
   }).strict(),
-  "long-comment": z.object({ maxLines: z.number().int().positive().default(3) }).strict(),
+  "long-comment": z.object({
+    maxLines: z.number().int().positive().default(3),
+    extensions: z.array(z.string().min(2)).default([".ts", ".tsx", ".yaml", ".yml"]),
+  }).strict(),
   "test-inline-multiline-fixture": z.object({ minLines: z.number().int().positive().default(7) }).strict(),
   "edition-leak": z.object({
     soloTier: z.number().int().default(0),
@@ -1177,6 +1180,34 @@ function checkCommentDates(repoPath: string, text: string): void {
       "Comment contains a calendar date; time-specific context belongs in version control or project documentation, not code comments that should remain durable.",
     );
   }
+}
+
+/**
+ * Applies the comment-length rule to a YAML file, where a comment is a run of `#` lines.
+ * The leading block is exempt, as it is for a module header in TypeScript.
+ */
+function checkYamlComments(repoPath: string, lines: string[], maxLines: number): void {
+  let run: string[] = [];
+  let runStart = 0;
+  let seenContent = false;
+  const flush = (): void => {
+    if (run.length === 0) return;
+    if (seenContent && run.length > maxLines) {
+      evaluateInModuleComment(repoPath, runStart, run, maxLines);
+    }
+    run = [];
+  };
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (line.trim().startsWith("#")) {
+      if (run.length === 0) runStart = index + 1;
+      run.push(line);
+      continue;
+    }
+    flush();
+    if (line.trim() !== "") seenContent = true;
+  }
+  flush();
 }
 
 // Evaluates one already-closed comment (a block comment or a run of consecutive
@@ -2398,6 +2429,17 @@ function checkFileFromText(path: string, text: string, catalog: ICatalog): void 
   const longCommentMaxLines = Number(ruleSettings(catalog, "long-comment").options.maxLines ?? 3);
   const minFixtureLines = Number(ruleSettings(catalog, "test-inline-multiline-fixture").options.minLines ?? 7);
 
+  const commentExtensions = (ruleSettings(catalog, "long-comment").options.extensions ??
+    [".ts", ".tsx", ".yaml", ".yml"]) as string[];
+  const extension = repoPath.slice(repoPath.lastIndexOf("."));
+  if (extension !== ".ts" && extension !== ".tsx") {
+    // Only the comment rules read a non-TypeScript file, so no TypeScript check sees it.
+    if (commentExtensions.includes(extension) && (extension === ".yaml" || extension === ".yml")) {
+      checkYamlComments(repoPath, lines, longCommentMaxLines);
+    }
+    return;
+  }
+
   // Single parse per file: the layer-leak check and the template-literal line
   // ranges both read from this SourceFile.
   const sourceFile = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
@@ -2589,6 +2631,9 @@ function emitTaggedFindings(buffered: string[], tags: Set<string>): void {
 
 /** Walks the requested paths and runs every enabled rule over each file. */
 async function runAllChecks(manualPaths: string[]): Promise<void> {
+  const walkExtensions = (ruleSettings(CATALOG, "long-comment").options.extensions ??
+    [".ts", ".tsx"]) as string[];
+
   if (manualPaths.length > 0) {
     for (const p of manualPaths) {
       const fullPath = p.startsWith("/") ? p : join(Deno.cwd(), p);
@@ -2600,7 +2645,7 @@ async function runAllChecks(manualPaths: string[]): Promise<void> {
           for await (
             const entry of walk(fullPath, {
               includeDirs: false,
-              exts: [".ts", ".tsx"],
+              exts: walkExtensions,
               followSymlinks: false,
               skip: IGNORE_GLOBS,
             })
@@ -2618,7 +2663,7 @@ async function runAllChecks(manualPaths: string[]): Promise<void> {
   for await (
     const entry of walk(REPO_ROOT, {
       includeDirs: false,
-      exts: [".ts", ".tsx"],
+      exts: walkExtensions,
       followSymlinks: false,
       skip: IGNORE_GLOBS,
     })

@@ -50,3 +50,36 @@ Deno.test("checkSource returns in-process findings without printing", () => {
   );
   assertEquals(findings.some((f) => f.rule === "promise-response-return" && f.line === 2), true);
 });
+
+Deno.test("a long YAML comment is reported under the configured extensions", () => {
+  const source = "key: value\n# one\n# two\n# three\n# four\nother: value\n";
+  const findings = checkSource("configs/probe.yaml", source, parseCatalog(catalogJson)).filter((f) =>
+    f.rule === "long-comment"
+  );
+  assertEquals(findings.length, 1);
+});
+
+Deno.test("catalog long-comment maxLines raises the YAML comment length too", () => {
+  const source = "key: value\n# one\n# two\n# three\n# four\nother: value\n";
+  const raised = catalogWith((rules) => {
+    (rules["long-comment"] as Record<string, JsonValue>).options = { maxLines: 5, extensions: [".yaml"] };
+  });
+  assertEquals(checkSource("configs/probe.yaml", source, raised).filter((f) => f.rule === "long-comment").length, 0);
+});
+
+Deno.test("catalog long-comment extensions filter a file out", () => {
+  const source = "key: value\n# one\n# two\n# three\n# four\nother: value\n";
+  const filtered = catalogWith((rules) => {
+    (rules["long-comment"] as Record<string, JsonValue>).options = { maxLines: 3, extensions: [".ts"] };
+  });
+  assertEquals(checkSource("configs/probe.yaml", source, filtered).filter((f) => f.rule === "long-comment").length, 0);
+});
+
+Deno.test("a leading YAML comment block is exempt, like a module header", () => {
+  const source = "# one\n# two\n# three\n# four\nkey: value\n";
+  assertEquals(
+    checkSource("configs/probe.yaml", source, parseCatalog(catalogJson)).filter((f) => f.rule === "long-comment")
+      .length,
+    0,
+  );
+});
