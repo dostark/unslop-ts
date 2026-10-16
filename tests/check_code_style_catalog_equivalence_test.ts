@@ -4,7 +4,7 @@
  * @description Locks the catalog-driven findings and proves catalog/code rule parity.
  */
 
-import { assertEquals } from "@std/assert";
+import { assertArrayIncludes, assertEquals } from "@std/assert";
 import { parseCatalog } from "@exaix/lint-rules";
 import { checkSource, IMPLEMENTED_SCRIPT_RULE_IDS } from "../src/exaix/check_code_style.ts";
 import catalogJson from "../../../scripts/config/style_rule_catalog.json" with { type: "json" };
@@ -23,6 +23,6 @@ Deno.test("checkSource findings are stable for the committed catalog", () => {
   const source = "export type A = Promise<" + "Response>;\nexport function f(): Promise<" +
     "Response> {\n  return fetch('x');\n}\n";
   const rules = checkSource(PROD, source, parseCatalog(catalogJson)).map((f) => f.rule).sort();
-  assertEquals(rules.includes("promise-response-alias"), true);
-  assertEquals(rules.includes("promise-response-return"), true);
+  assertArrayIncludes(rules, ["promise-response-alias"]);
+  assertArrayIncludes(rules, ["promise-response-return"]);
 });
