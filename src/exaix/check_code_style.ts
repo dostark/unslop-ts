@@ -1465,13 +1465,13 @@ function collectMultilineFixtureLines(lines: string[], minFixtureLines: number):
     const line = lines[idx];
     if (!anyTemplateStartRegex.test(line) || /`[^`]*`/.test(line)) continue;
     const run = scanTemplateRun(lines, idx);
-    // A TOML document opens with a section header, so it is a fixture at any size.
-    const looksLikeConfig = run.closed && run.firstNonEmptyLine !== null &&
-      /^\[[A-Za-z_]/.test(run.firstNonEmptyLine);
+    // A TOML section header or `schema_version:` opens a document, so it is a fixture at any size.
+    const looksLikeDocument = run.closed && run.firstNonEmptyLine !== null &&
+      (/^\[[A-Za-z_]/.test(run.firstNonEmptyLine) || /^schema_version:/.test(run.firstNonEmptyLine));
     const shouldWarn = run.closed && !run.containsInterpolation && run.lineCount >= minFixtureLines &&
       run.firstNonEmptyLine !== null &&
       (run.firstNonEmptyLine.startsWith("---") || run.firstNonEmptyLine.startsWith("#"));
-    if (looksLikeConfig) {
+    if (looksLikeDocument) {
       warn.add(idx + 1);
     } else if (fixtureStartRegex.test(line)) {
       if (!run.closed || run.containsInterpolation || run.lineCount < minFixtureLines) exempt.add(idx + 1);
