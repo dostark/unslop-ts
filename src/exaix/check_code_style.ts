@@ -331,25 +331,26 @@ function isProductionModulePath(repoPath: string): boolean {
   const isTestFile = repoPath.includes(LAYOUT.testsSegment) ||
     repoPath.endsWith("_test.ts") ||
     repoPath.endsWith(".test.ts");
-  // Test-infrastructure modules are NOT deployable production code: the @exaix/testing
-  // package and any `*/testing/` compatibility shim exist to provide test helpers and may
-  // legitimately bridge to tests/. They never ship in a production deploy.
+  // Test-infrastructure modules are not deployable production code.
+  // The @exaix/testing package and any `*/testing/` shim provide test helpers.
+  // They may bridge to tests/ and never ship in a production deploy.
   const isTestInfra = repoPath.startsWith(LAYOUT.testingPackageRoot) ||
     repoPath.includes(LAYOUT.testingSegment);
   return isProductionRoot && !isTestFile && !isTestInfra;
 }
 
 /**
- * True when a production module (packages/, exaix-team/, apps/) imports from the
- * root tests/ folder. Functional deployable modules must not depend on test code: it
- * is excluded from a deployed workspace, so such an import breaks the deployed
- * exactl/daemon at module load. This is the EvalSqliteStore-under-tests/ layering bug.
- * Test files are exempt — they may import test helpers/fixtures.
+ * True when a production module in packages/, apps/ or exaix-team/ imports tests/.
+ * A deployable module must not depend on test code.
+ * A deployed workspace excludes tests/, so the import breaks at module load.
+ * This is the EvalSqliteStore-under-tests/ layering bug.
+ * Test files are exempt, and they may import test helpers and fixtures.
  */
 export function isProductionToTestsImport(repoPath: string, specifier: string): boolean {
   if (!isProductionModulePath(repoPath)) return false;
-  if (!isRepoRelativeSpecifier(specifier)) return false; // bare alias / URL — not a tests/ path
-  // Resolve the specifier against the importing file's directory; flag if it lands in tests/.
+  if (!isRepoRelativeSpecifier(specifier)) return false; // bare alias or URL, not a tests/ path.
+  // Resolve the specifier against the importing file's directory.
+  // Flag the specifier when the resolved path lands in tests/.
   const resolved = specifier.startsWith(".") ? normalize(join(dirname(repoPath), specifier)) : specifier;
   return resolved === "tests" || resolved.startsWith(LAYOUT.testsRoot);
 }
@@ -362,17 +363,17 @@ function isTeamDynamicImportLine(line: string): boolean {
   return /\bimport\s*\(\s*["'](@exaix-team\/|\.\/src\/bootstrap_team)/.test(line);
 }
 
-/** True when the import sits in one of the two sanctioned edition-dispatch entry points —
- *  including their Team-edition counterparts under exaix-team/, which are the same dispatch
- *  mechanism for the Team app and carry the same edition-gated dynamic `@exaix-team/*` import. */
+/** True when the import sits in one of the two sanctioned edition-dispatch entry points.
+ *  Those points include the Team-edition counterparts under exaix-team/.
+ *  They use the same dispatch mechanism and carry the same edition-gated dynamic import. */
 function isEditionDispatchEntry(repoPath: string): boolean {
   return LAYOUT.editionAppPrefixes.some((prefix) => repoPath.startsWith(prefix));
 }
 
 /**
- * True when an `editionType` guard (`editionType === EDITION_TEAM` / `!== EDITION_SOLO`)
- * appears within the preceding-lines window — proof the dynamic import is reached only in a
- * non-Solo run, not loaded unconditionally at module scope.
+ * True when an `editionType` guard appears within the preceding-lines window.
+ * The guard proves the dynamic import is reached only in a non-Solo run.
+ * Without it the module would load unconditionally at module scope.
  */
 function precededByEditionGuard(precedingLines: string[]): boolean {
   const window = precedingLines.slice(-EDITION_GUARD_LOOKBACK_LINES);
@@ -380,22 +381,24 @@ function precededByEditionGuard(precedingLines: string[]): boolean {
 }
 
 /**
- * Shape check (line-only): a dynamic Team import in a dispatch entry. Used by the
- * dynamic-import / import-inside-statement STYLE exemptions, which only need to recognise
- * the sanctioned shape — the stricter edition-guard check below governs the edition-leak rule.
+ * Shape check on one line: a dynamic Team import in a dispatch entry.
+ * The dynamic-import and import-inside-statement style exemptions use it.
+ * They only need the sanctioned shape.
+ * The stricter edition-guard check below governs the edition-leak rule.
  */
 function isEditionGatedTeamDynamicImport(repoPath: string, line: string): boolean {
   return isEditionDispatchEntry(repoPath) && isTeamDynamicImportLine(line);
 }
 
 /**
- * True for a genuinely edition-gated dynamic Team import: it is in a dispatch entry, is a
- * dynamic `import("@exaix-team/...")`, AND is preceded by an `editionType` guard. This is
- * the ONLY allowed upper-edition value reference in lower-edition source — a Solo source-run
- * never executes it, so the Team module is never loaded and the deploy can omit exaix-team/.
- * (A dynamic import without an edition guard would load Team code even in Solo — the hole this
- * closes; `deno compile` bundles it either way, which is why the deploy ships source, not a
- * compiled binary — see dev/Exaix_Edition_Architecture.md.)
+ * True for a genuinely edition-gated dynamic Team import.
+ * It sits in a dispatch entry, is dynamic, and is preceded by an `editionType` guard.
+ * It is the only allowed upper-edition value reference in lower-edition source.
+ * A Solo source-run never executes it, so the Team module never loads.
+ *
+ * Without an edition guard the import would load Team code even in Solo.
+ * A deploy ships source, not a compiled binary, so the guard keeps Solo clean.
+ * See dev/Exaix_Edition_Architecture.md.
  */
 function isGuardedEditionDynamicImport(repoPath: string, line: string, precedingLines: string[]): boolean {
   return isEditionDispatchEntry(repoPath) &&
@@ -454,17 +457,17 @@ function editionTierOfSpecifier(specifier: string): number | null {
 }
 
 /**
- * True when a module imports from a HIGHER edition tier than its own — the edition leak
- * that couples a lower edition's source/build to code shipped or licensed separately
- * (e.g. a Solo app importing BSL Team code → the Team-into-Solo deploy/bundle leak).
- * Tiers: Solo (packages/, apps/) < Team (exaix-team/) < Enterprise (exaix-enterprise/).
+ * True when a module imports from a higher edition tier than its own.
+ * That leak couples a lower edition's source to code licensed separately.
+ * One example is a Solo app importing BSL Team code.
+ * The tier order is packages/ and apps/, then exaix-team/, then exaix-enterprise/.
  *
- * Exemptions: test files (integration tests may exercise higher tiers); type-only imports
- * (erased at compile, so they never enter a build); and the single sanctioned exception —
- * a GENUINELY edition-gated dynamic `await import("@exaix-team/...")` in a dispatch entry,
- * i.e. one preceded by an `editionType` guard (see `isGuardedEditionDynamicImport`). A
- * dynamic import without an edition guard is NOT exempt — it would load Team code even in a
- * Solo run. `precedingLines` is the source lines above `line`, used to verify the guard.
+ * Test files are exempt, because integration tests may exercise higher tiers.
+ * Type-only imports are exempt, because they are erased at compile.
+ * A dynamic Team import in a dispatch entry is exempt when a guard precedes it.
+ * A dynamic import without a guard is not exempt.
+ * It would load Team code even in a Solo run.
+ * The guard check reads `precedingLines`, the source above `line`.
  */
 export function isEditionLeakImport(
   repoPath: string,
@@ -542,8 +545,8 @@ function discoverPublicPackageAliases(): IPublicPackageAlias[] {
         continue;
       }
 
-      // Root packages are two segments deep (packages/<name>/...); exaix-team's own
-      // packages/apps are one level deeper (exaix-team/{packages,apps}/<name>/...).
+      // A root package is two segments deep relative to the repository root.
+      // A Team package or app sits one level deeper under exaix-team/.
       const rootSegments = entryPath.startsWith(LAYOUT.teamRoot) ? 3 : 2;
       const segments = entryPath.split("/");
       const packageName = segments[rootSegments - 1];
@@ -714,21 +717,18 @@ Description:
   Deno.exit(0);
 }
 
-// ── Layer-Aware Constant Imports (AST-based) ────────────────────────────────
+// Layer-aware constant imports, checked on the syntax tree.
 //
-// Detects when a file in package P imports a **value** (non-type) from a
-// domain-implementation package Q — a sign that the orchestrator may be
-// bypassing the service boundary and depending on low-level implementation
-// details that belong inside the service.
+// The check fires when a file in package P value-imports a symbol from a
+// domain-implementation package Q.
+// That pattern suggests the orchestrator bypasses the service boundary.
 //
-// Domain-implementation packages export concrete classes, command constants,
-// and runtime primitives.  Framework/API packages export interfaces, types,
-// enums, and event names.
+// Domain-implementation packages export classes, command constants and runtime
+// primitives.
+// Framework and API packages export interfaces, types, enums and event names.
 //
-// The check is AST-based (uses the TypeScript compiler API) rather than
-// regex-based, so it correctly handles multi-line imports, type-only imports,
-// and per-binding type annotations.
-// ────────────────────────────────────────────────────────────────────────────
+// The check uses the TypeScript compiler API, not regular expressions.
+// It handles multi-line imports, type-only imports and per-binding type annotations.
 
 /**
  * Framework/API packages that export shared contracts — value imports
@@ -747,15 +747,13 @@ const LAYER_LEAK_FRAMEWORK = new Set([
 const LAYER_LEAK_EXEMPT = new Set(LAYOUT.layerLeakExempt.map((entry) => entry.path));
 
 /**
- * Structural AST analysis: detect when a file in package P value-imports
- * a class from domain package Q and instantiates it with `new Q(...)`.
+ * Detects a file that value-imports a class from another domain package.
+ * It looks for a `new` call on that class.
  *
- * No hardcoded symbol names — the check is purely structural:
- *  1. Parse all import declarations (AST)
- *  2. Build a map of imported names → source packages
- *  3. Walk all NewExpression nodes
- *  4. If the constructor identifier matches an imported value from a
- *     different domain package, flag it.
+ * The check is structural and names no symbols.
+ * It parses all import declarations and maps each imported name to its package.
+ * Then it walks every `NewExpression` node.
+ * A constructor that matches an imported value from another domain package is flagged.
  */
 function isFrameworkSpecifier(specifier: string): boolean {
   if (LAYER_LEAK_FRAMEWORK.has(specifier)) return true;
@@ -924,10 +922,9 @@ function checkLayerLeaks(sourceFile: ts.SourceFile, repoPath: string): void {
   reportLayerConstantLeaks(imported, sourceFile, repoPath);
 }
 
-// Rules correspond to the code style guidelines in CODE_STYLE.md.  When a
-// violation is found we print a human-friendly explanation; the script exits
-// with a non-zero status if any errors were detected so it can be used in
-// pre-commit hooks or CI.
+// The rules match the code style guidelines in CODE_STYLE.md.
+// A violation prints a plain-language explanation.
+// The script exits non-zero when it finds any error, so hooks and CI can gate on it.
 const rules: Rule[] = [
   {
     name: "import-inside-statement",
@@ -946,11 +943,9 @@ const rules: Rule[] = [
   },
   {
     name: "inline-type-import",
-    // Matches import("...").Something used as a type annotation, e.g.:
-    //   Promise<import("./foo.ts").IFoo>
-    //   : import("./bar.ts").Bar
-    // Excludes `typeof import("...").Foo` which is the legitimate pattern for
-    // typing the result of a dynamic import helper without a top-level import.
+    // This matches `import("...").Something` in a type annotation, as in `Promise<import("./foo.ts").IFoo>`.
+    // It excludes `typeof import("...").Foo`.
+    // That form types the result of a dynamic import helper without a top-level import.
     regex: /(?<!typeof\s+)import\s*\(\s*["'][^"']+["']\s*\)\s*\.\s*\w/,
     message: 'Inline type imports (e.g. `import("./foo.ts").IFoo` inside a type annotation) are prohibited. ' +
       'Declare an explicit `import type { IFoo } from "./foo.ts"` at the top of the file.',
@@ -1000,20 +995,22 @@ const rules: Rule[] = [
   },
   {
     name: "magic-union-type",
-    // Match inline union of string literals: "foo" | "bar"
-    // Use word boundaries and double quotes to identify string literals
-    // Skip lines that start with 'type ' or 'export type ' (named type alias definitions are the
-    // recommended solution, not a violation)
+    // This matches an inline union of string literals such as `"foo" | "bar"`.
+    // Word boundaries and double quotes identify the string literals.
+    // A line that starts with `type ` or `export type ` is skipped.
+    // A named type alias is the recommended solution, not a violation.
     regex: /^(?!\s*(?:export\s+)?type\s+).*"\w+"\s*\|\s*"\w+"/,
     message: "Avoid magic string unions (e.g., '\"a\" | \"b\"'). Define a TypeScript 'enum' in " +
       `${LAYOUT.packageRoot}core/${LAYOUT.srcRoot}types/enums.ts or use a shared named union type instead.`,
   },
-  // NOTE: the former [mit-team-import] regex rule (packages/ must not import packages-team/)
-  // is superseded by the [edition-leak] check in checkFile(), which enforces the full tier
-  // model (Solo < Team < Enterprise) across packages/, apps/, and exaix-team/ with
-  // type-only + edition-gated-dynamic exemptions. See isEditionLeakImport().
-  // NOTE: the former [layer-constant-leak] regex rule is superseded by the AST-based
-  // checkLayerLeaks() called from checkFile(), which uses the TypeScript compiler API.
+  // The former [mit-team-import] regex rule is superseded.
+  // The [edition-leak] check in checkFile() replaces it with the full tier order.
+  // That order runs Solo, then Team, then Enterprise.
+  // Type-only and edition-gated dynamic imports stay exempt.
+  // See isEditionLeakImport().
+  //
+  // The former [layer-constant-leak] regex rule is also superseded, by checkLayerLeaks().
+  // That check is AST-based and uses the TypeScript compiler API.
   {
     name: "edition-conditional-outside-composer",
     // Forbid edition conditionals (edition ===, edition !==, EXAIX_EDITION)
@@ -1082,11 +1079,12 @@ function parseExclusionComment(line: string, ruleName: string): { code: string; 
   return null;
 }
 
-// Matches a run of 4+ repeated separator/decoration characters anywhere on a comment
-// line — pure banner lines ("// ====...") and text wrapped in dashes ("// ── Foo ──...")
-// alike. Threshold is 4, not 3, so a 3-char code echo in prose (e.g. `x === ""`) doesn't
-// false-positive against the real `===`/`!==` operators. `#` is excluded: this codebase
-// never uses it for banners, and it collides with markdown heading examples like `######`.
+// This matches a run of four or more repeated separator characters on a comment line.
+// It covers both pure banner lines and text wrapped in dashes.
+// The threshold is four, not three.
+// A short code echo in prose must not match the real comparison operators.
+// The `#` character is excluded, because this codebase never uses it for banners.
+// It also collides with markdown heading examples such as `######`.
 const DECORATIVE_COMMENT_LINE_PATTERN = /[=\-_~*─━═▬•]{4,}/;
 
 const EPHEMERAL_COMMENT_PATTERNS: { pattern: RegExp; hint: string }[] = [
@@ -1134,10 +1132,12 @@ function reportCommentViolation(
   else warnCount++;
 }
 
-// Matches only a NUMBERED plan-phase reference ("phase147_", "phase_2_") — bare "phase"
-// and any "step" form are deliberately exempt (see CODE_STYLE.md): "step" is an
-// established domain term here (flow/execution steps, PhaseStepManifestParser) independent
-// of plan-phase numbering, and banning it would flag dozens of correctly-named files.
+// This matches only a numbered plan-phase reference such as `phase147_`.
+// A bare phase word and any step form are deliberately exempt.
+// The step word is an established domain term for flow and execution steps.
+// It is independent of plan-phase numbering.
+// Banning it would flag dozens of correctly named files.
+// See CODE_STYLE.md.
 const EPHEMERAL_TEST_FILENAME_PATTERN = /(?:^|[_.-])phase[-_]?(\d+)(?:[_.-]|$)/i;
 
 function checkTestFileName(repoPath: string): void {
