@@ -16,7 +16,7 @@ function parentOf(node: ILintNode): ILintNode | undefined {
   return parent && typeof parent === "object" ? asNode(parent) : undefined;
 }
 
-function isObject(value: unknown): boolean {
+function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
 

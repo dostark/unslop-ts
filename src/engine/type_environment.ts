@@ -43,8 +43,8 @@ export function asNode(node: LintValue): ILintNode {
 /** The ESTree `Identifier` node type, shared so the literal appears once. */
 export const NODE_IDENTIFIER = "Identifier";
 
-/** True when a value is a node-like object with a string `type`. */
-export function isNodeLike(value: unknown): boolean {
+/** Narrows a value to a node-like object with a string `type`, so a caller keeps the evidence. */
+export function isNodeLike(value: unknown): value is ILintNode {
   return value !== null && typeof value === "object" && typeof (value as { type?: unknown }).type === "string";
 }
 
