@@ -12,6 +12,7 @@
  *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  */
 
+import { DEFAULT_RUNTIME_PATH } from "@exaix/shared";
 import { relative } from "@std/path";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
 import {
@@ -121,7 +122,9 @@ async function stagedTargetFiles(includeTests: boolean): Promise<string[]> {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.endsWith(".ts") || line.endsWith(".tsx"))
-    .filter((line) => !line.includes("/.copilot/") && !line.includes("/.exa/") && !line.includes("/types/"))
+    .filter((line) =>
+      !line.includes("/.copilot/") && !line.includes(`/${DEFAULT_RUNTIME_PATH}/`) && !line.includes("/types/")
+    )
     .filter((line) => !WHOLE_TREE_SETTINGS.optionalParams.skipSegments.some((segment) => line.includes(segment)))
     .filter((line) =>
       includeTests ||
