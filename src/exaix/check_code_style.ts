@@ -738,6 +738,8 @@ Description:
 const LAYER_LEAK_FRAMEWORK = new Set([
   "@exaix/core",
   "@exaix/schemas",
+  // The shared package holds the constants below core and schemas, so it is part of the same contract layer.
+  "@exaix/shared",
   "@exaix/ai",
   "@exaix/cli",
   "@exaix/tui",
