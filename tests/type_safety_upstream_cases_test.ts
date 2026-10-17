@@ -250,8 +250,7 @@ const NO_OBJECT_PARAMETERS: IUpstreamGroup = {
   ],
 };
 
-// anti-slop no-unsafe-dictionary-type maps to exaix/no-unsafe-dictionary.
-// The local rule adds Map<K, V> by the Step 6 decision, and it allows a generic constraint.
+// anti-slop no-unsafe-dictionary-type maps to exaix/no-unsafe-dictionary. The local rule also covers Map<K, V> and allows a generic constraint.
 // It does not follow wrapper types or non-alias declarations in the value position.
 
 const NO_UNSAFE_DICTIONARY: IUpstreamGroup = {
