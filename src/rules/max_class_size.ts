@@ -52,7 +52,7 @@ function paramCount(method: ILintNode): number {
 }
 
 /** Collects the class indicators, or null when the class is under `minClassLines`. */
-export function collectClassIndicators(
+function collectClassIndicators(
   classNode: ILintNode,
   text: string,
   importCount: number,
@@ -92,7 +92,7 @@ export function collectClassIndicators(
 }
 
 /** The check_god_objects.ts score for the collected indicators. */
-export function classSizeScore(m: IClassIndicators, minClassLines: number): number {
+function classSizeScore(m: IClassIndicators, minClassLines: number): number {
   const methodTerm = Math.min(m.methodCount, METHOD_CAP) * METHOD_WEIGHT;
   const ctorTerm = m.ctorParams > CTOR_PARAM_LIMIT ? m.ctorParams * CTOR_WEIGHT : 0;
   const lineTerm = Math.max(0, (m.lineCount - minClassLines) / LINE_DIVISOR);

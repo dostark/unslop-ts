@@ -5,6 +5,7 @@
  * @architectural-layer Tooling
  * @dependencies []
  * @related-files [packages/lint-rules/src/engine/catalog.ts, tests/scripts/rule_ceiling_ratchet_test.ts]
+ * @public Exports are the unit-test surface of this module.
  */
 
 /** Per-rule, per-package finding counts. */

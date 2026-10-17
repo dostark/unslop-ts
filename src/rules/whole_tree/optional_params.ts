@@ -6,6 +6,7 @@
  * @architectural-layer Shared
  * @dependencies [typescript, @std/fs]
  * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts, packages/lint-rules/src/cli/whole_tree.ts]
+ * @public Exports are the unit-test surface of this module.
  */
 
 import ts from "typescript";
@@ -105,7 +106,7 @@ export function hasBareOptional(
 }
 
 /** The hint that shows the wrapper rewrite for a bare-optional parameter. */
-export function bareOptionalMessage(
+function bareOptionalMessage(
   param: { name: string; typeText: string; hasQuestionToken: boolean },
   settings: IOptionalParamsSettings,
 ): string {
@@ -205,7 +206,7 @@ export function collectFunctions(
 }
 
 /** Collect every call site name and argument count. */
-export function collectCallSites(sourceFile: ts.SourceFile, calls: ICallSite[]): void {
+function collectCallSites(sourceFile: ts.SourceFile, calls: ICallSite[]): void {
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const expr = node.expression;
@@ -289,7 +290,7 @@ interface IMatchedFunc {
 }
 
 /** Dedupe declarations by name, keeping the widest signature, paired with its call sites. */
-export function matchCallsToFuncs(
+function matchCallsToFuncs(
   funcs: Map<string, IFuncDecl[]>,
   calls: readonly ICallSite[],
 ): IMatchedFunc[] {
@@ -348,7 +349,7 @@ export function analyze(matched: readonly IMatchedFunc[]): IOptionalViolation[] 
 }
 
 /** The repository `.ts`/`.tsx` files in scope for the whole-tree run. */
-export async function collectTargetFiles(
+async function collectTargetFiles(
   repoRoot: string,
   includeTests: boolean,
   settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,

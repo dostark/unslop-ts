@@ -9,62 +9,62 @@
 
 import { z } from "zod";
 
-export const NoChainedTypeAssertionsOptions = z.object({
+const NoChainedTypeAssertionsOptions = z.object({
   allowPartialMockInTests: z.boolean().default(true),
   allowNeverAnyMockInTests: z.boolean().default(true),
 }).strict();
 
-export const NoExplicitUnknownOptions = z.object({
+const NoExplicitUnknownOptions = z.object({
   allowCatchBinding: z.boolean().default(true),
   allowTypePredicateSubject: z.boolean().default(true),
 }).strict();
 
-export const NoUnsafeDictionaryOptions = z.object({
+const NoUnsafeDictionaryOptions = z.object({
   forbiddenValueTypes: z.array(z.string()).default(["unknown", "any", "object", "{}"]),
 }).strict();
 
-export const NoAnyEscapeOptions = z.object({
+const NoAnyEscapeOptions = z.object({
   allowedTypeofTargets: z.array(z.string()).default(["globalThis.fetch"]),
   allowAnyInTests: z.boolean().default(true),
 }).strict();
 
-export const NoOptions = z.object({}).strict();
+const NoOptions = z.object({}).strict();
 
-export const RequireSafetyCommentOptions = z.object({
+const RequireSafetyCommentOptions = z.object({
   markers: z.array(z.string()).default(["SAFETY"]),
 }).strict();
 
-export const NoRuntimeTypeofOptions = z.object({
+const NoRuntimeTypeofOptions = z.object({
   allowInTypeGuards: z.boolean().default(true),
 }).strict();
 
-export const NoBooleanAssertOptions = z.object({
+const NoBooleanAssertOptions = z.object({
   methods: z.array(z.string()).default(["includes", "startsWith", "endsWith"]),
   assertFunctions: z.array(z.string()).default(["assert", "assertEquals", "assertStrictEquals"]),
 }).strict();
 
-export const NoRepeatedAssertCallOptions = z.object({
+const NoRepeatedAssertCallOptions = z.object({
   assertPrefix: z.string().default("assert"),
 }).strict();
 
-export const NoConstantSubstringAssertOptions = z.object({
+const NoConstantSubstringAssertOptions = z.object({
   constantPattern: z.string().default("^[A-Z][A-Z0-9_]*$"),
 }).strict();
 
-export const MaxCyclomaticComplexityOptions = z.object({
+const MaxCyclomaticComplexityOptions = z.object({
   max: z.number().int().positive().default(15),
 }).strict();
 
-export const MaxClassSizeOptions = z.object({
+const MaxClassSizeOptions = z.object({
   minClassLines: z.number().int().positive().default(200),
   threshold: z.number().nonnegative().default(60),
 }).strict();
 
-export const RequireOptionalWrapperOptions = z.object({
+const RequireOptionalWrapperOptions = z.object({
   wrapperType: z.string().default("Opt"),
 }).strict();
 
-export const IgnoreNeedsReasonOptions = z.object({
+const IgnoreNeedsReasonOptions = z.object({
   separator: z.string().default("--"),
 }).strict();
 

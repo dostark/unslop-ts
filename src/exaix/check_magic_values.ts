@@ -8,6 +8,7 @@
  * @architectural-layer Tooling
  * @dependencies [typescript, @std/fs, @std/path]
  * @related-files [packages/lint-rules/src/exaix/check_code_style.ts]
+ * @public Exports are the unit-test surface of this module.
  *
  * Usage:
  *   deno run -A packages/lint-rules/src/exaix/check_magic_values.ts          # strings + numbers
