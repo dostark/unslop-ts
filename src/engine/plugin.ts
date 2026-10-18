@@ -1,15 +1,31 @@
 /**
  * @module LintPluginFactory
  * @path packages/lint-rules/src/engine/plugin.ts
- * @description Builds a Deno lint plugin from a validated catalog, honouring severity, scope, and local selection.
+ * @description Builds a Deno lint plugin from a validated catalog and rule packs, honouring severity, scope, and local selection.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/catalog.ts, packages/lint-rules/src/rules/mod.ts]
+ * @related-files [packages/lint-rules/src/engine/catalog.ts, packages/lint-rules/src/engine/registry.ts]
  */
 
 import { globToRegExp } from "@std/path";
-import { PLUGIN_RULE_IMPLEMENTATIONS } from "../rules/mod.ts";
-import { classifyPath, type ICatalog, PATH_CLASS, type PathClass, type RuleScope, ruleSettings } from "./catalog.ts";
+import {
+  classifyPath,
+  type ICatalog,
+  PATH_CLASS,
+  type PathClass,
+  requireRegisteredPluginRules,
+  type RuleScope,
+  ruleSettings,
+  type RuleSeverity,
+} from "./catalog.ts";
+import { createRuleRegistry, type IRulePack } from "./registry.ts";
+
+/** Rule packs the plugin factory registers. */
+export interface ILintPluginOptions {
+  readonly rulePacks: readonly IRulePack[];
+}
+
+type CatalogRule = ICatalog["rules"][string];
 
 function parseSelection(value: string): Set<string> | null {
   if (value.trim() === "") return null;
@@ -59,28 +75,40 @@ function allows(repoPath: string, pathClass: PathClass, settings: ReturnType<typ
   return true;
 }
 
-export function createLintPlugin(name: string, catalog: ICatalog): Deno.lint.Plugin {
+/** True when the rule should report: severity, opt-in, and the local selection all allow it. */
+function isRuleActive(
+  entry: CatalogRule,
+  severity: RuleSeverity,
+  selection: Set<string> | null,
+  names: { readonly id: string; readonly key: string },
+): boolean {
+  const selected = selection !== null && isSelected(selection, names.id, names.key, entry.tags);
+  // An `off` rule runs only when it is opt-in and explicitly selected.
+  if (severity === "off") return entry.optIn === true && selected;
+  return selection === null || selected;
+}
+
+/** Builds the plugin. An inactive rule stays registered and returns no visitors, so Deno treats its ignores as known. */
+export function createLintPlugin(name: string, catalog: ICatalog, options: ILintPluginOptions): Deno.lint.Plugin {
+  const registry = createRuleRegistry(name, options.rulePacks);
+  requireRegisteredPluginRules(catalog, registry);
   const selection = parseSelection(Deno.env.get("EXAIX_LINT_RULES") ?? "");
   if (selection) {
     console.error(`[exaix-lint] EXAIX_LINT_RULES active: ${[...selection].join(", ")}`);
   }
 
   const rules: Record<string, Deno.lint.Rule> = {};
-  for (const [id, implementation] of Object.entries(PLUGIN_RULE_IMPLEMENTATIONS)) {
+  for (const id of registry.catalogIds()) {
+    const implementation = registry.implementation(id);
     const entry = catalog.rules[id];
-    if (!entry) continue;
-    const settings = ruleSettings(catalog, id);
-    const key = id.startsWith(`${name}/`) ? id.slice(name.length + 1) : id;
-    const selected = selection !== null && isSelected(selection, id, key, entry.tags);
-    if (settings.severity === "off") {
-      // An `off` rule runs only when it is opt-in AND explicitly selected.
-      if (!(entry.optIn === true && selected)) continue;
-    } else if (selection && !selected) {
-      continue;
-    }
+    if (!implementation || !entry) continue;
+    const settings = ruleSettings(catalog, id, registry);
+    const key = id.slice(registry.pluginName.length + 1);
+    const active = isRuleActive(entry, settings.severity, selection, { id, key });
 
     rules[key] = {
       create(context) {
+        if (!active) return {};
         const repoPath = repoRelative(context.filename);
         const pathClass = classifyPath(repoPath, catalog.scopes);
         if (!allows(repoPath, pathClass, settings)) return {};

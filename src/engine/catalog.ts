@@ -4,12 +4,12 @@
  * @description Loads and validates the style-rule catalog, classifies repo paths, and resolves rule settings.
  * @architectural-layer Shared
  * @dependencies [@std/path, zod]
- * @related-files [packages/lint-rules/mod.ts, packages/lint-rules/src/rules/rule_options.ts]
+ * @related-files [packages/lint-rules/mod.ts, packages/lint-rules/src/engine/registry.ts]
  */
 
 import { globToRegExp } from "@std/path";
 import { z } from "zod";
-import { RULE_OPTION_SCHEMAS } from "../rules/rule_options.ts";
+import type { IRuleRegistry } from "./registry.ts";
 
 export type PathClass = "prod" | "test" | "fixture";
 export type RuleScope = "prod" | "test" | "all";
@@ -28,9 +28,10 @@ export type JsonValue =
 /** Per-rule option schemas for script-engine rules, owned by the script that implements them. */
 export type ScriptRuleSchemas = Record<string, z.ZodTypeAny>;
 
-/** Loader context. `scriptRuleSchemas` is null when the caller only needs plugin-rule validation. */
+/** Loader context: the registry that resolves plugin rules, and the script-rule schemas (null skips them). */
 export interface ICatalogLoadOptions {
   readonly scriptRuleSchemas: ScriptRuleSchemas | null;
+  readonly registry: IRuleRegistry;
 }
 
 export interface IResolvedRuleSettings {
@@ -42,6 +43,8 @@ export interface IResolvedRuleSettings {
   readonly exclusionCodes?: Record<string, string>;
   readonly options: Record<string, JsonValue>;
 }
+
+const NO_IMPLEMENTATION_MESSAGE = "no plugin rule implementation is registered for this id";
 
 /** Path classes, named once so no bare literal repeats across the engine. */
 export const PATH_CLASS = { prod: "prod", test: "test", fixture: "fixture" } as const;
@@ -133,20 +136,15 @@ function validateRuleTags(id: string, entry: IRuleEntry, catalog: ICatalog): voi
   }
 }
 
-function optionSchemaFor(
-  id: string,
-  entry: IRuleEntry,
-  scriptSchemas: ScriptRuleSchemas | null,
-): z.ZodTypeAny | null {
+function optionSchemaFor(id: string, entry: IRuleEntry, options: ICatalogLoadOptions): z.ZodTypeAny | null {
   if (entry.engine === "plugin") {
-    const schema = RULE_OPTION_SCHEMAS[id];
-    if (!schema) {
-      throw new CatalogError(`rules.${id}`, "no plugin rule implementation is registered for this id");
+    if (options.registry.implementation(id) === null) {
+      throw new CatalogError(`rules.${id}`, NO_IMPLEMENTATION_MESSAGE);
     }
-    return schema;
+    return options.registry.optionSchema(id);
   }
-  if (!scriptSchemas) return null;
-  return scriptSchemas[id] ?? null;
+  if (!options.scriptRuleSchemas) return null;
+  return options.scriptRuleSchemas[id] ?? null;
 }
 
 function validateRuleOptions(id: string, entry: IRuleEntry, schema: z.ZodTypeAny | null): void {
@@ -157,12 +155,7 @@ function validateRuleOptions(id: string, entry: IRuleEntry, schema: z.ZodTypeAny
   }
 }
 
-function validateRuleEntry(
-  id: string,
-  entry: IRuleEntry,
-  catalog: ICatalog,
-  scriptSchemas: ScriptRuleSchemas | null,
-): void {
+function validateRuleEntry(id: string, entry: IRuleEntry, catalog: ICatalog, options: ICatalogLoadOptions): void {
   if (entry.engine === "plugin" && entry.severity === "warn") {
     throw new CatalogError(`rules.${id}.severity`, "plugin rules support only 'error' or 'off'");
   }
@@ -173,7 +166,7 @@ function validateRuleEntry(
     throw new CatalogError(`rules.${id}.tags`, "a rule needs at least one tag");
   }
   validateRuleTags(id, entry, catalog);
-  validateRuleOptions(id, entry, optionSchemaFor(id, entry, scriptSchemas));
+  validateRuleOptions(id, entry, optionSchemaFor(id, entry, options));
 }
 
 function validateVocabularyUsage(catalog: ICatalog): void {
@@ -186,16 +179,13 @@ function validateVocabularyUsage(catalog: ICatalog): void {
 }
 
 /** Validates `input` and returns the typed catalog, or throws a {@link CatalogError}. */
-export function parseCatalog(
-  input: JsonValue,
-  options: ICatalogLoadOptions = { scriptRuleSchemas: null },
-): ICatalog {
+export function parseCatalog(input: JsonValue, options: ICatalogLoadOptions): ICatalog {
   const parsed = CatalogSchema.safeParse(input);
   if (!parsed.success) {
     throw new CatalogError(issuePath(parsed.error, "catalog"), parsed.error.issues[0]?.message ?? "invalid catalog");
   }
   for (const [id, entry] of Object.entries(parsed.data.rules)) {
-    validateRuleEntry(id, entry, parsed.data, options.scriptRuleSchemas);
+    validateRuleEntry(id, entry, parsed.data, options);
   }
   validateVocabularyUsage(parsed.data);
   return parsed.data;
@@ -223,11 +213,20 @@ export function classifyPath(repoPath: string, scopes: ICatalogScopes): PathClas
   return PATH_CLASS.prod;
 }
 
+/** Throws a {@link CatalogError} for the first plugin rule in the catalog that the registry cannot resolve. */
+export function requireRegisteredPluginRules(catalog: ICatalog, registry: IRuleRegistry): void {
+  for (const [id, entry] of Object.entries(catalog.rules)) {
+    if (entry.engine === "plugin" && registry.implementation(id) === null) {
+      throw new CatalogError(`rules.${id}`, NO_IMPLEMENTATION_MESSAGE);
+    }
+  }
+}
+
 /** Returns the effective settings for a rule id, with option defaults applied. */
-export function ruleSettings(catalog: ICatalog, id: string): IResolvedRuleSettings {
+export function ruleSettings(catalog: ICatalog, id: string, registry: IRuleRegistry): IResolvedRuleSettings {
   const entry = catalog.rules[id];
   if (!entry) throw new CatalogError(`rules.${id}`, "no catalog entry for this rule id");
-  const schema = RULE_OPTION_SCHEMAS[id];
+  const schema = registry.optionSchema(id);
   const options = schema
     ? schema.parse(entry.options ?? {}) as Record<string, JsonValue>
     : (entry.options ?? {}) as Record<string, JsonValue>;

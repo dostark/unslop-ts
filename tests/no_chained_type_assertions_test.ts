@@ -6,7 +6,8 @@
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { createLintPlugin, type JsonValue, parseCatalog, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
   test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
@@ -39,7 +40,7 @@ const PROD = "packages/x/src/a.ts";
 const TEST = "packages/x/tests/a_test.ts";
 
 function run(source: string, filename = PROD, ruleOverrides: Record<string, JsonValue> = {}) {
-  const plugin = createLintPlugin("exaix", parseCatalog(buildCatalog(ruleOverrides)));
+  const plugin = createTestPlugin(loadTestCatalog(buildCatalog(ruleOverrides)));
   return runPlugin(plugin, filename, source);
 }
 

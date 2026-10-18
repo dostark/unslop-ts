@@ -1,10 +1,10 @@
 /**
  * @module PluginRules
  * @path packages/lint-rules/src/rules/mod.ts
- * @description Registry of plugin rule implementations, keyed by catalog rule id.
+ * @description The TypeScript rule pack: the plugin rules the engine ships, keyed by bare rule key.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/plugin.ts]
+ * @related-files [packages/lint-rules/src/engine/registry.ts, packages/lint-rules/src/rules/rule_options.ts]
  */
 
 import { createNoChainedTypeAssertions } from "./no_chained_type_assertions.ts";
@@ -29,23 +29,29 @@ import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
 import { createIgnoreNeedsReason } from "./ignore_needs_reason.ts";
-import type { IPluginRule } from "./types.ts";
+import type { IRulePack } from "../engine/registry.ts";
+import { TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
 
-export const PLUGIN_RULE_IMPLEMENTATIONS: Record<string, IPluginRule> = {
-  "exaix/no-chained-type-assertions": { create: createNoChainedTypeAssertions },
-  "exaix/no-explicit-unknown": { create: createNoExplicitUnknown },
-  "exaix/no-unsafe-dictionary": { create: createNoUnsafeDictionary },
-  "exaix/no-any-escape": { create: createNoAnyEscape },
-  "exaix/no-pass-through-type-alias": { create: createNoPassThroughTypeAlias },
-  "exaix/no-object-parameters": { create: createNoObjectParameters },
-  "exaix/require-safety-comment": { create: createRequireSafetyComment },
-  "exaix/no-runtime-typeof": { create: createNoRuntimeTypeof },
-  "exaix/no-conditional-empty-object-spread": { create: createNoConditionalEmptyObjectSpread },
-  "exaix/no-boolean-assert": { create: createNoBooleanAssert },
-  "exaix/no-repeated-assert-call": { create: createNoRepeatedAssertCall },
-  "exaix/no-constant-substring-assert": { create: createNoConstantSubstringAssert },
-  "exaix/max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
-  "exaix/max-class-size": { create: createMaxClassSize },
-  "exaix/require-optional-wrapper": { create: createRequireOptionalWrapper },
-  "exaix/ignore-needs-reason": { create: createIgnoreNeedsReason },
+/** The generic TypeScript rule pack: every plugin rule the engine ships, keyed by bare rule key. */
+export const TYPESCRIPT_RULE_PACK: IRulePack = {
+  name: "typescript",
+  rules: {
+    "no-chained-type-assertions": { create: createNoChainedTypeAssertions },
+    "no-explicit-unknown": { create: createNoExplicitUnknown },
+    "no-unsafe-dictionary": { create: createNoUnsafeDictionary },
+    "no-any-escape": { create: createNoAnyEscape },
+    "no-pass-through-type-alias": { create: createNoPassThroughTypeAlias },
+    "no-object-parameters": { create: createNoObjectParameters },
+    "require-safety-comment": { create: createRequireSafetyComment },
+    "no-runtime-typeof": { create: createNoRuntimeTypeof },
+    "no-conditional-empty-object-spread": { create: createNoConditionalEmptyObjectSpread },
+    "no-boolean-assert": { create: createNoBooleanAssert },
+    "no-repeated-assert-call": { create: createNoRepeatedAssertCall },
+    "no-constant-substring-assert": { create: createNoConstantSubstringAssert },
+    "max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
+    "max-class-size": { create: createMaxClassSize },
+    "require-optional-wrapper": { create: createRequireOptionalWrapper },
+    "ignore-needs-reason": { create: createIgnoreNeedsReason },
+  },
+  optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
 };

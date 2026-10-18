@@ -7,7 +7,8 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { createLintPlugin, type JsonValue, parseCatalog, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
   test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
@@ -37,7 +38,7 @@ function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, J
 }
 
 function reports(source: string, options: Record<string, JsonValue> = {}): boolean {
-  const plugin = createLintPlugin("exaix", parseCatalog(buildCatalog(options)));
+  const plugin = createTestPlugin(loadTestCatalog(buildCatalog(options)));
   return runPlugin(plugin, PROD, source).length > 0;
 }
 

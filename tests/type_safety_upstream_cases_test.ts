@@ -9,7 +9,8 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { createLintPlugin, type JsonValue, parseCatalog, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const SCOPES = {
   test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
@@ -58,7 +59,7 @@ interface IUpstreamGroup {
 }
 
 function check(rule: string, code: string): number {
-  const plugin = createLintPlugin("exaix", parseCatalog(catalogFor(rule)));
+  const plugin = createTestPlugin(loadTestCatalog(catalogFor(rule)));
   return runPlugin(plugin, PROD, code).length;
 }
 

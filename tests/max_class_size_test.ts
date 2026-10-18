@@ -7,7 +7,8 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { createLintPlugin, type JsonValue, parseCatalog, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const RULE_ID = "exaix/max-class-size";
 const PROD = "packages/x/src/a.ts";
@@ -36,7 +37,7 @@ function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, J
 }
 
 function findings(source: string, options: Record<string, JsonValue> = {}) {
-  const plugin = createLintPlugin("exaix", parseCatalog(buildCatalog(options)));
+  const plugin = createTestPlugin(loadTestCatalog(buildCatalog(options)));
   return runPlugin(plugin, PROD, source);
 }
 

@@ -7,7 +7,8 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { createLintPlugin, type JsonValue, parseCatalog, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
   test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
@@ -56,7 +57,7 @@ function expectRule(
   filename = PROD,
   label = "",
 ): void {
-  const plugin = createLintPlugin("exaix", parseCatalog(buildCatalog(overrides, ruleId)));
+  const plugin = createTestPlugin(loadTestCatalog(buildCatalog(overrides, ruleId)));
   const count = runPlugin(plugin, filename, source).length;
   assertEquals(
     count > 0,

@@ -68,22 +68,22 @@ const IgnoreNeedsReasonOptions = z.object({
   separator: z.string().default("--"),
 }).strict();
 
-/** Implementation ids with a known option schema. A catalog id absent here is rejected. */
-export const RULE_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
-  "exaix/no-chained-type-assertions": NoChainedTypeAssertionsOptions,
-  "exaix/no-explicit-unknown": NoExplicitUnknownOptions,
-  "exaix/no-unsafe-dictionary": NoUnsafeDictionaryOptions,
-  "exaix/no-any-escape": NoAnyEscapeOptions,
-  "exaix/no-pass-through-type-alias": NoOptions,
-  "exaix/no-object-parameters": NoOptions,
-  "exaix/require-safety-comment": RequireSafetyCommentOptions,
-  "exaix/no-runtime-typeof": NoRuntimeTypeofOptions,
-  "exaix/no-conditional-empty-object-spread": NoOptions,
-  "exaix/no-boolean-assert": NoBooleanAssertOptions,
-  "exaix/no-repeated-assert-call": NoRepeatedAssertCallOptions,
-  "exaix/no-constant-substring-assert": NoConstantSubstringAssertOptions,
-  "exaix/max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
-  "exaix/max-class-size": MaxClassSizeOptions,
-  "exaix/require-optional-wrapper": RequireOptionalWrapperOptions,
-  "exaix/ignore-needs-reason": IgnoreNeedsReasonOptions,
+/** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
+export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
+  "no-explicit-unknown": NoExplicitUnknownOptions,
+  "no-unsafe-dictionary": NoUnsafeDictionaryOptions,
+  "no-any-escape": NoAnyEscapeOptions,
+  "no-pass-through-type-alias": NoOptions,
+  "no-object-parameters": NoOptions,
+  "require-safety-comment": RequireSafetyCommentOptions,
+  "no-runtime-typeof": NoRuntimeTypeofOptions,
+  "no-conditional-empty-object-spread": NoOptions,
+  "no-boolean-assert": NoBooleanAssertOptions,
+  "no-repeated-assert-call": NoRepeatedAssertCallOptions,
+  "no-constant-substring-assert": NoConstantSubstringAssertOptions,
+  "max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
+  "max-class-size": MaxClassSizeOptions,
+  "require-optional-wrapper": RequireOptionalWrapperOptions,
+  "ignore-needs-reason": IgnoreNeedsReasonOptions,
 };
