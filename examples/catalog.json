@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "scopes": {
+    "test": ["**/tests/**", "**/*_test.ts"],
+    "fixture": ["**/tests/fixtures/**"]
+  },
+  "tagVocabulary": {
+    "type-safety": { "description": "Rules that keep type evidence." }
+  },
+  "rules": {
+    "demo/no-chained-type-assertions": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": ["type-safety"]
+    },
+    "demo/no-runtime-typeof": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "prod",
+      "tags": ["type-safety"],
+      "options": { "allowInTypeGuards": true }
+    }
+  }
+}
