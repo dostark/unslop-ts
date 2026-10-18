@@ -10,7 +10,6 @@
 export { CatalogError, classifyPath, parseCatalog, PATH_CLASS, ruleSettings } from "./src/engine/catalog.ts";
 export { createLintPlugin } from "./src/engine/plugin.ts";
 export { runPlugin } from "./src/engine/run_plugin.ts";
-export { EDITION_TIERS, editionTierOfPath } from "./src/exaix/check_code_style.ts";
 export { PLUGIN_RULE_IMPLEMENTATIONS } from "./src/rules/mod.ts";
 export { RULE_OPTION_SCHEMAS } from "./src/rules/rule_options.ts";
 export type { ICatalog, IResolvedRuleSettings, JsonValue, PathClass } from "./src/engine/catalog.ts";

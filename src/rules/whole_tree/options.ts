@@ -7,7 +7,7 @@
  * @related-files [packages/lint-rules/src/rules/whole_tree/constant_restatement.ts]
  */
 
-import catalogJson from "../../../../../scripts/config/style_rule_catalog.json" with { type: "json" };
+import catalogJson from "@exaix/lint-policy/catalog.json" with { type: "json" };
 
 /** Settings for the constant-restatement rule. */
 export type IConstantRestatementSettings = typeof catalogJson.wholeTree.constantRestatement;

@@ -1,13 +1,11 @@
 # @exaix/lint-rules
 
-Generic Deno lint plugin engine for Exaix. It turns a validated JSON **catalog** of style
+Generic Deno lint plugin engine. It turns a validated JSON **catalog** of style
 rules into a `Deno.lint.Plugin` that runs inside `deno lint`, so the same diagnostics
 appear in the editor, on the command line, and in the pre-commit gate.
 
-The generic engine (`src/engine/`, `src/rules/`) knows nothing about Exaix: repository policy
-lives in the parent repo at `scripts/config/style_rule_catalog.json`, and the entry point that
-loads it is `scripts/config/exaix_lint_plugin.ts`. The `src/exaix/` folder holds the Exaix rule
-scripts moved here from `scripts/`.
+The engine knows nothing about Exaix. All Exaix lint policy lives in `packages/lint-policy`: the
+catalog `catalog.json`, the plugin entry `plugin.ts`, the style checkers, and the rule reference.
 
 ## Layout
 
@@ -16,9 +14,7 @@ scripts moved here from `scripts/`.
   the local `EXAIX_LINT_RULES` selection.
 - `src/engine/run_plugin.ts` — `runPlugin` test helper over `Deno.lint.runPlugin`.
 - `src/rules/` — generic rule implementations and their option schemas.
-- `src/exaix/` — the moved Exaix rule scripts (`check_code_style.ts`, `check_magic_values.ts`);
-  they name Exaix policy and read repo paths from the catalog.
-- `docs/style_rules.md` — the error-tag reference for the style checker.
+- `docs/style_guide.md` — the generic TypeScript style rules.
 
 ## Add a rule
 

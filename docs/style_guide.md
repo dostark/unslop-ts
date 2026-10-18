@@ -1,16 +1,13 @@
 ---
 title: "Package Style Guide"
-description: Generic TypeScript style rules for @exaix/lint-rules, moved out of CODE_STYLE.md
+description: Generic TypeScript style rules enforced by the lint engine package
 agent_priority: mandatory
 copilot_knowledge_base: true
 capabilities: [linting_rules, naming_conventions]
-links:
-  - "packages/lint-rules/docs/style_rules.md"
 ---
 
-> The generic TypeScript style rules. `CODE_STYLE.md` keeps the Exaix-specific rules and
-> links here for these sections. Rule ids and severities come from
-> `scripts/config/style_rule_catalog.json`.
+> The generic TypeScript style rules. Rule ids and severities come from the rule catalog
+> of the project that loads the engine.
 
 ## 1. Strict Type Safety {#strict-type-safety}
 
@@ -77,46 +74,7 @@ links:
 - **No masking type aliases.** Do not create type aliases that simply mask or rename `Record<string, unknown>` or `{ [key: string]: unknown }` (e.g., `type CopilotObject = Record<string, unknown>`). This is strictly prohibited. Always define a specific interface or use runtime validation and proper narrowing.
 
 These rules are referenced by multiple existing checklists (pre‑commit, CI,
-etc.). Enforcement differs by rule:
-
-- **Gates (`severity: error`):** `exaix/no-chained-type-assertions`,
-  `exaix/no-pass-through-type-alias`, and the style-checker rules
-  `ts-suppression-pragmas`, `deno-lint-no-explicit-any`, `promise-response-alias`,
-  and `promise-response-return`.
-- **Parked (`severity: off`, opt-in):** `exaix/no-explicit-unknown`,
-  `exaix/no-any-escape`, `exaix/no-unsafe-dictionary`, and
-  `exaix/no-object-parameters`. The rule-ceiling ratchet holds each one at a
-  measured count, so the count can only fall. Each rule becomes a gate when its
-  count reaches zero.
-
-### Automated Enforcement
-
-A dedicated AST-based script (`packages/lint-rules/src/exaix/check_magic_values.ts`) scans the entire
-codebase using the TypeScript compiler API to detect repeated literals that
-should be extracted into named constants or enums. It is invoked as part of the
-pre-commit gates via `deno task check:magic` (or directly:
-`deno run -A packages/lint-rules/src/exaix/check_magic_values.ts`).
-
-**Detection thresholds** (the script's actual defaults — keep this table in sync with
-`packages/lint-rules/src/exaix/check_magic_values.ts` `--local-*-threshold` / `--global-*-threshold`):
-
-| Scope  | String literals | Number literals |
-| ------ | --------------- | --------------- |
-| Module | > 3 occurrences | > 4 occurrences |
-| Global | > 5 occurrences | > 6 occurrences |
-
-**Whitelisted values (never flagged):**
-
-- Strings: `""`, `" "`, `"\n"`, `"\t"`, `"true"`, `"false"`, `"null"`,
-  `"undefined"`
-- Numbers: `0`, `1`, `-1`, `100`, `1000`
-- Strings shorter than 3 characters that don't start with a lowercase letter
-  (e.g., `"ID"`, `"OK"` are allowed; `"ab"` is not flagged)
-
-- **Magic string unions.** Avoid inline string literal unions (e.g., `"a" | "b"`)
-  directly in functional code. These are difficult to maintain and track.
-  Instead, define a TypeScript `enum` in the appropriate package or a shared named type alias.
-  This rule is enforced as an error in production code.
+etc.). Whether a rule blocks the build depends on its severity in the rule catalog.
 
 ### No Re-exporting
 
@@ -133,25 +91,6 @@ export { Baz }; // ❌ Explicit re-export
 ```
 
 **Allowed exception:** package entrypoint files like `mod.ts` or `index.ts` may re-export public interfaces, types, or values defined in other modules within the same package to expose the package's public API. This is only allowed for same-package modules owned by that package root surface; re-exporting from external packages, repo root retired `src/*` paths, or another package's source directories remains prohibited. This restriction is enforced as `[src-barrel-re-export]` for barrel files under the retired `src/`.
-
-**Canonical subpackage boundary:** if the root import map exposes an exact canonical subpackage alias such as `@exaix/core/status` or `@exaix/ai/providers`, the parent package entrypoint must not promote that subpackage's exports through `@exaix/core` or `@exaix/ai`. Keep the boundary explicit: consumers import subpackage-owned symbols from the canonical subpackage barrel, not from the parent package barrel.
-
-**Root-owned surface exception:** a package may still expose symbols from modules that define the parent package's primary root API even if the import map also offers a convenience grouping alias for that root-owned surface. In this repository, `@exaix/core/types` is treated as a root-owned grouping, so `@exaix/core` may continue to export those contracts.
-
-```ts
-// packages/core/mod.ts
-export type { IToolRegistry } from "./src/interfaces/i_tool_registry.ts";
-export type { IActivityRecord } from "./src/types/database.ts";
-export { PortalOperation } from "./src/enums.ts";
-```
-
-**Prohibited in parent package entrypoints when a canonical subpackage barrel exists:**
-
-```ts
-// packages/core/mod.ts
-export * from "./src/status/mod.ts"; // ❌ Import from @exaix/core/status instead
-export { RetryPolicy } from "./src/request/retry_policy.ts"; // ❌ Import from @exaix/core/request instead
-```
 
 **Prohibited in package entrypoints:**
 
@@ -243,8 +182,6 @@ import { IRequest } from "./request.ts";
 ```
 
 If a naming conflict occurs, it is better to refactor the local names or the conflicting modules than to alias the interfaces.
-
-**Exception:** Aliasing is permitted in `packages/core/src/parsing/markdown.ts` when used for backward compatibility shims or interface compatibility bridges.
 
 Good:
 
@@ -342,8 +279,7 @@ the next line already says.
   spans more than three physical lines, anywhere past the module's own
   header comment, is a violation. If an explanation genuinely needs more
   than three lines, it belongs in the module's own documentation (a
-  README, `ARCHITECTURE.md`, or the relevant `exaix-dev-docs/` doc) — not
-  inline in the source.
+  README or the project's design documentation) — not inline in the source.
 - **No ephemeral implementation history.** A comment must not reference a
   plan phase/step number, a specific GAP identifier (e.g. `GAP-1`, `GAP #2`),
   pre/post-gap analysis notes, narrate what was tried and abandoned, or explain
@@ -386,14 +322,3 @@ the next line already says.
   past what these rules allow, either delete it — most code is clear
   without it — or rewrite it as a short, concrete statement of the one
   non-obvious fact a reader needs.
-- **Comment prose follows ASD-STE100 and Exaix STE Extension v1.** Write
-  line/block comments, module headers, and JSDoc descriptions as concise,
-  result-first prose under the shared Issue 9 limits: at most 20 words per
-  sentence, no semicolons in eligible prose, and at most six descriptive
-  sentences per paragraph.
-  Preserve directives, JSDoc tags, identifiers, commands, one-line literal
-  spans, and exact quotations. Keep necessary invariants and rationale;
-  omit self-reflection and facts already clear from the code. Bullets are
-  allowed when they make steps easier to scan, within the existing
-  three-line limit. Documentation-file exemptions do **not** exempt
-  source-comment prose.
