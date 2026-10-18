@@ -1,13 +1,13 @@
 /**
  * @module RequireSafetyCommentTest
  * @path packages/lint-rules/tests/require_safety_comment_test.ts
- * @description Marker-comment placement rules for exaix/require-safety-comment (anti-slop, MIT).
+ * @description Marker-comment placement rules for demo/require-safety-comment (anti-slop, MIT).
  * @architectural-layer Test
  * @related-files [packages/lint-rules/src/rules/evidence_rules.ts]
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -26,7 +26,7 @@ function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, J
       deslop: { description: "Rule idea from deslop or anti-slop." },
     },
     rules: {
-      "exaix/require-safety-comment": {
+      "demo/require-safety-comment": {
         engine: "plugin",
         severity: "error",
         scope: "prod",

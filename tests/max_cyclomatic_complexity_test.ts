@@ -7,7 +7,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -26,7 +26,7 @@ function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, J
       deslop: { description: "Rule idea from deslop or anti-slop." },
     },
     rules: {
-      "exaix/max-cyclomatic-complexity": {
+      "demo/max-cyclomatic-complexity": {
         engine: "plugin",
         severity: "error",
         scope: "prod",

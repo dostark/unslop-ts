@@ -11,7 +11,7 @@
 
 import { walk } from "@std/fs";
 import { join, relative } from "@std/path";
-import { type IConstantRestatementSettings, WHOLE_TREE_SETTINGS } from "./options.ts";
+import type { IConstantRestatementSettings } from "./options.ts";
 
 /** A test that writes out a constant's value rather than importing the constant. */
 export interface IRestatement {
@@ -43,7 +43,7 @@ const DECLARATION = /export const ([A-Z][A-Z0-9_]*)\s*(?::[^=]+)?=\s*\[([\s\S]*?
  * elements appear in unrelated code constantly and would produce noise. */
 export function parseListConstants(
   source: string,
-  minRestatedElements = WHOLE_TREE_SETTINGS.constantRestatement.minRestatedElements,
+  minRestatedElements: number,
 ): Map<string, string[]> {
   const constants = new Map<string, string[]>();
   for (const match of source.matchAll(DECLARATION)) {
@@ -78,7 +78,7 @@ function restatableRuns(elements: string[], minRestatedElements: number): string
 export function findRestatements(
   constants: Map<string, string[]>,
   files: ISourceFile[],
-  minRestatedElements = WHOLE_TREE_SETTINGS.constantRestatement.minRestatedElements,
+  minRestatedElements: number,
 ): IRestatement[] {
   const findings: IRestatement[] = [];
 

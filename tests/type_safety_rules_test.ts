@@ -6,7 +6,7 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -15,11 +15,11 @@ const TEST_SCOPES = {
 };
 
 const RULE_IDS = [
-  "exaix/no-explicit-unknown",
-  "exaix/no-unsafe-dictionary",
-  "exaix/no-typeof-escape",
-  "exaix/no-pass-through-type-alias",
-  "exaix/no-object-parameters",
+  "demo/no-explicit-unknown",
+  "demo/no-unsafe-dictionary",
+  "demo/no-typeof-escape",
+  "demo/no-pass-through-type-alias",
+  "demo/no-object-parameters",
 ] as const;
 
 function buildCatalog(
@@ -77,7 +77,7 @@ Deno.test("no-explicit-unknown reports direct, array, union, and aliased unknown
     "function f(x: Error | string | unknown): void {}",
     "type P = unknown;\nfunction f(): Promise<P> { return fetch('x'); }",
   ];
-  for (const source of invalid) expectRule("exaix/no-explicit-unknown", source, true);
+  for (const source of invalid) expectRule("demo/no-explicit-unknown", source, true);
 });
 
 Deno.test("no-explicit-unknown accepts a catch binding and a typed value", () => {
@@ -86,14 +86,14 @@ Deno.test("no-explicit-unknown accepts a catch binding and a typed value", () =>
     "let x: string;",
     "function f(x: Error | string): void {}",
   ];
-  for (const source of valid) expectRule("exaix/no-explicit-unknown", source, false);
+  for (const source of valid) expectRule("demo/no-explicit-unknown", source, false);
 });
 
 Deno.test("no-explicit-unknown with allowCatchBinding false reports the catch binding", () => {
   const source = "try {\n  doWork();\n} catch (e: unknown) {\n  log(e);\n}";
-  expectRule("exaix/no-explicit-unknown", source, false);
-  expectRule("exaix/no-explicit-unknown", source, true, PROD, {
-    "exaix/no-explicit-unknown": { options: { allowCatchBinding: false } },
+  expectRule("demo/no-explicit-unknown", source, false);
+  expectRule("demo/no-explicit-unknown", source, true, PROD, {
+    "demo/no-explicit-unknown": { options: { allowCatchBinding: false } },
   });
 });
 
@@ -105,7 +105,7 @@ Deno.test("no-unsafe-dictionary reports Record, index signatures, and Map with a
     "let x: Map<string, unknown>;",
     "let x: Record<string, {}>;",
   ];
-  for (const source of invalid) expectRule("exaix/no-unsafe-dictionary", source, true);
+  for (const source of invalid) expectRule("demo/no-unsafe-dictionary", source, true);
 });
 
 Deno.test("no-unsafe-dictionary accepts strong value types", () => {
@@ -114,39 +114,39 @@ Deno.test("no-unsafe-dictionary accepts strong value types", () => {
     "let x: Map<string, string>;",
     "let x: { [k: string]: string };",
   ];
-  for (const source of valid) expectRule("exaix/no-unsafe-dictionary", source, false);
+  for (const source of valid) expectRule("demo/no-unsafe-dictionary", source, false);
 });
 
 Deno.test("no-typeof-escape reports as typeof, in both cast forms", () => {
   for (const source of ["let x = y as typeof z;", "let x = <typeof z> y;"]) {
-    expectRule("exaix/no-typeof-escape", source, true);
+    expectRule("demo/no-typeof-escape", source, true);
   }
 });
 
 Deno.test("no-typeof-escape leaves any to the built-in no-explicit-any", () => {
   for (const source of ["let x = y as any;", "let x: any[] = [];", "let x = <any> y;"]) {
-    expectRule("exaix/no-typeof-escape", source, false);
+    expectRule("demo/no-typeof-escape", source, false);
   }
 });
 
 Deno.test("no-typeof-escape accepts a precise cast", () => {
-  expectRule("exaix/no-typeof-escape", "let x = y as string;", false);
+  expectRule("demo/no-typeof-escape", "let x = y as string;", false);
 });
 
 Deno.test("no-pass-through-type-alias reports an alias that only renames another alias", () => {
-  expectRule("exaix/no-pass-through-type-alias", "type B = string;\ntype A = B;", true);
-  expectRule("exaix/no-pass-through-type-alias", "type A = string;", false);
+  expectRule("demo/no-pass-through-type-alias", "type B = string;\ntype A = B;", true);
+  expectRule("demo/no-pass-through-type-alias", "type A = string;", false);
 });
 
 Deno.test("no-unsafe-dictionary forbiddenValueTypes narrows the value set", () => {
   const source = "let x: Record<string, object>;";
-  expectRule("exaix/no-unsafe-dictionary", source, true);
-  expectRule("exaix/no-unsafe-dictionary", source, false, PROD, {
-    "exaix/no-unsafe-dictionary": { options: { forbiddenValueTypes: ["unknown"] } },
+  expectRule("demo/no-unsafe-dictionary", source, true);
+  expectRule("demo/no-unsafe-dictionary", source, false, PROD, {
+    "demo/no-unsafe-dictionary": { options: { forbiddenValueTypes: ["unknown"] } },
   });
 });
 
 Deno.test("no-object-parameters reports a parameter typed object", () => {
-  expectRule("exaix/no-object-parameters", "function f(o: object): void {}", true);
-  expectRule("exaix/no-object-parameters", "function f(o: { a: string }): void {}", false);
+  expectRule("demo/no-object-parameters", "function f(o: object): void {}", true);
+  expectRule("demo/no-object-parameters", "function f(o: { a: string }): void {}", false);
 });

@@ -15,8 +15,10 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { checkRepository, findRestatements, parseListConstants } from "../src/rules/whole_tree/constant_restatement.ts";
-import { WHOLE_TREE_SETTINGS } from "../src/rules/whole_tree/options.ts";
+import { findRestatements, parseListConstants } from "../src/rules/whole_tree/constant_restatement.ts";
+import { CONSTANT_RESTATEMENT_SETTINGS } from "./helpers/whole_tree_settings.ts";
+
+const MIN_ELEMENTS = CONSTANT_RESTATEMENT_SETTINGS.minRestatedElements;
 
 const CONSTANTS_SOURCE = `
 export const DAEMON_DEFAULT_NET_HOSTS: readonly string[] = [
@@ -32,7 +34,7 @@ export const NUMERIC_LIST = [50, 100, 200];
 `;
 
 Deno.test("[constant-restatement] list-valued string constants are parsed; scalars and numbers are not", () => {
-  const constants = parseListConstants(CONSTANTS_SOURCE);
+  const constants = parseListConstants(CONSTANTS_SOURCE, MIN_ELEMENTS);
 
   assertEquals(constants.get("DAEMON_DEFAULT_NET_HOSTS"), [
     "api.anthropic.com",
@@ -44,12 +46,12 @@ Deno.test("[constant-restatement] list-valued string constants are parsed; scala
 });
 
 Deno.test("[constant-restatement] a test hardcoding a constant's joined value is reported", () => {
-  const constants = parseListConstants(CONSTANTS_SOURCE);
+  const constants = parseListConstants(CONSTANTS_SOURCE, MIN_ELEMENTS);
   const findings = findRestatements(constants, [{
     path: "tests/integration/dogfood_net_resolver_test.ts",
     // The pre-fix shape, verbatim: the joined value written out, no import of the constant.
     source: 'const DEFAULT_NET = "--allow-net=api.anthropic.com,api.openai.com,generativelanguage.googleapis.com";',
-  }]);
+  }], MIN_ELEMENTS);
 
   assertEquals(findings.length, 1);
   assertEquals(findings[0].constant, "DAEMON_DEFAULT_NET_HOSTS");
@@ -57,15 +59,15 @@ Deno.test("[constant-restatement] a test hardcoding a constant's joined value is
 });
 
 Deno.test("[constant-restatement] a test importing the constant and deriving the value is not reported", () => {
-  const constants = parseListConstants(CONSTANTS_SOURCE);
+  const constants = parseListConstants(CONSTANTS_SOURCE, MIN_ELEMENTS);
   const findings = findRestatements(constants, [{
     path: "tests/integration/dogfood_net_resolver_test.ts",
     // The corrected shape that ships today.
     source: [
-      'import { DAEMON_DEFAULT_NET_HOSTS } from "@exaix/core/types";',
+      'import { DAEMON_DEFAULT_NET_HOSTS } from "@demo/core/types";',
       'const DEFAULT_NET = `--allow-net=${DAEMON_DEFAULT_NET_HOSTS.join(",")}`;',
     ].join("\n"),
-  }]);
+  }], MIN_ELEMENTS);
 
   assertEquals(findings, []);
 });
@@ -73,11 +75,11 @@ Deno.test("[constant-restatement] a test importing the constant and deriving the
 Deno.test("[constant-restatement] a partial copy of the list is reported too", () => {
   // The stale copy is by definition a *prefix* of the extended list — reporting only exact
   // whole-list matches would miss every real instance of this defect.
-  const constants = parseListConstants(CONSTANTS_SOURCE);
+  const constants = parseListConstants(CONSTANTS_SOURCE, MIN_ELEMENTS);
   const findings = findRestatements(constants, [{
     path: "apps/exactl/tests/daemon_least_privilege_test.ts",
     source: 'assertEquals(netFlag, "--allow-net=api.anthropic.com,api.openai.com");',
-  }]);
+  }], MIN_ELEMENTS);
 
   assertEquals(findings.length, 1);
   assertEquals(findings[0].value, "api.anthropic.com,api.openai.com");
@@ -86,21 +88,11 @@ Deno.test("[constant-restatement] a partial copy of the list is reported too", (
 Deno.test("[constant-restatement] a single element is not treated as a restatement", () => {
   // One host in a string is an ordinary fixture value, not a copy of the list. Flagging it would
   // make the check noisy enough to be turned off, which is worse than not having it.
-  const constants = parseListConstants(CONSTANTS_SOURCE);
+  const constants = parseListConstants(CONSTANTS_SOURCE, MIN_ELEMENTS);
   const findings = findRestatements(constants, [{
     path: "packages/ai-anthropic/tests/base_url_test.ts",
     source: 'assertEquals(host, "api.anthropic.com");',
-  }]);
+  }], MIN_ELEMENTS);
 
   assertEquals(findings, []);
-});
-
-Deno.test("[constant-restatement] the real repository is clean", async () => {
-  // The check is only worth registering if the tree currently satisfies it — a gate that is
-  // red on arrival gets ignored.
-  const findings = await checkRepository(Deno.cwd(), WHOLE_TREE_SETTINGS.constantRestatement);
-  assertEquals(
-    findings.map((f) => `${f.file}: ${f.constant} restated as "${f.value}"`),
-    [],
-  );
 });

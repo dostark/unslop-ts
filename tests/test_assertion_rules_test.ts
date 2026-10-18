@@ -7,7 +7,7 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -15,7 +15,7 @@ const TEST_SCOPES = {
   fixture: ["tests/scenario_framework/fixtures/**", "**/tests/fixtures/**"],
 };
 
-const RULE_ID = "exaix/no-boolean-assert";
+const RULE_ID = "demo/no-boolean-assert";
 const PROD = "packages/x/src/a.ts";
 const TEST = "packages/x/tests/a_test.ts";
 
@@ -74,8 +74,8 @@ Deno.test("no-boolean-assert methods option adds a method", () => {
   assertEquals(reports("assertEquals(set.has(x), true);", TEST, { options: { methods: ["includes", "has"] } }), true);
 });
 
-const REPEATED_RULE = "exaix/no-repeated-assert-call";
-const SUBSTRING_RULE = "exaix/no-constant-substring-assert";
+const REPEATED_RULE = "demo/no-repeated-assert-call";
+const SUBSTRING_RULE = "demo/no-constant-substring-assert";
 
 function buildRuleCatalog(id: string, overrides: Record<string, JsonValue> = {}): Record<string, JsonValue> {
   return {

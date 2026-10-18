@@ -11,7 +11,7 @@
 import ts from "typescript";
 import { walk } from "@std/fs";
 import { dirname, join, normalize } from "@std/path";
-import { type IUnusedExportsSettings, WHOLE_TREE_SETTINGS } from "./options.ts";
+import type { IUnusedExportsSettings } from "./options.ts";
 
 /** One exported declaration site. */
 export interface IExportSite {
@@ -137,7 +137,7 @@ function resolveImport(importerRepoPath: string, importPath: string): string | n
 /** Names imported by the repository's own wiring scripts, which are not scanned as production. */
 export async function collectScriptImportedNames(
   repoRoot: string,
-  settings: IUnusedExportsSettings = WHOLE_TREE_SETTINGS.unusedExports,
+  settings: IUnusedExportsSettings,
 ): Promise<Set<string>> {
   const names = new Set<string>();
   const skip = walkSkipPatterns(settings);
@@ -358,7 +358,7 @@ function rankDirectories(findings: readonly IUnwiredExport[]): Array<[string, nu
 export async function checkRepository(
   repoRoot: string,
   strict: boolean,
-  settings: IUnusedExportsSettings = WHOLE_TREE_SETTINGS.unusedExports,
+  settings: IUnusedExportsSettings,
 ): Promise<IUnusedExportsReport> {
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
   const exportMap = new Map<string, IExportSite[]>();

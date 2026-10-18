@@ -27,6 +27,20 @@ export interface ILintPluginOptions {
 
 type CatalogRule = ICatalog["rules"][string];
 
+const RULE_ID_SEPARATOR = "/";
+const NON_NAME_CHARS = /[^A-Z0-9]+/g;
+const SELECTION_ENV_SUFFIX = "_LINT_RULES";
+
+/** The variable that selects a plugin's rules locally: "demo" gives "DEMO_LINT_RULES". */
+export function selectionEnvName(pluginName: string): string {
+  return `${pluginName.toUpperCase().replace(NON_NAME_CHARS, "_")}${SELECTION_ENV_SUFFIX}`;
+}
+
+/** The selection variable of the plugin that owns a catalog id of the form `<plugin>/<key>`. */
+export function selectionEnvNameForRule(ruleId: string): string {
+  return selectionEnvName(ruleId.split(RULE_ID_SEPARATOR)[0]);
+}
+
 function parseSelection(value: string): Set<string> | null {
   if (value.trim() === "") return null;
   return new Set(value.split(",").map((token) => token.trim()).filter((token) => token.length > 0));
@@ -92,9 +106,10 @@ function isRuleActive(
 export function createLintPlugin(name: string, catalog: ICatalog, options: ILintPluginOptions): Deno.lint.Plugin {
   const registry = createRuleRegistry(name, options.rulePacks);
   requireRegisteredPluginRules(catalog, registry);
-  const selection = parseSelection(Deno.env.get("EXAIX_LINT_RULES") ?? "");
+  const envName = selectionEnvName(name);
+  const selection = parseSelection(Deno.env.get(envName) ?? "");
   if (selection) {
-    console.error(`[exaix-lint] EXAIX_LINT_RULES active: ${[...selection].join(", ")}`);
+    console.error(`[${name}-lint] ${envName} active: ${[...selection].join(", ")}`);
   }
 
   const rules: Record<string, Deno.lint.Rule> = {};
@@ -116,6 +131,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
           options: settings.options,
           isTestFile: pathClass === PATH_CLASS.test,
           codeStyle: settings.codeStyle,
+          pluginName: name,
         });
       },
     };

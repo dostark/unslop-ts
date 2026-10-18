@@ -11,7 +11,7 @@
 
 import ts from "typescript";
 import { walk } from "@std/fs";
-import { type IOptionalParamsSettings, WHOLE_TREE_SETTINGS } from "./options.ts";
+import type { IOptionalParamsSettings } from "./options.ts";
 
 /** A collected parameter. */
 export interface IFuncParam {
@@ -85,7 +85,7 @@ function isSkippedPath(filePath: string, settings: IOptionalParamsSettings): boo
 /** True when a parameter is wrapped with the configured optionality wrapper. */
 export function isWrapperType(
   param: ts.ParameterDeclaration,
-  settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,
+  settings: IOptionalParamsSettings,
 ): boolean {
   if (!param.type || !ts.isTypeReferenceNode(param.type)) return false;
   const typeName = ts.isIdentifier(param.type.typeName) ? param.type.typeName.text : "";
@@ -95,7 +95,7 @@ export function isWrapperType(
 /** True when a parameter is optional via a bare `?` or a bare `| undefined` union. */
 export function hasBareOptional(
   param: ts.ParameterDeclaration,
-  settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,
+  settings: IOptionalParamsSettings,
 ): boolean {
   if (isWrapperType(param, settings)) return false;
   if (param.questionToken) return true;
@@ -177,7 +177,7 @@ function usedInBodyFlags(params: readonly IFuncParam[], func: { body?: ts.Concis
 export function collectFunctions(
   sourceFile: ts.SourceFile,
   funcs: Map<string, IFuncDecl[]>,
-  settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,
+  settings: IOptionalParamsSettings,
 ): void {
   const visit = (node: ts.Node): void => {
     if (isFunctionLike(node)) {
@@ -268,7 +268,7 @@ function bareOptionalViolation(
 /** Caller-independent type-shape rules (BARE_OPTIONAL, MARKED_NOT_OPTIONAL). */
 export function collectTypeShapeViolations(
   funcs: Map<string, IFuncDecl[]>,
-  settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,
+  settings: IOptionalParamsSettings,
 ): IOptionalViolation[] {
   const violations: IOptionalViolation[] = [];
   for (const decls of funcs.values()) {
@@ -352,7 +352,7 @@ export function analyze(matched: readonly IMatchedFunc[]): IOptionalViolation[] 
 async function collectTargetFiles(
   repoRoot: string,
   includeTests: boolean,
-  settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,
+  settings: IOptionalParamsSettings,
 ): Promise<string[]> {
   const files: string[] = [];
   for await (
@@ -375,7 +375,7 @@ async function collectTargetFiles(
 export async function checkRepository(
   repoRoot: string,
   includeTests: boolean,
-  settings: IOptionalParamsSettings = WHOLE_TREE_SETTINGS.optionalParams,
+  settings: IOptionalParamsSettings,
 ): Promise<IOptionalViolation[]> {
   const files = await collectTargetFiles(repoRoot, includeTests, settings);
   const funcs = new Map<string, IFuncDecl[]>();

@@ -1,13 +1,13 @@
 /**
  * @module IgnoreNeedsReasonTest
  * @path packages/lint-rules/tests/ignore_needs_reason_test.ts
- * @description Rule-level tests for exaix/ignore-needs-reason.
+ * @description Rule-level tests for demo/ignore-needs-reason.
  * @architectural-layer Test
  * @related-files [packages/lint-rules/src/rules/deno/ignore_needs_reason.ts]
  */
 
-import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { assertEquals, assertStringIncludes } from "@std/assert";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -24,7 +24,7 @@ function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, J
       deslop: { description: "Rule idea from deslop or anti-slop." },
     },
     rules: {
-      "exaix/ignore-needs-reason": {
+      "demo/ignore-needs-reason": {
         engine: "plugin",
         severity: "error",
         scope: "all",
@@ -42,24 +42,35 @@ function reports(source: string, options: Record<string, JsonValue> = {}): boole
   return runPlugin(plugin, PROD, source).length > 0;
 }
 
-Deno.test("ignore-needs-reason reports an exaix ignore without a reason", () => {
-  assertEquals(reports("// deno-lint-ignore exaix/no-boolean-assert\nexport const a = 1;\n"), true);
+Deno.test("ignore-needs-reason reports a plugin ignore without a reason", () => {
+  assertEquals(reports("// deno-lint-ignore demo/no-boolean-assert\nexport const a = 1;\n"), true);
 });
 
-Deno.test("ignore-needs-reason accepts an exaix ignore with a reason", () => {
+Deno.test("ignore-needs-reason accepts a plugin ignore with a reason", () => {
   assertEquals(
-    reports("// deno-lint-ignore exaix/no-boolean-assert -- keeps the mock simple\nexport const a = 1;\n"),
+    reports("// deno-lint-ignore demo/no-boolean-assert -- keeps the mock simple\nexport const a = 1;\n"),
     false,
   );
 });
 
-Deno.test("ignore-needs-reason ignores an ignore for a non-exaix rule", () => {
+Deno.test("ignore-needs-reason ignores an ignore for a rule of another plugin", () => {
   assertEquals(reports("// deno-lint-ignore no-explicit-" + "any\nexport const a = 1;\n"), false);
+});
+
+Deno.test("ignore-needs-reason checks the prefix of the plugin it runs under", () => {
+  assertEquals(reports("// deno-lint-ignore other/no-boolean-assert\nexport const a = 1;\n"), false);
+  assertEquals(reports("// deno-lint-ignore demo/x other/y\nexport const a = 1;\n"), true);
+});
+
+Deno.test("ignore-needs-reason message names the plugin", () => {
+  const plugin = createTestPlugin(loadTestCatalog(buildCatalog()));
+  const [found] = runPlugin(plugin, PROD, "// deno-lint-ignore demo/x\nexport const a = 1;\n");
+  assertStringIncludes(found.message, "demo");
 });
 
 Deno.test("ignore-needs-reason honors a custom separator", () => {
   assertEquals(
-    reports("// deno-lint-ignore exaix/no-boolean-assert : keeps the mock simple\nexport const a = 1;\n", {
+    reports("// deno-lint-ignore demo/no-boolean-assert : keeps the mock simple\nexport const a = 1;\n", {
       separator: ":",
     }),
     false,
@@ -74,11 +85,11 @@ function linesOf(source: string): number[] {
 
 Deno.test("ignore-needs-reason reports at the comment's line, not line 1", () => {
   const source =
-    "export const a = 1;\nexport const b = 2;\n// deno-lint-ignore exaix/no-boolean-assert\nexport const c = 3;\n";
+    "export const a = 1;\nexport const b = 2;\n// deno-lint-ignore demo/no-boolean-assert\nexport const c = 3;\n";
   assertEquals(linesOf(source), [3]);
 });
 
 Deno.test("ignore-needs-reason reports each reasonless ignore on its own line", () => {
-  const source = "// deno-lint-ignore exaix/a\nexport const a = 1;\n// deno-lint-ignore exaix/b\nexport const b = 2;\n";
+  const source = "// deno-lint-ignore demo/a\nexport const a = 1;\n// deno-lint-ignore demo/b\nexport const b = 2;\n";
   assertEquals(linesOf(source), [1, 3]);
 });

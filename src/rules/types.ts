@@ -19,6 +19,8 @@ export interface IPluginRuleContext {
   readonly isTestFile: boolean;
   /** CODE_STYLE.md anchor the report hint links to. */
   readonly codeStyle?: string;
+  /** The name the plugin is registered under, which prefixes its catalog ids. */
+  readonly pluginName: string;
 }
 
 export interface IPluginRule {

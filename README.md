@@ -13,11 +13,13 @@ catalog `catalog.json`, the plugin entry `plugin.ts`, the style checkers, and th
 - `src/engine/registry.ts` — `createRuleRegistry` and the `IRulePack` contract. A rule pack groups rules
   and their option schemas under bare rule keys.
 - `src/engine/plugin.ts` — `createLintPlugin(name, catalog, { rulePacks })`; honours severity, scope, and
-  the local `EXAIX_LINT_RULES` selection. Every catalog rule stays registered with Deno, and an inactive
+  the local selection through the variable `selectionEnvName(name)` returns (`<NAME>_LINT_RULES`). Every catalog rule stays registered with Deno, and an inactive
   rule returns no visitors.
 - `src/engine/run_plugin.ts` — `runPlugin` test helper over `Deno.lint.runPlugin`.
 - `src/rules/` — generic rule implementations, their option schemas, `TYPESCRIPT_RULE_PACK`, and `DENO_RULE_PACK` (`src/rules/deno/`: rules about
   `deno-lint-ignore` comments and Deno script headers).
+- `src/cli/` — `rule_report.ts` ranks one rule's findings, and `whole_tree.ts` runs the whole-tree rules with
+  settings from `--catalog=<path>` (the `wholeTree` section, read by `parseWholeTreeSettings`).
 - `docs/style_guide.md` — the generic TypeScript style rules.
 
 ## Add a rule

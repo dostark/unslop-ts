@@ -7,7 +7,7 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -16,8 +16,8 @@ const TEST_SCOPES = {
 };
 
 const RULE_IDS = [
-  "exaix/no-runtime-typeof",
-  "exaix/no-conditional-empty-object-spread",
+  "demo/no-runtime-typeof",
+  "demo/no-conditional-empty-object-spread",
 ] as const;
 
 function buildCatalog(
@@ -68,7 +68,7 @@ function expectRule(
 
 Deno.test("no-runtime-typeof reports a string typeof comparison", () => {
   expectRule(
-    "exaix/no-runtime-typeof",
+    "demo/no-runtime-typeof",
     "export function f(x: string | number): boolean {\n  return typeof x === 'string';\n}",
     true,
   );
@@ -76,7 +76,7 @@ Deno.test("no-runtime-typeof reports a string typeof comparison", () => {
 
 Deno.test("no-runtime-typeof accepts an undefined existence probe", () => {
   expectRule(
-    "exaix/no-runtime-typeof",
+    "demo/no-runtime-typeof",
     "export function f(x: string | undefined): boolean {\n  return typeof x === 'undefined';\n}",
     false,
   );
@@ -84,18 +84,18 @@ Deno.test("no-runtime-typeof accepts an undefined existence probe", () => {
 
 Deno.test("no-runtime-typeof respects allowInTypeGuards", () => {
   const source = "export function isText(x: string | number): x is string {\n  return typeof x === 'string';\n}";
-  expectRule("exaix/no-runtime-typeof", source, false);
-  expectRule("exaix/no-runtime-typeof", source, true, {
-    "exaix/no-runtime-typeof": { options: { allowInTypeGuards: false } },
+  expectRule("demo/no-runtime-typeof", source, false);
+  expectRule("demo/no-runtime-typeof", source, true, {
+    "demo/no-runtime-typeof": { options: { allowInTypeGuards: false } },
   });
 });
 
 Deno.test("no-conditional-empty-object-spread reports an empty object branch", () => {
-  expectRule("exaix/no-conditional-empty-object-spread", "export const r = { ...(a ? { a: 1 } : {}) };", true);
+  expectRule("demo/no-conditional-empty-object-spread", "export const r = { ...(a ? { a: 1 } : {}) };", true);
 });
 
 Deno.test("no-conditional-empty-object-spread accepts non-empty branches", () => {
-  expectRule("exaix/no-conditional-empty-object-spread", "export const r = { ...(a ? { a: 1 } : { b: 2 }) };", false);
+  expectRule("demo/no-conditional-empty-object-spread", "export const r = { ...(a ? { a: 1 } : { b: 2 }) };", false);
 });
 
 // Upstream cases below are ported from anti-slop (MIT) at commit
@@ -113,7 +113,7 @@ Deno.test("no-runtime-typeof upstream valid cases report nothing", () => {
     ["no typeof at all", "const value = input;"],
   ] as const;
   for (const [name, source] of valid) {
-    expectRule("exaix/no-runtime-typeof", source, false, {}, PROD, name);
+    expectRule("demo/no-runtime-typeof", source, false, {}, PROD, name);
   }
 });
 
@@ -131,11 +131,11 @@ Deno.test("no-runtime-typeof upstream type-guard cases are valid with allowInTyp
   ] as const;
   for (const [name, source] of valid) {
     expectRule(
-      "exaix/no-runtime-typeof",
+      "demo/no-runtime-typeof",
       source,
       false,
       {
-        "exaix/no-runtime-typeof": { options: { allowInTypeGuards: true } },
+        "demo/no-runtime-typeof": { options: { allowInTypeGuards: true } },
       },
       PROD,
       name,
@@ -157,11 +157,11 @@ Deno.test("no-runtime-typeof upstream invalid cases report one diagnostic", () =
   ] as const;
   for (const [name, source] of invalid) {
     expectRule(
-      "exaix/no-runtime-typeof",
+      "demo/no-runtime-typeof",
       source,
       true,
       {
-        "exaix/no-runtime-typeof": { options: { allowInTypeGuards: true } },
+        "demo/no-runtime-typeof": { options: { allowInTypeGuards: true } },
       },
       PROD,
       name,
@@ -171,16 +171,16 @@ Deno.test("no-runtime-typeof upstream invalid cases report one diagnostic", () =
 
 Deno.test("no-runtime-typeof upstream changed case: a type predicate without options is valid locally", () => {
   // Changed from upstream: upstream defaults allowInTypeGuards to false, which reports this case.
-  // Exaix defaults it to true (Q4, 2026-10-14) so a type-predicate function may narrow JSON input.
+  // This pack defaults it to true (Q4, 2026-10-14) so a type-predicate function may narrow JSON input.
   const source = 'function isString(value: unknown): value is string { return typeof value === "string"; }';
-  expectRule("exaix/no-runtime-typeof", source, false, {}, PROD, "local default allowInTypeGuards");
+  expectRule("demo/no-runtime-typeof", source, false, {}, PROD, "local default allowInTypeGuards");
 });
 
 Deno.test("no-runtime-typeof upstream changed case: typeof against the undefined identifier is not matched", () => {
-  // Changed from upstream: upstream reports `typeof input === undefined`. The Exaix rule matches a
+  // Changed from upstream: upstream reports `typeof input === undefined`. This rule matches a
   // string literal on the other side, so a comparison against the `undefined` identifier is skipped.
   expectRule(
-    "exaix/no-runtime-typeof",
+    "demo/no-runtime-typeof",
     "if (typeof input === undefined) use(input);",
     false,
     {},
@@ -196,7 +196,7 @@ Deno.test("no-conditional-empty-object-spread upstream valid cases report nothin
     ["conditional outside a spread", "const result = condition ? { value } : {};"],
   ] as const;
   for (const [name, source] of valid) {
-    expectRule("exaix/no-conditional-empty-object-spread", source, false, {}, PROD, name);
+    expectRule("demo/no-conditional-empty-object-spread", source, false, {}, PROD, name);
   }
 });
 
@@ -206,6 +206,6 @@ Deno.test("no-conditional-empty-object-spread upstream invalid cases report one 
     ["empty consequent branch", "const result = { ...(condition ? {} : { value }) };"],
   ] as const;
   for (const [name, source] of invalid) {
-    expectRule("exaix/no-conditional-empty-object-spread", source, true, {}, PROD, name);
+    expectRule("demo/no-conditional-empty-object-spread", source, true, {}, PROD, name);
   }
 });

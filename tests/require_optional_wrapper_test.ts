@@ -1,13 +1,13 @@
 /**
  * @module RequireOptionalWrapperTest
  * @path packages/lint-rules/tests/require_optional_wrapper_test.ts
- * @description Rule-level tests for exaix/require-optional-wrapper.
+ * @description Rule-level tests for demo/require-optional-wrapper.
  * @architectural-layer Test
  * @related-files [packages/lint-rules/src/rules/require_optional_wrapper.ts]
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -26,7 +26,7 @@ function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, J
       deslop: { description: "Rule idea from deslop or anti-slop." },
     },
     rules: {
-      "exaix/require-optional-wrapper": {
+      "demo/require-optional-wrapper": {
         engine: "plugin",
         severity: "error",
         scope: "all",

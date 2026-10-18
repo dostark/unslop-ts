@@ -3,7 +3,7 @@
  * @path packages/lint-rules/tests/helpers/registry.ts
  * @description Shared registry, rule packs, and loaders that bind the engine tests to the TypeScript and Deno rule packs.
  * @architectural-layer Test
- * @dependencies [@exaix/lint-rules]
+ * @dependencies []
  * @related-files [packages/lint-rules/src/engine/registry.ts, packages/lint-rules/src/rules/mod.ts]
  */
 
@@ -17,9 +17,9 @@ import {
   type JsonValue,
   parseCatalog,
   TYPESCRIPT_RULE_PACK,
-} from "@exaix/lint-rules";
+} from "../../mod.ts";
 
-export const TEST_PLUGIN_NAME = "exaix";
+export const TEST_PLUGIN_NAME = "demo";
 
 export const TEST_RULE_PACKS: readonly IRulePack[] = [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK];
 

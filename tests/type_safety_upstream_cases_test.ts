@@ -9,7 +9,7 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const SCOPES = {
@@ -18,9 +18,9 @@ const SCOPES = {
 };
 
 const RULES = [
-  "exaix/no-explicit-unknown",
-  "exaix/no-object-parameters",
-  "exaix/no-unsafe-dictionary",
+  "demo/no-explicit-unknown",
+  "demo/no-object-parameters",
+  "demo/no-unsafe-dictionary",
 ] as const;
 
 const PROD = "packages/x/src/a.ts";
@@ -78,11 +78,11 @@ function expectGroup(group: IUpstreamGroup): void {
 }
 
 // anti-slop no-unknown-parameters + no-unknown-returns + no-unknown-type-aliases, merged into
-// exaix/no-explicit-unknown. The local rule matches every `unknown` annotation, so several
+// demo/no-explicit-unknown. The local rule matches every `unknown` annotation, so several
 // upstream-valid cases in the parameters/returns rules are reported here.
 
 const NO_EXPLICIT_UNKNOWN: IUpstreamGroup = {
-  rule: "exaix/no-explicit-unknown",
+  rule: "demo/no-explicit-unknown",
   valid: [
     {
       name: "type-predicate function parameter",
@@ -205,11 +205,11 @@ const NO_EXPLICIT_UNKNOWN: IUpstreamGroup = {
   ],
 };
 
-// anti-slop no-object-parameters maps to exaix/no-object-parameters. The local rule reads the
+// anti-slop no-object-parameters maps to demo/no-object-parameters. The local rule reads the
 // annotation from the parameter node directly and does not resolve local aliases.
 
 const NO_OBJECT_PARAMETERS: IUpstreamGroup = {
-  rule: "exaix/no-object-parameters",
+  rule: "demo/no-object-parameters",
   valid: [
     { name: "object alias declaration", code: "type Alias = object;" },
     { name: "named interface parameter", code: "interface Owner { readonly id: string } function f(value: Owner) {}" },
@@ -251,11 +251,11 @@ const NO_OBJECT_PARAMETERS: IUpstreamGroup = {
   ],
 };
 
-// anti-slop no-unsafe-dictionary-type maps to exaix/no-unsafe-dictionary. The local rule also covers Map<K, V> and allows a generic constraint.
+// anti-slop no-unsafe-dictionary-type maps to demo/no-unsafe-dictionary. The local rule also covers Map<K, V> and allows a generic constraint.
 // It does not follow wrapper types or non-alias declarations in the value position.
 
 const NO_UNSAFE_DICTIONARY: IUpstreamGroup = {
-  rule: "exaix/no-unsafe-dictionary",
+  rule: "demo/no-unsafe-dictionary",
   valid: [
     { name: "typed record", code: "type Commands = Record<string, Command>;" },
     { name: "PropertyKey record", code: "type Metadata = Record<PropertyKey, JsonValue>;" },

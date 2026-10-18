@@ -19,6 +19,9 @@ import {
   type IFuncDecl,
   isWrapperType,
 } from "../src/rules/whole_tree/optional_params.ts";
+import { OPTIONAL_PARAMS_SETTINGS } from "./helpers/whole_tree_settings.ts";
+
+const hasBare = (param: ts.ParameterDeclaration): boolean => hasBareOptional(param, OPTIONAL_PARAMS_SETTINGS);
 
 /** Parse a single function's first parameter from a source snippet. */
 function firstParam(src: string): ts.ParameterDeclaration {
@@ -40,11 +43,11 @@ function firstParam(src: string): ts.ParameterDeclaration {
 // `| undefined` union form
 
 Deno.test("[bare-optional] flags `x: string | undefined`", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x: string | undefined) {}")), true);
+  assertEquals(hasBare(firstParam("function f(x: string | undefined) {}")), true);
 });
 
 Deno.test("[bare-optional] flags multi-member union containing undefined", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x: string | null | undefined) {}")), true);
+  assertEquals(hasBare(firstParam("function f(x: string | null | undefined) {}")), true);
 });
 
 Deno.test("[bare-optional] flags a bare `| undefined` in a NON-trailing param position", () => {
@@ -61,45 +64,45 @@ Deno.test("[bare-optional] flags a bare `| undefined` in a NON-trailing param po
   };
   ts.forEachChild(sf, visit);
   assert(mid, "expected the middle parameter");
-  assertEquals(hasBareOptional(mid), true);
+  assertEquals(hasBare(mid), true);
 });
 
 // `?` token form (now treated identically to `| undefined`)
 
 Deno.test("[bare-optional] flags a bare `?` param `x?: string`", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x?: string) {}")), true);
+  assertEquals(hasBare(firstParam("function f(x?: string) {}")), true);
 });
 
 Deno.test("[bare-optional] flags `x?: string | undefined` (both signals present)", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x?: string | undefined) {}")), true);
+  assertEquals(hasBare(firstParam("function f(x?: string | undefined) {}")), true);
 });
 
 Deno.test("[bare-optional] flags a bare `?` with an object type", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x?: { a: number }) {}")), true);
+  assertEquals(hasBare(firstParam("function f(x?: { a: number }) {}")), true);
 });
 
 // Compliant / out-of-scope forms (NOT flagged)
 
 Deno.test("[bare-optional] does NOT flag a plain required param", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x: string) {}")), false);
+  assertEquals(hasBare(firstParam("function f(x: string) {}")), false);
 });
 
 Deno.test("[bare-optional] does NOT flag an Opt<T, Reason>-wrapped param (with `?`)", () => {
   const p = firstParam("function f(x?: Opt<string, Reason.TraceAbsent>) {}");
-  assertEquals(hasBareOptional(p), false);
-  assert(isWrapperType(p), "Opt-wrapped param must be recognized as Opt");
+  assertEquals(hasBare(p), false);
+  assert(isWrapperType(p, OPTIONAL_PARAMS_SETTINGS), "Opt-wrapped param must be recognized as Opt");
 });
 
 Deno.test("[bare-optional] does NOT flag an Opt<T, Reason> param without `?` (default form)", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x: Opt<number, Reason.SensibleDefault> = 10) {}")), false);
+  assertEquals(hasBare(firstParam("function f(x: Opt<number, Reason.SensibleDefault> = 10) {}")), false);
 });
 
 Deno.test("[bare-optional] does NOT flag a default-valued param `x = 5` (distinct intentional form)", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x = 5) {}")), false);
+  assertEquals(hasBare(firstParam("function f(x = 5) {}")), false);
 });
 
 Deno.test("[bare-optional] does NOT flag a union WITHOUT undefined", () => {
-  assertEquals(hasBareOptional(firstParam("function f(x: string | number) {}")), false);
+  assertEquals(hasBare(firstParam("function f(x: string | number) {}")), false);
 });
 
 // MARKED_NOT_OPTIONAL exemption for non-trailing Opt params
@@ -108,8 +111,8 @@ Deno.test("[bare-optional] does NOT flag a union WITHOUT undefined", () => {
 function shapeViolations(src: string): ReturnType<typeof collectTypeShapeViolations> {
   const sf = ts.createSourceFile("t.ts", src, ts.ScriptTarget.Latest, true);
   const funcs = new Map<string, IFuncDecl[]>();
-  collectFunctions(sf, funcs);
-  return collectTypeShapeViolations(funcs);
+  collectFunctions(sf, funcs, OPTIONAL_PARAMS_SETTINGS);
+  return collectTypeShapeViolations(funcs, OPTIONAL_PARAMS_SETTINGS);
 }
 
 // Note: a function whose params carry NO optionality signal at all (no `?`, no default, no

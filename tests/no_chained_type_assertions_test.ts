@@ -1,12 +1,12 @@
 /**
  * @module NoChainedTypeAssertionsTest
  * @path packages/lint-rules/tests/no_chained_type_assertions_test.ts
- * @description Rule-level tests for exaix/no-chained-type-assertions, including cases
+ * @description Rule-level tests for demo/no-chained-type-assertions, including cases
  *   ported from anti-slop (MIT) at commit 13909c9e07590f5a85d93c62712259fe14a883f7.
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
@@ -23,7 +23,7 @@ function buildCatalog(ruleOverrides: Record<string, JsonValue> = {}): Record<str
       deslop: { description: "Rule idea from deslop or anti-slop." },
     },
     rules: {
-      "exaix/no-chained-type-assertions": {
+      "demo/no-chained-type-assertions": {
         engine: "plugin",
         severity: "error",
         scope: "all",
@@ -73,7 +73,7 @@ Deno.test("no-chained-type-assertions invalid cases report one diagnostic", () =
   for (const [name, source, filename] of invalid) {
     const diagnostics = run(source, filename);
     assertEquals(diagnostics.length, 1, `expected one report for: ${name}`);
-    assertEquals(diagnostics[0].id, "exaix/no-chained-type-assertions", name);
+    assertEquals(diagnostics[0].id, "demo/no-chained-type-assertions", name);
   }
 });
 

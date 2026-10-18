@@ -13,7 +13,7 @@ import {
   parseCatalog,
   ruleSettings,
   TYPESCRIPT_RULE_PACK,
-} from "@exaix/lint-rules";
+} from "../mod.ts";
 import { loadTestCatalog, TEST_REGISTRY } from "./helpers/registry.ts";
 
 const SCOPES = {
@@ -30,7 +30,7 @@ function baseCatalog(): Record<string, JsonValue> {
       deslop: { description: "Rule idea from deslop or anti-slop." },
     },
     rules: {
-      "exaix/no-chained-type-assertions": {
+      "demo/no-chained-type-assertions": {
         engine: "plugin",
         severity: "error",
         scope: "all",
@@ -43,7 +43,7 @@ function baseCatalog(): Record<string, JsonValue> {
 }
 
 function ruleOf(catalog: Record<string, JsonValue>): Record<string, JsonValue> {
-  return (catalog.rules as Record<string, JsonValue>)["exaix/no-chained-type-assertions"] as Record<string, JsonValue>;
+  return (catalog.rules as Record<string, JsonValue>)["demo/no-chained-type-assertions"] as Record<string, JsonValue>;
 }
 
 function expectError(mutate: (c: Record<string, JsonValue>) => void, pathPart: string): void {
@@ -60,19 +60,19 @@ function expectError(mutate: (c: Record<string, JsonValue>) => void, pathPart: s
 
 Deno.test("parseCatalog rejects an unknown rule id", () => {
   expectError((c) => {
-    (c.rules as Record<string, JsonValue>)["exaix/not-a-rule"] = { ...ruleOf(c), tags: ["type-safety"] };
-  }, "exaix/not-a-rule");
+    (c.rules as Record<string, JsonValue>)["demo/not-a-rule"] = { ...ruleOf(c), tags: ["type-safety"] };
+  }, "demo/not-a-rule");
 });
 
 Deno.test("parseCatalog rejects a plugin id that no registered pack defines, with the existing message and path", () => {
   const catalog = baseCatalog();
-  (catalog.rules as Record<string, JsonValue>)["exaix/not-a-rule"] = { ...ruleOf(catalog), tags: ["type-safety"] };
+  (catalog.rules as Record<string, JsonValue>)["demo/not-a-rule"] = { ...ruleOf(catalog), tags: ["type-safety"] };
   try {
     loadTestCatalog(catalog);
     throw new Error("expected parseCatalog to throw");
   } catch (error) {
     assertEquals(error instanceof CatalogError, true, "expected a CatalogError");
-    assertEquals((error as CatalogError).path, "rules.exaix/not-a-rule");
+    assertEquals((error as CatalogError).path, "rules.demo/not-a-rule");
     assertStringIncludes((error as CatalogError).message, "no plugin rule implementation is registered for this id");
   }
 });
@@ -84,7 +84,7 @@ Deno.test("parseCatalog rejects a plugin id under another plugin name", () => {
     throw new Error("expected parseCatalog to throw");
   } catch (error) {
     assertEquals(error instanceof CatalogError, true, "expected a CatalogError");
-    assertEquals((error as CatalogError).path, "rules.exaix/no-chained-type-assertions");
+    assertEquals((error as CatalogError).path, "rules.demo/no-chained-type-assertions");
   }
 });
 
@@ -143,7 +143,7 @@ Deno.test("classifyPath classifies production, test, and fixture paths", () => {
 Deno.test("ruleSettings applies option defaults", () => {
   const catalog = baseCatalog();
   delete (ruleOf(catalog) as { options?: JsonValue }).options;
-  const settings = ruleSettings(loadTestCatalog(catalog), "exaix/no-chained-type-assertions", TEST_REGISTRY);
+  const settings = ruleSettings(loadTestCatalog(catalog), "demo/no-chained-type-assertions", TEST_REGISTRY);
   assertEquals(settings.options, { allowPartialMockInTests: true, allowNeverAnyMockInTests: true });
   assertEquals(settings.severity, "error");
 });

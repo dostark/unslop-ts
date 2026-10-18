@@ -1,16 +1,16 @@
 /**
  * @module MaxClassSizeTest
  * @path packages/lint-rules/tests/max_class_size_test.ts
- * @description Rule-level tests for exaix/max-class-size (ported from check_god_objects.ts).
+ * @description Rule-level tests for demo/max-class-size (ported from check_god_objects.ts).
  * @architectural-layer Test
  * @related-files [packages/lint-rules/src/rules/max_class_size.ts]
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
-const RULE_ID = "exaix/max-class-size";
+const RULE_ID = "demo/max-class-size";
 const PROD = "packages/x/src/a.ts";
 
 function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, JsonValue> {

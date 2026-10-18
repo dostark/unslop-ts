@@ -7,7 +7,7 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const SCOPES = {
@@ -18,8 +18,8 @@ const SCOPES = {
 const PROD = "packages/x/src/a.ts";
 const SCRIPT = "scripts/x.ts";
 const SHEBANG = "#!/usr/bin/env -S deno run -A";
-const FORBIDDEN_RULE = "exaix/no-forbidden-lint-ignore";
-const SHEBANG_RULE = "exaix/require-deno-shebang";
+const FORBIDDEN_RULE = "demo/no-forbidden-lint-ignore";
+const SHEBANG_RULE = "demo/require-deno-shebang";
 
 function ignoreCatalog(options: Record<string, JsonValue>): Record<string, JsonValue> {
   return {

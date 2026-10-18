@@ -7,13 +7,14 @@
  * @related-files [packages/lint-rules/src/rules/whole_tree/optional_params.ts]
  *
  * Usage:
- *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --rule=constant-restatement
- *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --rule=unused-exports [--strict]
- *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
+ *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
+ *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--strict]
+ *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  */
 
-import { DEFAULT_RUNTIME_PATH } from "@exaix/shared";
 import { relative } from "@std/path";
+import { CatalogError, type JsonValue } from "../engine/catalog.ts";
+import { selectionEnvNameForRule } from "../engine/plugin.ts";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
 import {
   checkRepository as checkOptionalParams,
@@ -21,18 +22,24 @@ import {
   type TOptionalViolationKind,
 } from "../rules/whole_tree/optional_params.ts";
 import { checkRepository as checkUnusedExports } from "../rules/whole_tree/unused_exports.ts";
-import { WHOLE_TREE_SETTINGS } from "../rules/whole_tree/options.ts";
+import {
+  type IConstantRestatementSettings,
+  type IOptionalParamsSettings,
+  type IUnusedExportsSettings,
+  type IWholeTreeSettings,
+  parseWholeTreeSettings,
+} from "../rules/whole_tree/options.ts";
 
 const RULES: readonly string[] = ["constant-restatement", "unused-exports", "optional-params"];
-const PLUGIN_BARE_OPTIONAL_RULE = "exaix/require-optional-wrapper";
+const USAGE_EXIT = 2;
 
 function flagValue(args: readonly string[], name: string): string | undefined {
   const prefix = `--${name}=`;
   return args.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
 }
 
-async function runConstantRestatement(): Promise<void> {
-  const findings = await checkConstantRestatement(Deno.cwd(), WHOLE_TREE_SETTINGS.constantRestatement);
+async function runConstantRestatement(settings: IConstantRestatementSettings): Promise<void> {
+  const findings = await checkConstantRestatement(Deno.cwd(), settings);
   if (findings.length === 0) {
     console.log("✅ No constant restatements found in tests.");
     return;
@@ -46,8 +53,8 @@ async function runConstantRestatement(): Promise<void> {
   Deno.exit(1);
 }
 
-async function runUnusedExports(strict: boolean): Promise<void> {
-  const report = await checkUnusedExports(Deno.cwd(), strict);
+async function runUnusedExports(strict: boolean, settings: IUnusedExportsSettings): Promise<void> {
+  const report = await checkUnusedExports(Deno.cwd(), strict, settings);
   if (report.findings.length === 0) {
     console.log("✅ No unwired exports found.");
     return;
@@ -110,7 +117,7 @@ async function applyOptionalFix(violations: readonly IOptionalViolation[]): Prom
   console.error(`✅ Auto-fixed ${redundant.length} REDUNDANT_OPTIONAL violation(s) across ${sources.size} file(s)`);
 }
 
-async function stagedTargetFiles(includeTests: boolean): Promise<string[]> {
+async function stagedTargetFiles(includeTests: boolean, settings: IOptionalParamsSettings): Promise<string[]> {
   const result = await new Deno.Command("git", {
     args: ["diff", "--cached", "--name-only", "--diff-filter=ACM"],
     env: { LD_LIBRARY_PATH: "" },
@@ -122,29 +129,27 @@ async function stagedTargetFiles(includeTests: boolean): Promise<string[]> {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.endsWith(".ts") || line.endsWith(".tsx"))
-    .filter((line) =>
-      !line.includes("/.copilot/") && !line.includes(`/${DEFAULT_RUNTIME_PATH}/`) && !line.includes("/types/")
-    )
-    .filter((line) => !WHOLE_TREE_SETTINGS.optionalParams.skipSegments.some((segment) => line.includes(segment)))
+    .filter((line) => !settings.walkSkipSegments.some((segment) => line.includes(segment)))
+    .filter((line) => !settings.skipSegments.some((segment) => line.includes(segment)))
     .filter((line) =>
       includeTests ||
       !(
-        WHOLE_TREE_SETTINGS.optionalParams.testSegments.some((segment) => line.includes(segment)) ||
-        WHOLE_TREE_SETTINGS.optionalParams.testSuffixes.some((suffix) => line.endsWith(suffix))
+        settings.testSegments.some((segment) => line.includes(segment)) ||
+        settings.testSuffixes.some((suffix) => line.endsWith(suffix))
       )
     );
 }
 
 /** In staged mode the plugin bare-optional rule enforces the file-level ratchet. */
-async function runOptionalParamsStaged(includeTests: boolean): Promise<void> {
-  const files = await stagedTargetFiles(includeTests);
+async function runOptionalParamsStaged(includeTests: boolean, settings: IOptionalParamsSettings): Promise<void> {
+  const files = await stagedTargetFiles(includeTests, settings);
   if (files.length === 0) {
     console.log("✅ No bare-optional (`?` or `| undefined`) params in staged files.");
     return;
   }
   const command = new Deno.Command(Deno.execPath(), {
     args: ["lint", "--json", ...files],
-    env: { EXAIX_LINT_RULES: PLUGIN_BARE_OPTIONAL_RULE },
+    env: { [selectionEnvNameForRule(settings.pluginRuleId)]: settings.pluginRuleId },
     stdout: "piped",
     stderr: "null",
   });
@@ -153,7 +158,7 @@ async function runOptionalParamsStaged(includeTests: boolean): Promise<void> {
   const report = JSON.parse(new TextDecoder().decode(stdout)) as {
     diagnostics?: ReadonlyArray<{ code?: string; filename?: string; range?: { start?: { line?: number } } }>;
   };
-  const findings = (report.diagnostics ?? []).filter((diagnostic) => diagnostic.code === PLUGIN_BARE_OPTIONAL_RULE);
+  const findings = (report.diagnostics ?? []).filter((diagnostic) => diagnostic.code === settings.pluginRuleId);
   if (findings.length === 0) {
     console.log("✅ No bare-optional (`?` or `| undefined`) params in staged files.");
     return;
@@ -163,12 +168,13 @@ async function runOptionalParamsStaged(includeTests: boolean): Promise<void> {
   }
   console.error(
     `${findings.length} bare-optional param(s) in staged file(s) — staging a file obliges ` +
-      `converting all of its bare optionals. Wrap each in ${WHOLE_TREE_SETTINGS.optionalParams.wrapperType}<T, Reason.*>.`,
+      `converting all of its bare optionals. Wrap each in ${settings.wrapperType}<T, Reason.*>.`,
   );
   Deno.exit(1);
 }
 
 async function runOptionalParams(
+  settings: IOptionalParamsSettings,
   staged: boolean,
   includeTests: boolean,
   verbose: boolean,
@@ -176,10 +182,10 @@ async function runOptionalParams(
   fix: boolean,
 ): Promise<void> {
   if (staged) {
-    await runOptionalParamsStaged(includeTests);
+    await runOptionalParamsStaged(includeTests, settings);
     return;
   }
-  const violations = await checkOptionalParams(Deno.cwd(), includeTests, WHOLE_TREE_SETTINGS.optionalParams);
+  const violations = await checkOptionalParams(Deno.cwd(), includeTests, settings);
   if (verbose && violations.length > 0) {
     for (const violation of violations) {
       console.error(
@@ -210,17 +216,48 @@ async function runOptionalParams(
   }
 }
 
+function exitWithUsage(message: string): never {
+  console.error(message);
+  console.error(
+    `Usage: whole_tree.ts --catalog=<path> --rule=<${
+      RULES.join("|")
+    }> [--strict] [--staged] [--include-tests] [--fail]`,
+  );
+  Deno.exit(USAGE_EXIT);
+}
+
+/** Reads the whole-tree settings from the `--catalog` file, or exits with a usage error. */
+async function loadSettings(catalogPath: string): Promise<IWholeTreeSettings> {
+  try {
+    return parseWholeTreeSettings(JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue);
+  } catch (error) {
+    if (error instanceof CatalogError) return exitWithUsage(error.message);
+    if (error instanceof Deno.errors.NotFound || error instanceof SyntaxError) {
+      return exitWithUsage(`Cannot read the catalog '${catalogPath}': ${error.message}`);
+    }
+    throw error;
+  }
+}
+
 async function main(): Promise<void> {
   const rule = flagValue(Deno.args, "rule");
-  if (rule === undefined || !RULES.includes(rule)) {
-    console.error(`Usage: whole_tree.ts --rule=<${RULES.join("|")}> [--strict] [--staged] [--include-tests] [--fail]`);
-    Deno.exit(2);
-  }
+  if (rule === undefined || !RULES.includes(rule)) exitWithUsage("Missing or unknown --rule.");
+  const catalogPath = flagValue(Deno.args, "catalog");
+  if (catalogPath === undefined) exitWithUsage("Missing --catalog=<path>.");
+  const settings = await loadSettings(catalogPath);
   const args = Deno.args;
-  if (rule === "constant-restatement") await runConstantRestatement();
-  if (rule === "unused-exports") await runUnusedExports(args.includes("--strict"));
+  if (rule === "constant-restatement") {
+    if (!settings.constantRestatement) exitWithUsage("The catalog has no wholeTree.constantRestatement section.");
+    await runConstantRestatement(settings.constantRestatement);
+  }
+  if (rule === "unused-exports") {
+    if (!settings.unusedExports) exitWithUsage("The catalog has no wholeTree.unusedExports section.");
+    await runUnusedExports(args.includes("--strict"), settings.unusedExports);
+  }
   if (rule === "optional-params") {
+    if (!settings.optionalParams) exitWithUsage("The catalog has no wholeTree.optionalParams section.");
     await runOptionalParams(
+      settings.optionalParams,
       args.includes("--staged"),
       args.includes("--include-tests"),
       args.includes("--verbose"),

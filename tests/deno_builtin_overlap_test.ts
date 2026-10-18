@@ -3,13 +3,12 @@
  * @path packages/lint-rules/tests/deno_builtin_overlap_test.ts
  * @description Keeps the engine rule packs from duplicating or shadowing a built-in `deno lint` rule.
  * @architectural-layer Test
- * @dependencies [@exaix/lint-rules]
+ * @dependencies []
  * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/rules/type_safety_rules.ts]
  */
 
 import { assertArrayIncludes, assertEquals, assertNotEquals } from "@std/assert";
-import { join } from "@std/path";
-import { DENO_RULE_PACK, type JsonValue, TYPESCRIPT_RULE_PACK } from "@exaix/lint-rules";
+import { DEMO_PLUGIN_NAME, lintJson, packRuleKeys, runDeno, withDemoProject } from "./helpers/demo_project.ts";
 
 const OVERLAP_KIND = {
   duplicate: "duplicate",
@@ -34,24 +33,8 @@ interface ICollectedCase {
   readonly ownRuleReported: boolean;
 }
 
-interface ILintDiagnostic {
-  readonly filename?: string;
-  readonly code?: string;
-}
-
-interface ILintReport {
-  readonly diagnostics?: readonly ILintDiagnostic[];
-  readonly errors?: readonly JsonValue[];
-}
-
-const DEMO_PLUGIN_NAME = "exaix";
-const DEMO_TAG = "demo";
-/** The non-recommended built-ins the Exaix `lint` task enables. */
+/** Non-recommended built-ins that a consumer enables on top of the recommended set. */
 const CONSUMER_BUILTIN_RULES = ["explicit-module-boundary-types"];
-const DEMO_OPTIONS: Readonly<Record<string, Record<string, number>>> = {
-  "max-cyclomatic-complexity": { max: 1 },
-  "max-class-size": { minClassLines: 1, threshold: 1 },
-};
 const DECLARATIONS = "declare const input: string;\n";
 
 const CASES: readonly IOverlapCase[] = [
@@ -150,8 +133,8 @@ const CASES: readonly IOverlapCase[] = [
   },
   {
     rule: "ignore-needs-reason",
-    name: "an ignore of an exaix rule without a reason",
-    source: "// deno-lint-ignore exaix/no-runtime-typeof\nexport const value = 1;\n",
+    name: "an ignore of a plugin rule without a reason",
+    source: "// deno-lint-ignore demo/no-runtime-typeof\nexport const value = 1;\n",
     expectedBuiltins: { "ban-unused-ignore": OVERLAP_KIND.incidental },
   },
   {
@@ -187,85 +170,19 @@ function caseFileName(index: number, entry: IOverlapCase): string {
   return `case_${index}${entry.isTestFile ? "_test" : ""}.ts`;
 }
 
-function packRuleKeys(): string[] {
-  return [...Object.keys(TYPESCRIPT_RULE_PACK.rules), ...Object.keys(DENO_RULE_PACK.rules)];
-}
-
-function demoCatalog(): Record<string, JsonValue> {
-  const rules: Record<string, JsonValue> = {};
-  for (const key of packRuleKeys()) {
-    rules[`${DEMO_PLUGIN_NAME}/${key}`] = {
-      engine: "plugin",
-      severity: "error",
-      scope: "all",
-      tags: [DEMO_TAG],
-      ...(key in DEMO_OPTIONS ? { options: DEMO_OPTIONS[key] } : {}),
-    };
-  }
-  return {
-    version: "1",
-    scopes: {
-      test: ["**/*_test.ts"],
-      fixture: ["**/tests/fixtures/**"],
-    },
-    tagVocabulary: { [DEMO_TAG]: { description: "Rules under the overlap check." } },
-    rules,
-  };
-}
-
-function demoPluginSource(): string {
-  return [
-    'import { createLintPlugin, createRuleRegistry, DENO_RULE_PACK, parseCatalog, TYPESCRIPT_RULE_PACK } from "@exaix/lint-rules";',
-    "const packs = [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK];",
-    `const registry = createRuleRegistry(${JSON.stringify(DEMO_PLUGIN_NAME)}, packs);`,
-    `const catalog = parseCatalog(${JSON.stringify(demoCatalog())}, { scriptRuleSchemas: null, registry });`,
-    `export default createLintPlugin(${JSON.stringify(DEMO_PLUGIN_NAME)}, catalog, { rulePacks: packs });`,
-    "",
-  ].join("\n");
-}
-
-async function projectConfig(): Promise<string> {
-  const rootConfig = JSON.parse(await Deno.readTextFile(new URL("../../../deno.json", import.meta.url)));
-  return JSON.stringify({
-    imports: {
-      "@exaix/lint-rules": new URL("../mod.ts", import.meta.url).href,
-      zod: rootConfig.imports.zod,
-    },
-    lint: {
-      plugins: ["./plugin.ts"],
-      rules: { tags: ["recommended"], include: CONSUMER_BUILTIN_RULES },
-    },
-  });
-}
-
-async function runDeno(args: string[], cwd: string): Promise<string> {
-  const output = await new Deno.Command(Deno.execPath(), {
-    args,
-    cwd,
-    env: { EXAIX_LINT_RULES: "" },
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  return new TextDecoder().decode(output.stdout);
-}
-
 /** The built-in rule codes of the installed Deno. */
 async function builtinCodes(): Promise<Set<string>> {
-  const listing = JSON.parse(await runDeno(["lint", "--rules", "--json"], Deno.cwd())) as {
-    rules: { code: string }[];
-  };
+  const result = await runDeno(["lint", "--rules", "--json"], Deno.cwd());
+  const listing = JSON.parse(result.stdout) as { rules: { code: string }[] };
   return new Set(listing.rules.map((rule) => rule.code));
 }
 
 /** Lints every case in one temp project and returns what fired on each. */
-async function collect(entries: readonly IOverlapCase[]): Promise<ICollectedCase[]> {
-  const dir = await Deno.makeTempDir({ prefix: "overlap_" });
-  try {
-    await Deno.writeTextFile(join(dir, "deno.json"), await projectConfig());
-    await Deno.writeTextFile(join(dir, "plugin.ts"), demoPluginSource());
-    const names = entries.map((entry, index) => caseFileName(index, entry));
-    for (const [index, entry] of entries.entries()) await Deno.writeTextFile(join(dir, names[index]), entry.source);
-    const report = JSON.parse(await runDeno(["lint", "--json", "--config", "deno.json", ...names], dir)) as ILintReport;
+function collect(entries: readonly IOverlapCase[]): Promise<ICollectedCase[]> {
+  const names = entries.map((entry, index) => caseFileName(index, entry));
+  const files = Object.fromEntries(entries.map((entry, index) => [names[index], entry.source]));
+  return withDemoProject({ files, lintRules: { include: CONSUMER_BUILTIN_RULES } }, async (dir) => {
+    const report = await lintJson(dir, names);
     assertEquals(report.errors ?? [], [], "the demo project must lint without errors");
     return entries.map((entry, index) => {
       const codes = (report.diagnostics ?? [])
@@ -276,9 +193,7 @@ async function collect(entries: readonly IOverlapCase[]): Promise<ICollectedCase
         ownRuleReported: entry.rule !== null && codes.includes(`${DEMO_PLUGIN_NAME}/${entry.rule}`),
       };
     });
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
+  });
 }
 
 /** The built-in codes a case fired but did not declare. */

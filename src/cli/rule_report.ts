@@ -11,7 +11,8 @@
  *   deno run -A packages/lint-rules/src/cli/rule_report.ts --rule=<id> [--roots=a,b] [--topFiles=5] [--topFns=5] [--json] [--fail]
  */
 
-import { dirname, fromFileUrl, join, relative } from "@std/path";
+import { fromFileUrl, relative } from "@std/path";
+import { selectionEnvNameForRule } from "../engine/plugin.ts";
 
 /** One ranked finding. */
 export interface IRankedFinding {
@@ -91,11 +92,11 @@ export function summarizeFiles(
   return { total: ranked.length, topFiles: summaries.slice(0, topFiles) };
 }
 
-/** Runs `deno lint --json` for one rule over the given roots and returns its diagnostics. */
+/** Runs `deno lint --json` for one rule over the given roots and returns its diagnostics. The rule id is `<plugin>/<key>`. */
 export async function runDenoLint(rule: string, roots: readonly string[]): Promise<ILintDiagnostic[]> {
   const command = new Deno.Command(Deno.execPath(), {
     args: ["lint", "--json", ...roots],
-    env: { EXAIX_LINT_RULES: rule },
+    env: { [selectionEnvNameForRule(rule)]: rule },
     stdout: "piped",
     stderr: "null",
   });
@@ -123,7 +124,7 @@ async function main(): Promise<void> {
   const asJson = args.includes("--json");
   const shouldFail = args.includes("--fail");
 
-  const root = join(dirname(fromFileUrl(import.meta.url)), "..", "..", "..", "..");
+  const root = Deno.cwd();
   const findings = await runDenoLint(rule, roots);
   const ranked = rankFindings(findings).map((finding) => ({
     ...finding,

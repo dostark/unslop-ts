@@ -7,7 +7,7 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { type JsonValue, runPlugin } from "@exaix/lint-rules";
+import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const SCOPES = {
@@ -23,7 +23,7 @@ function buildCatalog(filters: Record<string, JsonValue>): Record<string, JsonVa
     scopes: SCOPES,
     tagVocabulary: { "type-safety": { description: "Rules that keep type evidence." } },
     rules: {
-      "exaix/no-runtime-typeof": {
+      "demo/no-runtime-typeof": {
         engine: "plugin",
         severity: "error",
         scope: "all",

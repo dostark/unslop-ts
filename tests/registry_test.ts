@@ -15,7 +15,7 @@ import {
   type IRulePack,
   RuleRegistryError,
   TYPESCRIPT_RULE_PACK,
-} from "@exaix/lint-rules";
+} from "../mod.ts";
 
 const NOOP_RULE: IPluginRule = { create: () => ({}) };
 const NO_OPTIONS = z.object({}).strict();
