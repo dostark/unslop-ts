@@ -1,10 +1,10 @@
 /**
  * @module RequireOptionalWrapper
- * @path packages/lint-rules/src/rules/require_optional_wrapper.ts
+ * @path src/rules/require_optional_wrapper.ts
  * @description Requires a catalogued wrapper type for optional parameters.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts]
+ * @related-files [src/rules/mod.ts]
  */
 
 import {

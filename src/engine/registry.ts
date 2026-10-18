@@ -1,10 +1,10 @@
 /**
  * @module RuleRegistry
- * @path packages/lint-rules/src/engine/registry.ts
+ * @path src/engine/registry.ts
  * @description Resolves catalog rule ids to rule implementations and option schemas from the rule packs a consumer registers.
  * @architectural-layer Shared
  * @dependencies [zod]
- * @related-files [packages/lint-rules/src/engine/plugin.ts, packages/lint-rules/src/engine/catalog.ts, packages/lint-rules/src/rules/types.ts]
+ * @related-files [src/engine/plugin.ts, src/engine/catalog.ts, src/rules/types.ts]
  */
 
 import type { z } from "zod";

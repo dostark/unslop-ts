@@ -1,10 +1,10 @@
 /**
  * @module LintRulesTypes
- * @path packages/lint-rules/src/rules/types.ts
+ * @path src/rules/types.ts
  * @description Shared types for plugin rule implementations.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/engine/catalog.ts]
+ * @related-files [src/rules/mod.ts, src/engine/catalog.ts]
  */
 
 import type { JsonValue } from "../engine/catalog.ts";

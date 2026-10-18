@@ -1,9 +1,9 @@
 /**
  * @module MaxClassSizeTest
- * @path packages/lint-rules/tests/max_class_size_test.ts
+ * @path tests/max_class_size_test.ts
  * @description Rule-level tests for demo/max-class-size (ported from check_god_objects.ts).
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/max_class_size.ts]
+ * @related-files [src/rules/max_class_size.ts]
  */
 
 import { assertEquals } from "@std/assert";

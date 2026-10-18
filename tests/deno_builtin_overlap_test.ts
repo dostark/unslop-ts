@@ -1,10 +1,10 @@
 /**
  * @module DenoBuiltinOverlapTest
- * @path packages/lint-rules/tests/deno_builtin_overlap_test.ts
+ * @path tests/deno_builtin_overlap_test.ts
  * @description Keeps the engine rule packs from duplicating or shadowing a built-in `deno lint` rule.
  * @architectural-layer Test
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/rules/type_safety_rules.ts]
+ * @related-files [src/rules/mod.ts, src/rules/type_safety_rules.ts]
  */
 
 import { assertArrayIncludes, assertEquals, assertNotEquals } from "@std/assert";

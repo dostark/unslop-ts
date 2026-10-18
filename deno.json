@@ -1,9 +1,47 @@
 {
-  "name": "@exaix/lint-rules",
+  "name": "@dostark/unslop-ts",
   "version": "0.1.0",
-  "exports": "./mod.ts",
+  "license": "MIT",
+  "exports": {
+    ".": "./mod.ts",
+    "./cli/rule_ceiling": "./src/cli/rule_ceiling.ts"
+  },
   "imports": {
-    "@exaix/lint-rules": "./mod.ts",
-    "@exaix/lint-rules/": "./src/"
+    "@dostark/unslop-ts": "./mod.ts",
+    "@std/assert": "jsr:@std/assert@^1.0.19",
+    "@std/fs": "jsr:@std/fs@^1.0.24",
+    "@std/path": "jsr:@std/path@^1.1.6",
+    "typescript": "npm:typescript@6.0.3",
+    "zod": "npm:zod@^4.4.3"
+  },
+  "tasks": {
+    "test": "deno test --allow-all",
+    "lint": "deno lint",
+    "check": "deno check mod.ts src/ tests/ examples/",
+    "fmt": "deno fmt"
+  },
+  "compilerOptions": {
+    "lib": [
+      "deno.window",
+      "deno.ns",
+      "deno.unstable"
+    ],
+    "strict": true,
+    "checkJs": false
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 120,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false,
+    "proseWrap": "preserve"
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-slow-types"
+      ]
+    }
   }
 }

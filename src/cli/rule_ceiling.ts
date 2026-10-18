@@ -1,10 +1,10 @@
 /**
  * @module RuleCeiling
- * @path packages/lint-rules/src/cli/rule_ceiling.ts
+ * @path src/cli/rule_ceiling.ts
  * @description Evaluates ratcheted rule counts against the committed ceilings file.
  * @architectural-layer Tooling
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/catalog.ts, tests/scripts/rule_ceiling_ratchet_test.ts]
+ * @related-files [src/engine/catalog.ts]
  * @public Exports are the unit-test surface of this module.
  */
 

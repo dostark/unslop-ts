@@ -1,9 +1,9 @@
 /**
  * @module IgnoreNeedsReasonTest
- * @path packages/lint-rules/tests/ignore_needs_reason_test.ts
+ * @path tests/ignore_needs_reason_test.ts
  * @description Rule-level tests for demo/ignore-needs-reason.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/deno/ignore_needs_reason.ts]
+ * @related-files [src/rules/deno/ignore_needs_reason.ts]
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";

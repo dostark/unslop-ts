@@ -1,10 +1,10 @@
 /**
  * @module IgnoreNeedsReason
- * @path packages/lint-rules/src/rules/deno/ignore_needs_reason.ts
+ * @path src/rules/deno/ignore_needs_reason.ts
  * @description Requires a reason on a `deno-lint-ignore <plugin>/<rule>` comment.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/rules/deno/ignore_directive.ts]
+ * @related-files [src/rules/mod.ts, src/rules/deno/ignore_directive.ts]
  */
 
 import type { IPluginRuleContext, LintVisitor } from "../types.ts";

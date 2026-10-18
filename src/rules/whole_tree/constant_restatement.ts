@@ -1,11 +1,11 @@
 /**
  * @module WholeTreeConstantRestatement
- * @path packages/lint-rules/src/rules/whole_tree/constant_restatement.ts
+ * @path src/rules/whole_tree/constant_restatement.ts
  * @description A test must derive a list constant's value, not restate it. Whole-tree rule
  *   (TypeScript/regular-expression scan), moved from scripts/check_constant_restatement.ts.
  * @architectural-layer Shared
  * @dependencies [@std/fs, @std/path]
- * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts, packages/lint-rules/tests/whole_tree_constant_restatement_test.ts]
+ * @related-files [src/rules/whole_tree/options.ts, tests/whole_tree_constant_restatement_test.ts]
  * @public Exports are the unit-test surface of this module.
  */
 

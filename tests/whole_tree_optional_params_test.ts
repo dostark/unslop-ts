@@ -1,13 +1,13 @@
 /**
  * @module CheckOptionalParamsBareOptionalTest
- * @path packages/lint-rules/tests/whole_tree_optional_params_test.ts
+ * @path tests/whole_tree_optional_params_test.ts
  * @description Verifies the BARE_OPTIONAL rule of the whole-tree optional-params rule: a parameter
  *   made optional via a bare `?` token OR a bare `| undefined` union (without the Opt<T, Reason>
  *   wrapper) is flagged — the two forms are treated identically because they are semantically
  *   equivalent. Opt-wrapped, plain-required, and default-valued params are not flagged. Guards
  *   the convention that optionality must be codified via Opt<T, Reason>.
  * @architectural-layer Tooling
- * @related-files [packages/lint-rules/src/rules/whole_tree/optional_params.ts, packages/core/src/types/optional_marker.ts]
+ * @related-files [src/rules/whole_tree/optional_params.ts]
  */
 
 import { assert, assertEquals } from "@std/assert";

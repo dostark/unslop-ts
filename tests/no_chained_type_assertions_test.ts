@@ -1,6 +1,6 @@
 /**
  * @module NoChainedTypeAssertionsTest
- * @path packages/lint-rules/tests/no_chained_type_assertions_test.ts
+ * @path tests/no_chained_type_assertions_test.ts
  * @description Rule-level tests for demo/no-chained-type-assertions, including cases
  *   ported from anti-slop (MIT) at commit 13909c9e07590f5a85d93c62712259fe14a883f7.
  */

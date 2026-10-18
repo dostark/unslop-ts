@@ -1,9 +1,9 @@
 /**
  * @module EvidenceRulesTest
- * @path packages/lint-rules/tests/evidence_rules_test.ts
+ * @path tests/evidence_rules_test.ts
  * @description Rule-level tests for the ratcheted evidence rules, ported from anti-slop (MIT).
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/evidence_rules.ts, packages/lint-rules/tests/require_safety_comment_test.ts]
+ * @related-files [src/rules/evidence_rules.ts, tests/require_safety_comment_test.ts]
  */
 
 import { assertEquals } from "@std/assert";

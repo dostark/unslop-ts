@@ -1,10 +1,10 @@
 /**
  * @module TestAssertionRules
- * @path packages/lint-rules/src/rules/test_assertion_rules.ts
+ * @path src/rules/test_assertion_rules.ts
  * @description Test-assertion quality rules. Rule ideas from deslop / anti-slop (MIT).
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts]
+ * @related-files [src/rules/mod.ts]
  */
 
 import { asNode, type LintValue, NODE_IDENTIFIER } from "../engine/type_environment.ts";

@@ -1,10 +1,10 @@
 /**
  * @module LintPluginFactory
- * @path packages/lint-rules/src/engine/plugin.ts
+ * @path src/engine/plugin.ts
  * @description Builds a Deno lint plugin from a validated catalog and rule packs, honouring severity, scope, and local selection.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/catalog.ts, packages/lint-rules/src/engine/registry.ts]
+ * @related-files [src/engine/catalog.ts, src/engine/registry.ts]
  */
 
 import { globToRegExp } from "@std/path";

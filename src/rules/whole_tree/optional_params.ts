@@ -1,11 +1,11 @@
 /**
  * @module WholeTreeOptionalParams
- * @path packages/lint-rules/src/rules/whole_tree/optional_params.ts
+ * @path src/rules/whole_tree/optional_params.ts
  * @description Optional parameters whose optionality does not match usage. Whole-tree rule
  *   (TypeScript compiler API), moved from scripts/check_optional_params.ts.
  * @architectural-layer Shared
  * @dependencies [typescript, @std/fs]
- * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts, packages/lint-rules/src/cli/whole_tree.ts]
+ * @related-files [src/rules/whole_tree/options.ts, src/cli/whole_tree.ts]
  * @public Exports are the unit-test surface of this module.
  */
 

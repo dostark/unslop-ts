@@ -1,10 +1,10 @@
 /**
  * @module RuleRegistryTestHelper
- * @path packages/lint-rules/tests/helpers/registry.ts
+ * @path tests/helpers/registry.ts
  * @description Shared registry, rule packs, and loaders that bind the engine tests to the TypeScript and Deno rule packs.
  * @architectural-layer Test
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/registry.ts, packages/lint-rules/src/rules/mod.ts]
+ * @related-files [src/engine/registry.ts, src/rules/mod.ts]
  */
 
 import {

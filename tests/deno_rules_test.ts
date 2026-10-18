@@ -1,9 +1,9 @@
 /**
  * @module DenoRulesTest
- * @path packages/lint-rules/tests/deno_rules_test.ts
+ * @path tests/deno_rules_test.ts
  * @description Named valid and invalid cases for the Deno rule pack: forbidden ignores and the script shebang.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/deno/no_forbidden_lint_ignore.ts, packages/lint-rules/src/rules/deno/require_deno_shebang.ts]
+ * @related-files [src/rules/deno/no_forbidden_lint_ignore.ts, src/rules/deno/require_deno_shebang.ts]
  */
 
 import { assertEquals } from "@std/assert";

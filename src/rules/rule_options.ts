@@ -1,10 +1,10 @@
 /**
  * @module RuleOptions
- * @path packages/lint-rules/src/rules/rule_options.ts
+ * @path src/rules/rule_options.ts
  * @description Per-rule option schemas and defaults, used to validate catalog options.
  * @architectural-layer Shared
  * @dependencies [zod]
- * @related-files [packages/lint-rules/src/engine/catalog.ts]
+ * @related-files [src/engine/catalog.ts]
  */
 
 import { z } from "zod";

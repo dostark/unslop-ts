@@ -1,9 +1,9 @@
 /**
  * @module RuleReportTest
- * @path packages/lint-rules/tests/rule_report_test.ts
+ * @path tests/rule_report_test.ts
  * @description Ranking and summarising for the rule-report CLI.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/cli/rule_report.ts]
+ * @related-files [src/cli/rule_report.ts]
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";

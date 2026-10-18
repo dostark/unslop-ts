@@ -1,10 +1,10 @@
 /**
  * @module IgnoreDirective
- * @path packages/lint-rules/src/rules/deno/ignore_directive.ts
+ * @path src/rules/deno/ignore_directive.ts
  * @description Parses the text of a `deno-lint-ignore` comment into its rule ids and its reason.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/deno/ignore_needs_reason.ts, packages/lint-rules/src/rules/deno/no_forbidden_lint_ignore.ts]
+ * @related-files [src/rules/deno/ignore_needs_reason.ts, src/rules/deno/no_forbidden_lint_ignore.ts]
  */
 
 /** The rule ids and the reason of one `deno-lint-ignore` or `deno-lint-ignore-file` comment. */

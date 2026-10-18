@@ -1,10 +1,10 @@
 /**
  * @module LintRuleCatalog
- * @path packages/lint-rules/src/engine/catalog.ts
+ * @path src/engine/catalog.ts
  * @description Loads and validates the style-rule catalog, classifies repo paths, and resolves rule settings.
  * @architectural-layer Shared
  * @dependencies [@std/path, zod]
- * @related-files [packages/lint-rules/mod.ts, packages/lint-rules/src/engine/registry.ts]
+ * @related-files [mod.ts, src/engine/registry.ts]
  */
 
 import { globToRegExp } from "@std/path";

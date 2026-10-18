@@ -1,11 +1,11 @@
 /**
  * @module MaxClassSize
- * @path packages/lint-rules/src/rules/max_class_size.ts
+ * @path src/rules/max_class_size.ts
  * @description Class-size (god-object) score as a plugin rule on the Deno ESTree.
  *   Indicators ported from scripts/check_god_objects.ts.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/tests/max_class_size_test.ts]
+ * @related-files [src/rules/mod.ts, tests/max_class_size_test.ts]
  */
 
 import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/type_environment.ts";

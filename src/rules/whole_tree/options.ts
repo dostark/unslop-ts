@@ -1,10 +1,10 @@
 /**
  * @module WholeTreeOptions
- * @path packages/lint-rules/src/rules/whole_tree/options.ts
+ * @path src/rules/whole_tree/options.ts
  * @description Whole-tree rule settings: the schema of a catalog's `wholeTree` section and its parser.
  * @architectural-layer Shared
  * @dependencies [zod]
- * @related-files [packages/lint-rules/src/rules/whole_tree/constant_restatement.ts, packages/lint-rules/src/cli/whole_tree.ts]
+ * @related-files [src/rules/whole_tree/constant_restatement.ts, src/cli/whole_tree.ts]
  */
 
 import { z } from "zod";

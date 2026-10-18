@@ -1,9 +1,9 @@
 /**
  * @module RequireSafetyCommentTest
- * @path packages/lint-rules/tests/require_safety_comment_test.ts
+ * @path tests/require_safety_comment_test.ts
  * @description Marker-comment placement rules for demo/require-safety-comment (anti-slop, MIT).
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/evidence_rules.ts]
+ * @related-files [src/rules/evidence_rules.ts]
  */
 
 import { assertEquals } from "@std/assert";

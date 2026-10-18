@@ -1,10 +1,10 @@
 /**
  * @module WholeTreeSettingsTest
- * @path packages/lint-rules/tests/whole_tree_settings_test.ts
+ * @path tests/whole_tree_settings_test.ts
  * @description The whole-tree settings are read from a catalog and rejected with a JSON path when invalid.
  * @architectural-layer Test
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts]
+ * @related-files [src/rules/whole_tree/options.ts]
  */
 
 import { assertEquals, assertThrows } from "@std/assert";

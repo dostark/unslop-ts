@@ -1,9 +1,9 @@
 /**
  * @module PluginSelectionTest
- * @path packages/lint-rules/tests/plugin_selection_test.ts
+ * @path tests/plugin_selection_test.ts
  * @description `DEMO_LINT_RULES` selection, the `optIn` dispatch, and registration of every catalog rule.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/engine/plugin.ts]
+ * @related-files [src/engine/plugin.ts]
  */
 
 import { assertArrayIncludes, assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";

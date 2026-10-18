@@ -1,10 +1,10 @@
 /**
  * @module PluginRules
- * @path packages/lint-rules/src/rules/mod.ts
+ * @path src/rules/mod.ts
  * @description The TypeScript and Deno rule packs: the plugin rules the engine ships, keyed by bare rule key.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/registry.ts, packages/lint-rules/src/rules/rule_options.ts]
+ * @related-files [src/engine/registry.ts, src/rules/rule_options.ts]
  */
 
 import { createNoChainedTypeAssertions } from "./no_chained_type_assertions.ts";

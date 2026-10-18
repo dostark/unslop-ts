@@ -1,10 +1,10 @@
 /**
  * @module DemoProjectTestHelper
- * @path packages/lint-rules/tests/helpers/demo_project.ts
+ * @path tests/helpers/demo_project.ts
  * @description Writes a temp project that loads the engine rule packs as a lint plugin, and runs `deno lint` over it.
  * @architectural-layer Test
  * @dependencies []
- * @related-files [packages/lint-rules/tests/deno_builtin_overlap_test.ts, packages/lint-rules/tests/plugin_selection_test.ts]
+ * @related-files [tests/deno_builtin_overlap_test.ts, tests/plugin_selection_test.ts]
  */
 
 import { join } from "@std/path";
@@ -74,9 +74,9 @@ function pluginSource(): string {
 }
 
 async function configSource(options: IDemoProjectOptions): Promise<string> {
-  const rootConfig = JSON.parse(await Deno.readTextFile(new URL("../../../../deno.json", import.meta.url)));
+  const ownConfig = JSON.parse(await Deno.readTextFile(new URL("../../deno.json", import.meta.url)));
   return JSON.stringify({
-    imports: { [ENGINE_ALIAS]: new URL("../../mod.ts", import.meta.url).href, zod: rootConfig.imports.zod },
+    imports: { [ENGINE_ALIAS]: new URL("../../mod.ts", import.meta.url).href, zod: ownConfig.imports.zod },
     lint: { plugins: [`./${PLUGIN_FILE}`], rules: { tags: ["recommended"], ...options.lintRules } },
   });
 }

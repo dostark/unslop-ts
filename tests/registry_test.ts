@@ -1,9 +1,9 @@
 /**
  * @module RuleRegistryTest
- * @path packages/lint-rules/tests/registry_test.ts
+ * @path tests/registry_test.ts
  * @description Rule-pack registry: id resolution, option schemas, and rejection of malformed packs.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/engine/registry.ts]
+ * @related-files [src/engine/registry.ts]
  */
 
 import { assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";

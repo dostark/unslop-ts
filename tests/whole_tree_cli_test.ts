@@ -1,10 +1,10 @@
 /**
  * @module WholeTreeCliTest
- * @path packages/lint-rules/tests/whole_tree_cli_test.ts
+ * @path tests/whole_tree_cli_test.ts
  * @description The whole-tree CLI reads its settings from `--catalog` and exits 2 on a missing or invalid catalog.
  * @architectural-layer Test
  * @dependencies []
- * @related-files [packages/lint-rules/src/cli/whole_tree.ts]
+ * @related-files [src/cli/whole_tree.ts]
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";

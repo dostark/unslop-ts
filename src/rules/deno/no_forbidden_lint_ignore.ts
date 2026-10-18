@@ -1,10 +1,10 @@
 /**
  * @module NoForbiddenLintIgnore
- * @path packages/lint-rules/src/rules/deno/no_forbidden_lint_ignore.ts
+ * @path src/rules/deno/no_forbidden_lint_ignore.ts
  * @description Reports a `deno-lint-ignore` comment that silences a rule the project forbids ignoring.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/rules/deno/ignore_directive.ts]
+ * @related-files [src/rules/mod.ts, src/rules/deno/ignore_directive.ts]
  */
 
 import type { IPluginRuleContext, LintVisitor } from "../types.ts";

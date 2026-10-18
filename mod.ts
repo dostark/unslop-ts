@@ -1,10 +1,10 @@
 /**
  * @module LintRules
- * @path packages/lint-rules/mod.ts
+ * @path mod.ts
  * @description Generic lint-rule engine: catalog loader, plugin factory, rule registry, and test helpers.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/catalog.ts, packages/lint-rules/src/engine/plugin.ts, packages/lint-rules/src/engine/registry.ts]
+ * @related-files [src/engine/catalog.ts, src/engine/plugin.ts, src/engine/registry.ts]
  */
 
 export { CatalogError, classifyPath, parseCatalog, PATH_CLASS, ruleSettings } from "./src/engine/catalog.ts";

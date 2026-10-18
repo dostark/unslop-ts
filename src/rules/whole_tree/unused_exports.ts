@@ -1,11 +1,11 @@
 /**
  * @module WholeTreeUnusedExports
- * @path packages/lint-rules/src/rules/whole_tree/unused_exports.ts
+ * @path src/rules/whole_tree/unused_exports.ts
  * @description Finds exported declarations never imported by other production files.
  *   Whole-tree rule (TypeScript compiler API), moved from scripts/check_unused_exports.ts.
  * @architectural-layer Shared
  * @dependencies [typescript, @std/fs, @std/path]
- * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts, packages/lint-rules/src/cli/whole_tree.ts]
+ * @related-files [src/rules/whole_tree/options.ts, src/cli/whole_tree.ts]
  */
 
 import ts from "typescript";

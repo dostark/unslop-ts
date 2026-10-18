@@ -1,14 +1,14 @@
 #!/usr/bin/env -S deno run -A
 /**
  * @module RuleReport
- * @path packages/lint-rules/src/cli/rule_report.ts
+ * @path src/cli/rule_report.ts
  * @description Runs one catalog rule over given roots and ranks the findings by their message value.
  * @architectural-layer Tooling
- * @related-files [packages/lint-rules/src/engine/plugin.ts, packages/lint-rules/tests/rule_report_test.ts]
+ * @related-files [src/engine/plugin.ts, tests/rule_report_test.ts]
  * @public Exports are the unit-test surface of this module.
  *
  * Usage:
- *   deno run -A packages/lint-rules/src/cli/rule_report.ts --rule=<id> [--roots=a,b] [--topFiles=5] [--topFns=5] [--json] [--fail]
+ *   deno run -A src/cli/rule_report.ts --rule=<id> [--roots=a,b] [--topFiles=5] [--topFns=5] [--json] [--fail]
  */
 
 import { fromFileUrl, relative } from "@std/path";

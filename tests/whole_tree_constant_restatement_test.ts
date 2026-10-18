@@ -1,6 +1,6 @@
 /**
  * @module CheckConstantRestatementTest
- * @path packages/lint-rules/tests/whole_tree_constant_restatement_test.ts
+ * @path tests/whole_tree_constant_restatement_test.ts
  * @description Phase 142 Step 19 (GAP-3) — a test must derive a constant's value, not restate it.
  *
  *   Step 7 added two hosts to `DAEMON_DEFAULT_NET_HOSTS`. Four tests carried a hardcoded copy of
@@ -11,7 +11,7 @@
  *   This is the same defect class the phase removed from its own parity gates: an expectation
  *   derived from a stale copy rather than from the source of truth.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/whole_tree/constant_restatement.ts, packages/core/src/types/constants.ts]
+ * @related-files [src/rules/whole_tree/constant_restatement.ts]
  */
 
 import { assertEquals } from "@std/assert";

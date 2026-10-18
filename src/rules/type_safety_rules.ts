@@ -1,10 +1,10 @@
 /**
  * @module TypeSafetyRules
- * @path packages/lint-rules/src/rules/type_safety_rules.ts
+ * @path src/rules/type_safety_rules.ts
  * @description AST-matched type-safety plugin rules. Rule ideas from deslop / anti-slop (MIT).
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/engine/type_environment.ts, packages/lint-rules/src/rules/mod.ts]
+ * @related-files [src/engine/type_environment.ts, src/rules/mod.ts]
  */
 
 import {

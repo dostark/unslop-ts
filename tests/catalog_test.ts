@@ -1,6 +1,6 @@
 /**
  * @module LintRulesCatalogTest
- * @path packages/lint-rules/tests/catalog_test.ts
+ * @path tests/catalog_test.ts
  * @description Validates the style-rule catalog loader, path classification, and settings.
  */
 

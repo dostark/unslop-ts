@@ -1,10 +1,10 @@
 /**
  * @module MaxCyclomaticComplexity
- * @path packages/lint-rules/src/rules/max_cyclomatic_complexity.ts
+ * @path src/rules/max_cyclomatic_complexity.ts
  * @description Cyclomatic-complexity limit as a plugin rule on the Deno ESTree.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/tests/max_cyclomatic_complexity_test.ts]
+ * @related-files [src/rules/mod.ts, tests/max_cyclomatic_complexity_test.ts]
  */
 
 import { asNode, type ILintNode, isNodeLike, walk } from "../engine/type_environment.ts";

@@ -1,9 +1,9 @@
 /**
  * @module WholeTreeUnusedExportsTest
- * @path packages/lint-rules/tests/whole_tree_unused_exports_test.ts
+ * @path tests/whole_tree_unused_exports_test.ts
  * @description The unused-exports rule honours its configured entry points.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/whole_tree/unused_exports.ts]
+ * @related-files [src/rules/whole_tree/unused_exports.ts]
  */
 
 import { assert } from "@std/assert";

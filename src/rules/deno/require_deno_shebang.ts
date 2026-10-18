@@ -1,10 +1,10 @@
 /**
  * @module RequireDenoShebang
- * @path packages/lint-rules/src/rules/deno/require_deno_shebang.ts
+ * @path src/rules/deno/require_deno_shebang.ts
  * @description Reports a file whose first line does not start with the configured Deno shebang.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/rules/rule_options.ts]
+ * @related-files [src/rules/mod.ts, src/rules/rule_options.ts]
  */
 
 import type { IPluginRuleContext, LintVisitor } from "../types.ts";

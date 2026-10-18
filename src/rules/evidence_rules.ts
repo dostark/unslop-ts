@@ -1,11 +1,11 @@
 /**
  * @module EvidenceRules
- * @path packages/lint-rules/src/rules/evidence_rules.ts
+ * @path src/rules/evidence_rules.ts
  * @description Ratcheted evidence rules: justified assertions, no ad-hoc typeof, no empty spreads.
  *   Rule ideas from deslop / anti-slop (MIT).
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/src/rules/type_safety_rules.ts]
+ * @related-files [src/rules/mod.ts, src/rules/type_safety_rules.ts]
  */
 
 import { asNode, type ILintNode, type LintValue, toLintNode, unwrap } from "../engine/type_environment.ts";

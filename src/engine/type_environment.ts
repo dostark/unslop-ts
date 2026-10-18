@@ -1,11 +1,11 @@
 /**
  * @module TypeEnvironment
- * @path packages/lint-rules/src/engine/type_environment.ts
+ * @path src/engine/type_environment.ts
  * @description Per-file type alias resolution for the AST-matched type-safety rules.
  *   Reimplemented from the anti-slop approach (MIT); no upstream source is copied.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/type_safety_rules.ts, packages/lint-rules/src/rules/types.ts]
+ * @related-files [src/rules/type_safety_rules.ts, src/rules/types.ts]
  */
 
 /** A dynamic ESTree value: a node, a list of values, or a primitive leaf. */

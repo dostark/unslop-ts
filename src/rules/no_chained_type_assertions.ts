@@ -1,10 +1,10 @@
 /**
  * @module NoChainedTypeAssertions
- * @path packages/lint-rules/src/rules/no_chained_type_assertions.ts
+ * @path src/rules/no_chained_type_assertions.ts
  * @description Reports chained TypeScript type assertions. Ported from anti-slop (MIT) at commit 13909c9e.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/mod.ts, packages/lint-rules/tests/no_chained_type_assertions_test.ts]
+ * @related-files [src/rules/mod.ts, tests/no_chained_type_assertions_test.ts]
  */
 
 import type { IPluginRuleContext, LintVisitor } from "./types.ts";

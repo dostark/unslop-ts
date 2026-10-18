@@ -1,9 +1,9 @@
 /**
  * @module TestAssertionRulesTest
- * @path packages/lint-rules/tests/test_assertion_rules_test.ts
+ * @path tests/test_assertion_rules_test.ts
  * @description Rule-level tests for the test-assertion quality rules (deslop / anti-slop, MIT).
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/test_assertion_rules.ts]
+ * @related-files [src/rules/test_assertion_rules.ts]
  */
 
 import { assertEquals } from "@std/assert";

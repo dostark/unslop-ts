@@ -1,11 +1,11 @@
 /**
  * @module TypeSafetyUpstreamCasesTest
- * @path packages/lint-rules/tests/type_safety_upstream_cases_test.ts
+ * @path tests/type_safety_upstream_cases_test.ts
  * @description Upstream cases for the five type-safety rules, ported from anti-slop (MIT) at
  *   commit 13909c9e07590f5a85d93c62712259fe14a883f7, with upstream case names kept.
  *   A case whose local result differs from upstream carries its reason in `reason`.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/type_safety_rules.ts]
+ * @related-files [src/rules/type_safety_rules.ts]
  */
 
 import { assertEquals } from "@std/assert";

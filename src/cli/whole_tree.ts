@@ -1,15 +1,15 @@
 #!/usr/bin/env -S deno run -A
 /**
  * @module WholeTreeCli
- * @path packages/lint-rules/src/cli/whole_tree.ts
+ * @path src/cli/whole_tree.ts
  * @description Runs a whole-tree rule over the repository.
  * @architectural-layer Tooling
- * @related-files [packages/lint-rules/src/rules/whole_tree/optional_params.ts]
+ * @related-files [src/rules/whole_tree/optional_params.ts]
  *
  * Usage:
- *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
- *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--strict]
- *   deno run -A packages/lint-rules/src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--strict]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  */
 
 import { relative } from "@std/path";

@@ -1,9 +1,9 @@
 /**
  * @module RequireOptionalWrapperTest
- * @path packages/lint-rules/tests/require_optional_wrapper_test.ts
+ * @path tests/require_optional_wrapper_test.ts
  * @description Rule-level tests for demo/require-optional-wrapper.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/require_optional_wrapper.ts]
+ * @related-files [src/rules/require_optional_wrapper.ts]
  */
 
 import { assertEquals } from "@std/assert";

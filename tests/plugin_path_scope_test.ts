@@ -1,9 +1,9 @@
 /**
  * @module PluginPathScopeTest
- * @path packages/lint-rules/tests/plugin_path_scope_test.ts
+ * @path tests/plugin_path_scope_test.ts
  * @description The plugin's `include` and `exclude` path filters.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/engine/plugin.ts]
+ * @related-files [src/engine/plugin.ts]
  */
 
 import { assertEquals } from "@std/assert";

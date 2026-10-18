@@ -1,9 +1,9 @@
 /**
  * @module MaxCyclomaticComplexityTest
- * @path packages/lint-rules/tests/max_cyclomatic_complexity_test.ts
+ * @path tests/max_cyclomatic_complexity_test.ts
  * @description Golden-value parity for the ESTree cyclomatic-complexity rule.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/max_cyclomatic_complexity.ts, tests/scripts/rule_ceiling_ratchet_test.ts]
+ * @related-files [src/rules/max_cyclomatic_complexity.ts, tests/scripts/rule_ceiling_ratchet_test.ts]
  */
 
 import { assert, assertEquals } from "@std/assert";

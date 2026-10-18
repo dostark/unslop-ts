@@ -1,6 +1,6 @@
 /**
  * @module TypeSafetyRulesTest
- * @path packages/lint-rules/tests/type_safety_rules_test.ts
+ * @path tests/type_safety_rules_test.ts
  * @description Rule-level tests for the AST-matched type-safety plugin rules, including
  *   evasion forms found in the Phase 213 review. Rule ideas from deslop / anti-slop (MIT).
  */

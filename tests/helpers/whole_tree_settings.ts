@@ -1,10 +1,10 @@
 /**
  * @module WholeTreeSettingsTestHelper
- * @path packages/lint-rules/tests/helpers/whole_tree_settings.ts
+ * @path tests/helpers/whole_tree_settings.ts
  * @description Whole-tree settings for the unit tests of the optional-parameter and constant-restatement rules.
  * @architectural-layer Test
  * @dependencies []
- * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts]
+ * @related-files [src/rules/whole_tree/options.ts]
  */
 
 import type { IConstantRestatementSettings, IOptionalParamsSettings } from "../../src/rules/whole_tree/options.ts";
