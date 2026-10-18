@@ -6,6 +6,7 @@
  * @architectural-layer Shared
  * @dependencies [@std/fs, @std/path]
  * @related-files [packages/lint-rules/src/rules/whole_tree/options.ts, packages/lint-rules/tests/whole_tree_constant_restatement_test.ts]
+ * @public Exports are the unit-test surface of this module.
  */
 
 import { walk } from "@std/fs";

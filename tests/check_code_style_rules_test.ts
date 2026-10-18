@@ -298,6 +298,14 @@ for (const testCase of CASES) {
   });
 }
 
+Deno.test("layer-constant-leak: a constant imported from the shared foundation package is not reported", () => {
+  const source = "import { DEFAULT_RUNTIME_PATH } from '@exaix/shared';\nexport const a = DEFAULT_RUNTIME_PATH;\n";
+  const findings = checkSource(abs("packages/flow/src/sample.ts"), source, catalog).filter((f) =>
+    f.rule === "layer-constant-leak"
+  );
+  assertEquals(findings.length, 0);
+});
+
 // Whole-tree script rules have dedicated test files rather than a per-file case.
 const WHOLE_TREE_RULE_IDS = new Set(["duplicate-constant", "duplicate-type"]);
 

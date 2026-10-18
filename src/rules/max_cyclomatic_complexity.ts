@@ -22,10 +22,8 @@ const DECISION_NODES = new Set([
   "ConditionalExpression",
 ]);
 
-/**
- * True when a node is one decision point. Matches `scripts/measure_complexity.ts`:
- * a `SwitchCase` counts only with a test. A `LogicalExpression` counts only for `||` and `&&`.
- */
+/** True when a node is one decision point, matching `scripts/measure_complexity.ts`.
+ *  A `SwitchCase` counts only with a test. A `LogicalExpression` counts only for `||` and `&&`. */
 function isDecision(node: ILintNode): boolean {
   if (node.type === "SwitchCase") return node.test !== null && node.test !== undefined;
   if (node.type === "LogicalExpression") return node.operator === "||" || node.operator === "&&";
