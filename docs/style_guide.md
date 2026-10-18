@@ -76,8 +76,18 @@ links:
 
 - **No masking type aliases.** Do not create type aliases that simply mask or rename `Record<string, unknown>` or `{ [key: string]: unknown }` (e.g., `type CopilotObject = Record<string, unknown>`). This is strictly prohibited. Always define a specific interface or use runtime validation and proper narrowing.
 
-These rules are enforced by linting and are referenced by multiple existing
-checklists (pre‑commit, CI, etc.).
+These rules are referenced by multiple existing checklists (pre‑commit, CI,
+etc.). Enforcement differs by rule:
+
+- **Gates (`severity: error`):** `exaix/no-chained-type-assertions`,
+  `exaix/no-pass-through-type-alias`, and the style-checker rules
+  `ts-suppression-pragmas`, `deno-lint-no-explicit-any`, `promise-response-alias`,
+  and `promise-response-return`.
+- **Parked (`severity: off`, opt-in):** `exaix/no-explicit-unknown`,
+  `exaix/no-any-escape`, `exaix/no-unsafe-dictionary`, and
+  `exaix/no-object-parameters`. The rule-ceiling ratchet holds each one at a
+  measured count, so the count can only fall. Each rule becomes a gate when its
+  count reaches zero.
 
 ### Automated Enforcement
 
