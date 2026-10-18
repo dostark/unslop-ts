@@ -11,7 +11,7 @@ export { CatalogError, classifyPath, parseCatalog, PATH_CLASS, ruleSettings } fr
 export { createLintPlugin } from "./src/engine/plugin.ts";
 export { createRuleRegistry, RuleRegistryError } from "./src/engine/registry.ts";
 export { runPlugin } from "./src/engine/run_plugin.ts";
-export { TYPESCRIPT_RULE_PACK } from "./src/rules/mod.ts";
+export { DENO_RULE_PACK, TYPESCRIPT_RULE_PACK } from "./src/rules/mod.ts";
 export type { ICatalog, IResolvedRuleSettings, JsonValue, PathClass } from "./src/engine/catalog.ts";
 export type { ICatalogLoadOptions, ScriptRuleSchemas } from "./src/engine/catalog.ts";
 export type { RuleScope, RuleSeverity } from "./src/engine/catalog.ts";

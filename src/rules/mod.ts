@@ -1,7 +1,7 @@
 /**
  * @module PluginRules
  * @path packages/lint-rules/src/rules/mod.ts
- * @description The TypeScript rule pack: the plugin rules the engine ships, keyed by bare rule key.
+ * @description The TypeScript and Deno rule packs: the plugin rules the engine ships, keyed by bare rule key.
  * @architectural-layer Shared
  * @dependencies []
  * @related-files [packages/lint-rules/src/engine/registry.ts, packages/lint-rules/src/rules/rule_options.ts]
@@ -28,9 +28,11 @@ import {
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
-import { createIgnoreNeedsReason } from "./ignore_needs_reason.ts";
+import { createIgnoreNeedsReason } from "./deno/ignore_needs_reason.ts";
+import { createNoForbiddenLintIgnore } from "./deno/no_forbidden_lint_ignore.ts";
+import { createRequireDenoShebang } from "./deno/require_deno_shebang.ts";
 import type { IRulePack } from "../engine/registry.ts";
-import { TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
+import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
 
 /** The generic TypeScript rule pack: every plugin rule the engine ships, keyed by bare rule key. */
 export const TYPESCRIPT_RULE_PACK: IRulePack = {
@@ -51,7 +53,17 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
     "max-class-size": { create: createMaxClassSize },
     "require-optional-wrapper": { create: createRequireOptionalWrapper },
-    "ignore-needs-reason": { create: createIgnoreNeedsReason },
   },
   optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
+};
+
+/** The Deno rule pack: rules about `deno-lint-ignore` comments and Deno script headers. */
+export const DENO_RULE_PACK: IRulePack = {
+  name: "deno",
+  rules: {
+    "ignore-needs-reason": { create: createIgnoreNeedsReason },
+    "no-forbidden-lint-ignore": { create: createNoForbiddenLintIgnore },
+    "require-deno-shebang": { create: createRequireDenoShebang },
+  },
+  optionSchemas: DENO_OPTION_SCHEMAS,
 };

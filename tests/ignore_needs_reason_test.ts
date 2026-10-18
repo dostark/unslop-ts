@@ -3,7 +3,7 @@
  * @path packages/lint-rules/tests/ignore_needs_reason_test.ts
  * @description Rule-level tests for exaix/ignore-needs-reason.
  * @architectural-layer Test
- * @related-files [packages/lint-rules/src/rules/ignore_needs_reason.ts]
+ * @related-files [packages/lint-rules/src/rules/deno/ignore_needs_reason.ts]
  */
 
 import { assertEquals } from "@std/assert";
@@ -64,4 +64,21 @@ Deno.test("ignore-needs-reason honors a custom separator", () => {
     }),
     false,
   );
+});
+
+/** The 1-based line of the start of each diagnostic. */
+function linesOf(source: string): number[] {
+  const plugin = createTestPlugin(loadTestCatalog(buildCatalog()));
+  return runPlugin(plugin, PROD, source).map((diagnostic) => source.slice(0, diagnostic.range[0]).split("\n").length);
+}
+
+Deno.test("ignore-needs-reason reports at the comment's line, not line 1", () => {
+  const source =
+    "export const a = 1;\nexport const b = 2;\n// deno-lint-ignore exaix/no-boolean-assert\nexport const c = 3;\n";
+  assertEquals(linesOf(source), [3]);
+});
+
+Deno.test("ignore-needs-reason reports each reasonless ignore on its own line", () => {
+  const source = "// deno-lint-ignore exaix/a\nexport const a = 1;\n// deno-lint-ignore exaix/b\nexport const b = 2;\n";
+  assertEquals(linesOf(source), [1, 3]);
 });

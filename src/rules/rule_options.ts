@@ -8,6 +8,9 @@
  */
 
 import { z } from "zod";
+import { DEFAULT_REASON_SEPARATOR } from "./deno/ignore_directive.ts";
+import { DEFAULT_FORBIDDEN_IGNORES } from "./deno/no_forbidden_lint_ignore.ts";
+import { DEFAULT_DENO_SHEBANG } from "./deno/require_deno_shebang.ts";
 
 const NoChainedTypeAssertionsOptions = z.object({
   allowPartialMockInTests: z.boolean().default(true),
@@ -65,7 +68,16 @@ const RequireOptionalWrapperOptions = z.object({
 }).strict();
 
 const IgnoreNeedsReasonOptions = z.object({
-  separator: z.string().default("--"),
+  separator: z.string().default(DEFAULT_REASON_SEPARATOR),
+}).strict();
+
+const NoForbiddenLintIgnoreOptions = z.object({
+  forbiddenRules: z.array(z.string()).default([...DEFAULT_FORBIDDEN_IGNORES]),
+  includeFileIgnores: z.boolean().default(true),
+}).strict();
+
+const RequireDenoShebangOptions = z.object({
+  shebang: z.string().default(DEFAULT_DENO_SHEBANG),
 }).strict();
 
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
@@ -85,5 +97,11 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
   "max-class-size": MaxClassSizeOptions,
   "require-optional-wrapper": RequireOptionalWrapperOptions,
+};
+
+/** Option schemas of the Deno rule pack, keyed by bare rule key. */
+export const DENO_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "ignore-needs-reason": IgnoreNeedsReasonOptions,
+  "no-forbidden-lint-ignore": NoForbiddenLintIgnoreOptions,
+  "require-deno-shebang": RequireDenoShebangOptions,
 };

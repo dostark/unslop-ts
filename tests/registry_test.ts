@@ -10,6 +10,7 @@ import { assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } fr
 import { z } from "zod";
 import {
   createRuleRegistry,
+  DENO_RULE_PACK,
   type IPluginRule,
   type IRulePack,
   RuleRegistryError,
@@ -78,11 +79,19 @@ Deno.test("an option schema without a rule throws a RuleRegistryError naming the
   assertStringIncludes(error.message, "orphan");
 });
 
-const TYPESCRIPT_PACK_RULE_COUNT = 16;
+const TYPESCRIPT_PACK_RULE_COUNT = 15;
+const DENO_PACK_RULE_KEYS = ["ignore-needs-reason", "no-forbidden-lint-ignore", "require-deno-shebang"];
 
 Deno.test("the TypeScript rule pack holds the engine rules, each with an option schema and no prefix", () => {
   const keys = Object.keys(TYPESCRIPT_RULE_PACK.rules).sort();
   assertEquals(keys.length, TYPESCRIPT_PACK_RULE_COUNT);
   assertEquals(Object.keys(TYPESCRIPT_RULE_PACK.optionSchemas).sort(), keys);
   assertEquals(keys.filter((key) => key.includes("/")), []);
+});
+
+Deno.test("the Deno rule pack holds the Deno rules, each with an option schema, and shares no key with the TypeScript pack", () => {
+  assertEquals(Object.keys(DENO_RULE_PACK.rules).sort(), DENO_PACK_RULE_KEYS);
+  assertEquals(Object.keys(DENO_RULE_PACK.optionSchemas).sort(), DENO_PACK_RULE_KEYS);
+  const shared = Object.keys(DENO_RULE_PACK.rules).filter((key) => key in TYPESCRIPT_RULE_PACK.rules);
+  assertEquals(shared, []);
 });

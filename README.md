@@ -16,14 +16,15 @@ catalog `catalog.json`, the plugin entry `plugin.ts`, the style checkers, and th
   the local `EXAIX_LINT_RULES` selection. Every catalog rule stays registered with Deno, and an inactive
   rule returns no visitors.
 - `src/engine/run_plugin.ts` — `runPlugin` test helper over `Deno.lint.runPlugin`.
-- `src/rules/` — generic rule implementations, their option schemas, and `TYPESCRIPT_RULE_PACK`.
+- `src/rules/` — generic rule implementations, their option schemas, `TYPESCRIPT_RULE_PACK`, and `DENO_RULE_PACK` (`src/rules/deno/`: rules about
+  `deno-lint-ignore` comments and Deno script headers).
 - `docs/style_guide.md` — the generic TypeScript style rules.
 
 ## Add a rule
 
 1. Implement `create(context, ctx)` in `src/rules/<rule>.ts` and register it in
-   `TYPESCRIPT_RULE_PACK` (`src/rules/mod.ts`) under its bare rule key.
-1. Add its option schema to `TYPESCRIPT_OPTION_SCHEMAS` in `src/rules/rule_options.ts`.
+   `TYPESCRIPT_RULE_PACK` or, for a Deno-specific rule, `DENO_RULE_PACK` (`src/rules/mod.ts`) under its bare rule key.
+1. Add its option schema to `TYPESCRIPT_OPTION_SCHEMAS` or `DENO_OPTION_SCHEMAS` in `src/rules/rule_options.ts`.
 1. Add the catalog entry `<plugin name>/<rule key>` to the catalog of the project that loads the
    engine, with `tags` from the vocabulary.
 1. Add named valid and invalid cases in `tests/<rule>_test.ts`.
