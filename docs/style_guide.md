@@ -1,10 +1,4 @@
----
-title: "Package Style Guide"
-description: Generic TypeScript style rules enforced by the lint engine package
-agent_priority: mandatory
-copilot_knowledge_base: true
-capabilities: [linting_rules, naming_conventions]
----
+# Style guide
 
 > The generic TypeScript style rules. Rule ids and severities come from the rule catalog
 > of the project that loads the engine.
