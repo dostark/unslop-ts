@@ -26,9 +26,8 @@ const NoUnsafeDictionaryOptions = z.object({
   forbiddenValueTypes: z.array(z.string()).default(["unknown", "any", "object", "{}"]),
 }).strict();
 
-const NoAnyEscapeOptions = z.object({
+const NoTypeofEscapeOptions = z.object({
   allowedTypeofTargets: z.array(z.string()).default(["globalThis.fetch"]),
-  allowAnyInTests: z.boolean().default(true),
 }).strict();
 
 const NoOptions = z.object({}).strict();
@@ -85,7 +84,7 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
   "no-explicit-unknown": NoExplicitUnknownOptions,
   "no-unsafe-dictionary": NoUnsafeDictionaryOptions,
-  "no-any-escape": NoAnyEscapeOptions,
+  "no-typeof-escape": NoTypeofEscapeOptions,
   "no-pass-through-type-alias": NoOptions,
   "no-object-parameters": NoOptions,
   "require-safety-comment": RequireSafetyCommentOptions,

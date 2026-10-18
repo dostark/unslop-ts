@@ -14,10 +14,10 @@ import {
   createRequireSafetyComment,
 } from "./evidence_rules.ts";
 import {
-  createNoAnyEscape,
   createNoExplicitUnknown,
   createNoObjectParameters,
   createNoPassThroughTypeAlias,
+  createNoTypeofEscape,
   createNoUnsafeDictionary,
 } from "./type_safety_rules.ts";
 import {
@@ -41,7 +41,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "no-chained-type-assertions": { create: createNoChainedTypeAssertions },
     "no-explicit-unknown": { create: createNoExplicitUnknown },
     "no-unsafe-dictionary": { create: createNoUnsafeDictionary },
-    "no-any-escape": { create: createNoAnyEscape },
+    "no-typeof-escape": { create: createNoTypeofEscape },
     "no-pass-through-type-alias": { create: createNoPassThroughTypeAlias },
     "no-object-parameters": { create: createNoObjectParameters },
     "require-safety-comment": { create: createRequireSafetyComment },

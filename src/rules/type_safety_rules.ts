@@ -153,38 +153,24 @@ function queryText(node: ILintNode, text: string): string {
   return range ? text.slice(range[0], range[1]) : "";
 }
 
-export function createNoAnyEscape(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoTypeofEscape(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
   const raw = ctx.options.allowedTypeofTargets;
   const allowed = new Set(Array.isArray(raw) ? raw.map(String) : ["globalThis.fetch"]);
-  const allowAnyInTests = ctx.options.allowAnyInTests !== false;
   const report = makeReporter(context, ctx);
-  const message =
-    "An 'any' or 'as typeof' escape discards type evidence. Keep the precise type or parse at the boundary.";
+  const message = "An 'as typeof' escape discards type evidence. Keep the precise type or parse at the boundary.";
   const text = context.sourceCode.text;
   const checkType = (rawNode: Deno.lint.Node): void => {
     const node = asNode(rawNode);
     const annotation = node.typeAnnotation;
     if (!annotation || typeof annotation !== "object") return;
     const type = unwrap(asNode(annotation));
-    if (type.type === "TSAnyKeyword") {
-      if (!(ctx.isTestFile && allowAnyInTests)) report(rawNode, message);
-      return;
-    }
     if (type.type === "TSTypeQuery" && !(ctx.isTestFile && allowed.has(queryText(type, text)))) {
-      report(rawNode, message);
-    }
-  };
-  const checkArray = (rawNode: Deno.lint.Node): void => {
-    const node = asNode(rawNode);
-    const element = node.elementType;
-    if (element && typeof element === "object" && unwrap(asNode(element)).type === "TSAnyKeyword") {
       report(rawNode, message);
     }
   };
   return {
     TSAsExpression: checkType,
     TSTypeAssertion: checkType,
-    TSArrayType: checkArray,
   };
 }
 

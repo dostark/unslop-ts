@@ -17,7 +17,7 @@ const TEST_SCOPES = {
 const RULE_IDS = [
   "exaix/no-explicit-unknown",
   "exaix/no-unsafe-dictionary",
-  "exaix/no-any-escape",
+  "exaix/no-typeof-escape",
   "exaix/no-pass-through-type-alias",
   "exaix/no-object-parameters",
 ] as const;
@@ -117,13 +117,20 @@ Deno.test("no-unsafe-dictionary accepts strong value types", () => {
   for (const source of valid) expectRule("exaix/no-unsafe-dictionary", source, false);
 });
 
-Deno.test("no-any-escape reports as any, any[], and as typeof", () => {
-  const invalid = ["let x = y as any;", "let x: any[] = [];", "let x = y as typeof z;"];
-  for (const source of invalid) expectRule("exaix/no-any-escape", source, true);
+Deno.test("no-typeof-escape reports as typeof, in both cast forms", () => {
+  for (const source of ["let x = y as typeof z;", "let x = <typeof z> y;"]) {
+    expectRule("exaix/no-typeof-escape", source, true);
+  }
 });
 
-Deno.test("no-any-escape accepts a precise cast", () => {
-  expectRule("exaix/no-any-escape", "let x = y as string;", false);
+Deno.test("no-typeof-escape leaves any to the built-in no-explicit-any", () => {
+  for (const source of ["let x = y as any;", "let x: any[] = [];", "let x = <any> y;"]) {
+    expectRule("exaix/no-typeof-escape", source, false);
+  }
+});
+
+Deno.test("no-typeof-escape accepts a precise cast", () => {
+  expectRule("exaix/no-typeof-escape", "let x = y as string;", false);
 });
 
 Deno.test("no-pass-through-type-alias reports an alias that only renames another alias", () => {
