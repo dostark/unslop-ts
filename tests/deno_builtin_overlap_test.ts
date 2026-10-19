@@ -149,6 +149,101 @@ const CASES: readonly IOverlapCase[] = [
     source: "export const value = 1;\n",
     expectedBuiltins: {},
   },
+  {
+    rule: "no-chained-type-assertions",
+    name: "an angle-bracket chain",
+    source: `${DECLARATIONS}export const value = <number> (<unknown> input);\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-explicit-unknown",
+    name: "an unknown array parameter",
+    source: "export function sizeOf(items: unknown[]): number {\n  return items.length;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-unsafe-dictionary",
+    name: "a Map with unknown values",
+    source: "export const cache: Map<string, unknown> = new Map();\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-typeof-escape",
+    name: "an angle-bracket typeof cast",
+    source: `${DECLARATIONS}export const value = <typeof Math> input;\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-object-parameters",
+    name: "an object parameter of an arrow function",
+    source: "export const sizeOf = (value: object): number => Object.keys(value).length;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "require-safety-comment",
+    name: "an angle-bracket assertion without a marker",
+    source: `${DECLARATIONS}export const value = <string> input;\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-runtime-typeof",
+    name: "a misspelled typeof comparison",
+    source: `${DECLARATIONS}export const isText = typeof input === "strng";\n`,
+    expectedBuiltins: { "valid-typeof": OVERLAP_KIND.related },
+  },
+  {
+    rule: "no-conditional-empty-object-spread",
+    name: "a spread with the empty branch second",
+    source: "export const merged = { ...(Math.random() > 0.5 ? {} : { a: 1 }) };\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-boolean-assert",
+    name: "assert on startsWith",
+    isTestFile: true,
+    source: 'export function check(): void {\n  assert("abc".startsWith("a"));\n}\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-repeated-assert-call",
+    name: "two adjacent assertStrictEquals calls",
+    isTestFile: true,
+    source:
+      "export function check(x: number): void {\n  assertStrictEquals(f(x), 1);\n  assertStrictEquals(f(x), 2);\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-constant-substring-assert",
+    name: "assertStringIncludes on an imported constant",
+    isTestFile: true,
+    source:
+      'import { THINGS } from "./t.ts";\nexport function check(): void {\n  assertStringIncludes(THINGS, "X");\n}\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "max-cyclomatic-complexity",
+    name: "a function with a ternary",
+    source: "export function pick(flag: boolean): number {\n  return flag ? 1 : 2;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "require-optional-wrapper",
+    name: "a bare undefined union parameter",
+    source: "export function take(value: string | undefined): string {\n  return String(value);\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "ignore-needs-reason",
+    name: "a file ignore of a plugin rule without a reason",
+    source: "// deno-lint-ignore-file demo/no-runtime-typeof\nexport const value = 1;\n",
+    expectedBuiltins: { "ban-unused-ignore": OVERLAP_KIND.incidental },
+  },
+  {
+    rule: "no-forbidden-lint-ignore",
+    name: "a file ignore of no-explicit-any",
+    source: "// deno-lint-ignore-file no-explicit-any\nexport const value: any = 1;\n",
+    expectedBuiltins: {},
+  },
 ];
 
 /** A cast to any, which the built-in no-explicit-any reports. */
@@ -156,6 +251,14 @@ const SEEDED_ANY_CASE: IOverlapCase = {
   rule: null,
   name: "an as any cast",
   source: `${DECLARATIONS}export const value = input as any;\n`,
+  expectedBuiltins: {},
+};
+
+/** The misspelled typeof case with its built-in left undeclared, which the check must refuse. */
+const SEEDED_TYPEOF_CASE: IOverlapCase = {
+  rule: null,
+  name: "a misspelled typeof comparison, undeclared",
+  source: `${DECLARATIONS}export const isText = typeof input === "strng";\n`,
   expectedBuiltins: {},
 };
 
@@ -242,4 +345,18 @@ Deno.test("an empty interface declared incidental passes", async () => {
   const [collected] = await collect([EMPTY_INTERFACE_CASE]);
   assertArrayIncludes([...collected.builtins], ["no-empty-interface"]);
   assertEquals(undeclared(EMPTY_INTERFACE_CASE, collected), []);
+});
+
+Deno.test("a misspelled typeof comparison is reported as an undeclared valid-typeof", async () => {
+  const [collected] = await collect([SEEDED_TYPEOF_CASE]);
+  assertArrayIncludes(undeclared(SEEDED_TYPEOF_CASE, collected), ["valid-typeof"]);
+});
+
+Deno.test("each rule with two reporting forms has a case for each form", () => {
+  const perRule = new Map<string, number>();
+  for (const entry of CASES) if (entry.rule !== null) perRule.set(entry.rule, (perRule.get(entry.rule) ?? 0) + 1);
+  const twoForms = ["no-chained-type-assertions", "no-explicit-unknown", "no-unsafe-dictionary", "no-typeof-escape"];
+  const single = twoForms.filter((rule) => (perRule.get(rule) ?? 0) < 2);
+  assertEquals(single, []);
+  assertEquals((perRule.get("no-runtime-typeof") ?? 0) >= 2, true);
 });
