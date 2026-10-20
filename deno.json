@@ -4,7 +4,8 @@
   "license": "MIT",
   "exports": {
     ".": "./mod.ts",
-    "./cli/rule_ceiling": "./src/cli/rule_ceiling.ts"
+    "./cli/rule_ceiling": "./src/cli/rule_ceiling.ts",
+    "./whole-tree": "./src/rules/whole_tree/mod.ts"
   },
   "imports": {
     "@dostark/unslop-ts": "./mod.ts",

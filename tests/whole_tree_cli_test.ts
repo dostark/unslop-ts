@@ -69,3 +69,80 @@ Deno.test("whole_tree reads the restatement settings from --catalog", async () =
     assertStringIncludes(result.stderr, "restates HOSTS");
   });
 });
+
+const DUPLICATE_CATALOG = {
+  version: "1",
+  scopes: { test: ["**/tests/**"], fixture: [] },
+  rules: {
+    "demo/duplicate-type": {
+      engine: "script",
+      severity: "error",
+      scope: "prod",
+      tags: ["duplication"],
+      include: ["packages/**"],
+      options: { allow: [] },
+    },
+    "demo/duplicate-constant": {
+      engine: "script",
+      severity: "error",
+      scope: "prod",
+      tags: ["duplication"],
+      include: ["packages/**"],
+      options: {
+        allow: [{ name: "GONE", files: ["packages/a/a.ts", "packages/b/b.ts"], reason: "Stale on purpose." }],
+      },
+    },
+  },
+};
+
+async function writeDuplicateProject(dir: string): Promise<void> {
+  for (const pkg of ["a", "b"]) await Deno.mkdir(join(dir, "packages", pkg, "tests"), { recursive: true });
+  await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(DUPLICATE_CATALOG));
+  const shape = "export interface IThing { a: string; b: number; }\nexport const LIMIT = 3;\n";
+  await Deno.writeTextFile(join(dir, "packages/a/a.ts"), shape);
+  await Deno.writeTextFile(join(dir, "packages/b/b.ts"), shape);
+  await Deno.writeTextFile(join(dir, "packages/b/tests/b_test.ts"), shape);
+}
+
+Deno.test("whole_tree reports a duplicate type in production files and ignores test files", async () => {
+  await inTempDir(async (dir) => {
+    await writeDuplicateProject(dir);
+    const result = await runDeno(["run", "-A", CLI, "--rule=duplicate-type", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stdout, "ERROR [duplicate-type] packages/b/b.ts");
+    assertStringIncludes(result.stdout, "'IThing' duplicates packages/a/a.ts");
+    assertEquals(result.stdout.includes("tests/b_test.ts"), false);
+  });
+});
+
+Deno.test("whole_tree reports a duplicate constant and a stale allow entry", async () => {
+  await inTempDir(async (dir) => {
+    await writeDuplicateProject(dir);
+    const result = await runDeno(["run", "-A", CLI, "--rule=duplicate-constant", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stdout, "ERROR [duplicate-constant] packages/b/b.ts");
+    assertStringIncludes(result.stdout, "the allow entry 'GONE' matches no current duplicate");
+  });
+});
+
+Deno.test("whole_tree passes a tree without duplicates", async () => {
+  await inTempDir(async (dir) => {
+    await writeDuplicateProject(dir);
+    await Deno.remove(join(dir, "packages/b/b.ts"));
+    const result = await runDeno(["run", "-A", CLI, "--rule=duplicate-type", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, 0);
+    assertStringIncludes(result.stdout, "No duplicate types found");
+  });
+});
+
+Deno.test("whole_tree exits 2 when the catalog has no entry for the duplicate rule", async () => {
+  await inTempDir(async (dir) => {
+    await Deno.writeTextFile(
+      join(dir, "catalog.json"),
+      JSON.stringify({ version: "1", scopes: { test: [], fixture: [] }, rules: {} }),
+    );
+    const result = await runDeno(["run", "-A", CLI, "--rule=duplicate-type", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, USAGE_EXIT);
+    assertStringIncludes(result.stderr, "duplicate-type");
+  });
+});

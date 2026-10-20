@@ -43,6 +43,46 @@ const WholeTreeSettingsSchema = z.object({
   }).strict(),
 }).partial().strict();
 
+const DuplicateAllowEntrySchema = z.object({
+  name: z.string(),
+  files: z.array(z.string()),
+  reason: z.string(),
+}).strict();
+
+const DEFAULT_MIN_PROPERTIES = 2;
+const DEFAULT_CONSTANT_NAME_PATTERN = "^[A-Z][A-Z0-9_]*$";
+
+/** Options of the duplicate-type check, as a catalog rule entry states them. */
+export const DuplicateTypeOptionsSchema = z.object({
+  minProperties: z.number().int().positive().default(DEFAULT_MIN_PROPERTIES),
+  allow: z.array(DuplicateAllowEntrySchema).default([]),
+}).strict();
+
+/** Options of the duplicate-constant check, as a catalog rule entry states them. */
+export const DuplicateConstantOptionsSchema = z.object({
+  namePattern: z.string().default(DEFAULT_CONSTANT_NAME_PATTERN),
+  allow: z.array(DuplicateAllowEntrySchema).default([]),
+}).strict();
+
+/** An allow entry as a caller writes it. */
+export interface IDuplicateAllowInput {
+  readonly name: string;
+  readonly files: readonly string[];
+  readonly reason: string;
+}
+
+/** Duplicate-type options before defaults apply. */
+export interface IDuplicateTypeInput {
+  readonly minProperties?: number;
+  readonly allow?: readonly IDuplicateAllowInput[];
+}
+
+/** Duplicate-constant options before defaults apply. */
+export interface IDuplicateConstantInput {
+  readonly namePattern?: string;
+  readonly allow?: readonly IDuplicateAllowInput[];
+}
+
 /** The catalog `wholeTree` section. */
 export type IWholeTreeSettings = z.infer<typeof WholeTreeSettingsSchema>;
 

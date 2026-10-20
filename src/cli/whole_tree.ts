@@ -10,6 +10,8 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--strict]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
  */
 
 import { relative } from "@std/path";
@@ -22,6 +24,7 @@ import {
   type TOptionalViolationKind,
 } from "../rules/whole_tree/optional_params.ts";
 import { checkRepository as checkUnusedExports } from "../rules/whole_tree/unused_exports.ts";
+import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
 import {
   type IConstantRestatementSettings,
   type IOptionalParamsSettings,
@@ -30,7 +33,7 @@ import {
   parseWholeTreeSettings,
 } from "../rules/whole_tree/options.ts";
 
-const RULES: readonly string[] = ["constant-restatement", "unused-exports", "optional-params"];
+const RULES: readonly string[] = ["constant-restatement", "unused-exports", "optional-params", ...DUPLICATE_RULES];
 const USAGE_EXIT = 2;
 
 function flagValue(args: readonly string[], name: string): string | undefined {
@@ -216,6 +219,43 @@ async function runOptionalParams(
   }
 }
 
+function isDuplicateRule(rule: string): rule is DuplicateRuleKey {
+  return DUPLICATE_RULES.some((candidate) => candidate === rule);
+}
+
+const DUPLICATE_SUBJECT: Readonly<Record<DuplicateRuleKey, string>> = {
+  "duplicate-type": "types",
+  "duplicate-constant": "constants",
+};
+
+async function runDuplicates(rule: DuplicateRuleKey, catalogPath: string): Promise<void> {
+  let catalog: JsonValue;
+  try {
+    catalog = JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue;
+  } catch (error) {
+    return exitWithUsage(
+      `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  let report;
+  try {
+    report = await checkDuplicates(Deno.cwd(), catalog, rule);
+  } catch (error) {
+    if (error instanceof CatalogError) return exitWithUsage(error.message);
+    throw error;
+  }
+  for (const duplicate of report.duplicates) {
+    console.log(
+      `ERROR [${rule}] ${duplicate.laterFile} – '${duplicate.name}' duplicates ${duplicate.firstFile}. Keep one owner and import it.`,
+    );
+  }
+  for (const name of report.staleAllow) {
+    console.log(`ERROR [${rule}] the allow entry '${name}' matches no current duplicate.`);
+  }
+  if (report.duplicates.length + report.staleAllow.length > 0) Deno.exit(1);
+  console.log(`✅ No duplicate ${DUPLICATE_SUBJECT[rule]} found.`);
+}
+
 function exitWithUsage(message: string): never {
   console.error(message);
   console.error(
@@ -244,6 +284,7 @@ async function main(): Promise<void> {
   if (rule === undefined || !RULES.includes(rule)) exitWithUsage("Missing or unknown --rule.");
   const catalogPath = flagValue(Deno.args, "catalog");
   if (catalogPath === undefined) exitWithUsage("Missing --catalog=<path>.");
+  if (isDuplicateRule(rule)) return await runDuplicates(rule, catalogPath);
   const settings = await loadSettings(catalogPath);
   const args = Deno.args;
   if (rule === "constant-restatement") {
