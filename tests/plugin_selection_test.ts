@@ -9,7 +9,7 @@
 import { assertArrayIncludes, assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";
 import { CatalogError, createLintPlugin, type JsonValue, runPlugin, selectionEnvName } from "../mod.ts";
 import { lintJson, withDemoProject } from "./helpers/demo_project.ts";
-import { createTestPlugin, loadTestCatalog, TEST_PLUGIN_NAME } from "./helpers/registry.ts";
+import { createTestPlugin, loadTestCatalog, TEST_PLUGIN_NAME, TEST_RULE_PACKS } from "./helpers/registry.ts";
 
 const PROD_FILE = "packages/x/src/a.ts";
 const SELECTION_VARIABLE = "DEMO_LINT_RULES";
@@ -164,6 +164,17 @@ Deno.test("a plugin ignores the selection variable of another plugin", () => {
   } finally {
     Deno.env.delete(other);
   }
+});
+
+Deno.test("an explicit selection option wins over the selection variable", () => {
+  const catalog = loadTestCatalog(buildCatalog());
+  const plugin = withSelection("demo/does-not-exist", () =>
+    createLintPlugin(TEST_PLUGIN_NAME, catalog, {
+      rulePacks: TEST_RULE_PACKS,
+      selection: `demo/${OFF_RULE}`,
+    }));
+  const ids = runPlugin(plugin, PROD_FILE, SOURCE).map((diagnostic) => diagnostic.id);
+  assertEquals([...new Set(ids)], [`demo/${OFF_RULE}`]);
 });
 
 const TYPEOF_SOURCE = 'declare const input: string;\nexport const isText = typeof input === "string";\n';

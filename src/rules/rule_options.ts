@@ -79,6 +79,15 @@ const RequireDenoShebangOptions = z.object({
   shebang: z.string().default(DEFAULT_DENO_SHEBANG),
 }).strict();
 
+const DynamicAllowance = z.object({
+  files: z.array(z.string()).min(1),
+  specifiers: z.array(z.string()).default([]),
+}).strict();
+
+const ImportCallOptions = z.object({
+  allowDynamicImports: z.array(DynamicAllowance).default([]),
+}).strict();
+
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
 export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -96,6 +105,12 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
   "max-class-size": MaxClassSizeOptions,
   "require-optional-wrapper": RequireOptionalWrapperOptions,
+  "import-inside-statement": ImportCallOptions,
+  "dynamic-import": ImportCallOptions,
+  "inline-type-import": NoOptions,
+  "re-export-imported": NoOptions,
+  "import-placement": NoOptions,
+  "exported-interface-placement": NoOptions,
 };
 
 /** Option schemas of the Deno rule pack, keyed by bare rule key. */

@@ -70,7 +70,7 @@
 These rules are referenced by multiple existing checklists (pre‑commit, CI,
 etc.). Whether a rule blocks the build depends on its severity in the rule catalog.
 
-### No Re-exporting
+### No Re-exporting {#no-re-exporting}
 
 Exporting entities imported from other modules is prohibited. Each module must only export the entities it definitionally contains (classes, functions, interfaces, etc., defined within the file). This maintains clear module boundaries and avoids "barrel" files which can obfuscate the origin of symbols and complicate dependency analysis.
 
@@ -110,7 +110,7 @@ import { BarService, FooService } from "./services.ts";
 import { BarService, BazService, FooService, QuuxService, QuxService } from "./services.ts";
 ```
 
-### Dynamic Imports
+### Dynamic Imports {#dynamic-imports}
 
 Dynamic imports with `await import()` are **discouraged**. If you must use a dynamic import (for example, to load a large optional module, for conditional loading, or to break a circular dependency), you **must** document the rationale in a comment immediately above the import statement explaining why a static import is not possible or not desirable.
 
@@ -130,7 +130,7 @@ const { join } = await import("@std/path");
 
 The code style checker will strictly enforce that all imports appear at the top level. Dynamic imports should only be used when absolutely necessary and always provide a justification comment.
 
-### No Inline Type Imports
+### No Inline Type Imports {#no-inline-type-imports}
 
 Using `import(...)` inside a type annotation or return type — instead of a top-level `import type` statement — is **prohibited**. All imports, including type-only imports, must be explicit top-level declarations.
 

@@ -7,7 +7,7 @@
  * @related-files [src/engine/catalog.ts, src/engine/registry.ts]
  */
 
-import { globToRegExp } from "@std/path";
+import { matchesAnyGlob } from "./glob.ts";
 import {
   classifyPath,
   type ICatalog,
@@ -23,6 +23,8 @@ import { createRuleRegistry, type IRulePack } from "./registry.ts";
 /** Rule packs the plugin factory registers. */
 export interface ILintPluginOptions {
   readonly rulePacks: readonly IRulePack[];
+  /** A selection list that replaces the selection variable, so a caller need not change the process environment. */
+  readonly selection?: string;
 }
 
 type CatalogRule = ICatalog["rules"][string];
@@ -59,21 +61,6 @@ function scopeAllows(scope: RuleScope, pathClass: PathClass): boolean {
   return scope === "all" || scope === pathClass;
 }
 
-const compiledGlobs = new Map<string, RegExp>();
-
-function globRegex(glob: string): RegExp {
-  let regex = compiledGlobs.get(glob);
-  if (!regex) {
-    regex = globToRegExp(glob, { extended: true, globstar: true });
-    compiledGlobs.set(glob, regex);
-  }
-  return regex;
-}
-
-function matchesAnyGlob(repoPath: string, globs: readonly string[]): boolean {
-  return globs.some((glob) => globRegex(glob).test(repoPath));
-}
-
 /** The repository-relative path for a filename Deno lint reports as absolute. */
 function repoRelative(filename: string): string {
   const cwd = Deno.cwd();
@@ -107,7 +94,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
   const registry = createRuleRegistry(name, options.rulePacks);
   requireRegisteredPluginRules(catalog, registry);
   const envName = selectionEnvName(name);
-  const selection = parseSelection(Deno.env.get(envName) ?? "");
+  const selection = parseSelection(options.selection ?? Deno.env.get(envName) ?? "");
   if (selection) {
     console.error(`[${name}-lint] ${envName} active: ${[...selection].join(", ")}`);
   }
@@ -129,6 +116,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
         if (!allows(repoPath, pathClass, settings)) return {};
         return implementation.create(context, {
           options: settings.options,
+          repoPath,
           isTestFile: pathClass === PATH_CLASS.test,
           codeStyle: settings.codeStyle,
           pluginName: name,

@@ -28,6 +28,13 @@ import {
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
+import {
+  createDynamicImport,
+  createImportInsideStatement,
+  createInlineTypeImport,
+  createReExportImported,
+} from "./import_rules.ts";
+import { createExportedInterfacePlacement, createImportPlacement } from "./module_layout_rules.ts";
 import { createIgnoreNeedsReason } from "./deno/ignore_needs_reason.ts";
 import { createNoForbiddenLintIgnore } from "./deno/no_forbidden_lint_ignore.ts";
 import { createRequireDenoShebang } from "./deno/require_deno_shebang.ts";
@@ -53,6 +60,12 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
     "max-class-size": { create: createMaxClassSize },
     "require-optional-wrapper": { create: createRequireOptionalWrapper },
+    "import-inside-statement": { create: createImportInsideStatement },
+    "dynamic-import": { create: createDynamicImport },
+    "inline-type-import": { create: createInlineTypeImport },
+    "re-export-imported": { create: createReExportImported },
+    "import-placement": { create: createImportPlacement },
+    "exported-interface-placement": { create: createExportedInterfacePlacement },
   },
   optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
 };

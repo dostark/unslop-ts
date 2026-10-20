@@ -37,6 +37,8 @@ interface ICollectedCase {
 const CONSUMER_BUILTIN_RULES = ["explicit-module-boundary-types"];
 const DECLARATIONS = "declare const input: string;\n";
 
+const IMPORT_CALL = "import";
+
 const CASES: readonly IOverlapCase[] = [
   {
     rule: "no-chained-type-assertions",
@@ -242,6 +244,79 @@ const CASES: readonly IOverlapCase[] = [
     rule: "no-forbidden-lint-ignore",
     name: "a file ignore of no-explicit-any",
     source: "// deno-lint-ignore-file no-explicit-any\nexport const value: any = 1;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "import-inside-statement",
+    name: "a dynamic import inside a function",
+    source: `export function load(): Promise<unknown> {\n  return ${IMPORT_CALL}("./b.ts");\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "import-inside-statement",
+    name: "a dynamic import inside an if block",
+    source:
+      `export async function load(flag: boolean): Promise<void> {\n  if (flag) {\n    await ${IMPORT_CALL}("./b.ts");\n  }\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "dynamic-import",
+    name: "a dynamic import at the top level",
+    source: `export const loaded = await ${IMPORT_CALL}("./b.ts");\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "dynamic-import",
+    name: "a dynamic import returned from a function",
+    source: `export function load(): Promise<unknown> {\n  return ${IMPORT_CALL}("./b.ts");\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "inline-type-import",
+    name: "an import type with a member in a type argument",
+    source: `export type Loaded = Promise<${IMPORT_CALL}("./b.ts").IThing>;\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "inline-type-import",
+    name: "an import type with a member in a return type",
+    source: `export function find(): ${IMPORT_CALL}("./b.ts").IThing | null {\n  return null;\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "re-export-imported",
+    name: "a named export from another module",
+    source: 'export { value } from "./b.ts";\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "re-export-imported",
+    name: "an export of everything from another module",
+    source: 'export * from "./b.ts";\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "import-placement",
+    name: "an import after a constant",
+    source: 'export const first = 1;\nimport "./b.ts";\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "import-placement",
+    name: "an import after an interface",
+    source: 'export interface IThing {\n  readonly a: number;\n}\nimport "./b.ts";\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "exported-interface-placement",
+    name: "an exported interface after a constant",
+    source: "export const first = 1;\nexport interface IThing {\n  readonly a: number;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "exported-interface-placement",
+    name: "an exported interface after a function",
+    source: "export function f(): void {}\nexport interface IOther {\n  readonly b: number;\n}\n",
     expectedBuiltins: {},
   },
 ];

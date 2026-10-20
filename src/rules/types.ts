@@ -15,6 +15,8 @@ export type LintVisitor = ReturnType<Deno.lint.Rule["create"]>;
 export interface IPluginRuleContext {
   /** Options parsed and defaulted from the rule's catalog entry. */
   readonly options: Record<string, JsonValue>;
+  /** The path of the file under lint, relative to the working directory. */
+  readonly repoPath: string;
   /** True when the file under lint is a test file. */
   readonly isTestFile: boolean;
   /** CODE_STYLE.md anchor the report hint links to. */
