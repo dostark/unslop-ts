@@ -48,6 +48,7 @@ import { createRequireScriptUsage } from "./deno/require_script_usage.ts";
 import { createDecorativeComment, createEphemeralComment, createLongComment } from "./comment_rules.ts";
 import { createEphemeralFilename, createRequireModuleHeader } from "./header_rules.ts";
 import { createMaxParams } from "./max_params.ts";
+import { createExportedInterfaceNaming, createNoInterfaceRenameOnImport } from "./interface_convention_rules.ts";
 import { createTestInlineMultilineFixture } from "./test_fixture_rules.ts";
 import type { IRulePack } from "../engine/registry.ts";
 import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
@@ -88,6 +89,8 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "test-inline-multiline-fixture": { create: createTestInlineMultilineFixture },
     "require-module-header": { create: createRequireModuleHeader },
     "ephemeral-filename": { create: createEphemeralFilename },
+    "exported-interface-naming": { create: createExportedInterfaceNaming },
+    "no-interface-rename-on-import": { create: createNoInterfaceRenameOnImport },
   },
   optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
 };

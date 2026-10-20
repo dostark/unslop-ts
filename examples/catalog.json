@@ -1,25 +1,67 @@
 {
   "version": "1",
   "scopes": {
-    "test": ["**/tests/**", "**/*_test.ts"],
-    "fixture": ["**/tests/fixtures/**"]
+    "test": [
+      "**/tests/**",
+      "**/*_test.ts"
+    ],
+    "fixture": [
+      "**/tests/fixtures/**"
+    ]
   },
   "tagVocabulary": {
-    "type-safety": { "description": "Rules that keep type evidence." }
+    "type-safety": {
+      "description": "Rules that keep type evidence."
+    },
+    "naming": {
+      "description": "Rules about names."
+    }
   },
   "rules": {
     "demo/no-chained-type-assertions": {
       "engine": "plugin",
       "severity": "error",
       "scope": "all",
-      "tags": ["type-safety"]
+      "tags": [
+        "type-safety"
+      ]
     },
     "demo/no-runtime-typeof": {
       "engine": "plugin",
       "severity": "error",
       "scope": "prod",
-      "tags": ["type-safety"],
-      "options": { "allowInTypeGuards": true }
+      "tags": [
+        "type-safety"
+      ],
+      "options": {
+        "allowInTypeGuards": true
+      }
+    },
+    "demo/exported-interface-naming": {
+      "engine": "plugin",
+      "severity": "off",
+      "optIn": true,
+      "reason": "Opt-in: a naming convention. Select the rule with DEMO_LINT_RULES when the project follows the convention.",
+      "scope": "all",
+      "tags": [
+        "naming"
+      ],
+      "options": {
+        "prefix": "I"
+      }
+    },
+    "demo/no-interface-rename-on-import": {
+      "engine": "plugin",
+      "severity": "off",
+      "optIn": true,
+      "reason": "Opt-in: a naming convention. Select the rule with DEMO_LINT_RULES when the project follows the convention.",
+      "scope": "all",
+      "tags": [
+        "naming"
+      ],
+      "options": {
+        "prefix": "I"
+      }
     }
   }
 }

@@ -408,6 +408,30 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "exported-interface-naming",
+    name: "an exported interface without the prefix",
+    source: "export interface Thing {\n  readonly a: number;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "exported-interface-naming",
+    name: "an exported interface whose second letter is lowercase",
+    source: "export interface Ithing {\n  readonly a: number;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-interface-rename-on-import",
+    name: "an interface renamed on import",
+    source: 'import { IThing as Thing } from "./b.ts";\nexport const value = Thing;\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "no-interface-rename-on-import",
+    name: "a type import that renames an interface",
+    source: 'import type { IThing as Thing } from "./b.ts";\nexport type Alias = Thing;\n',
+    expectedBuiltins: {},
+  },
+  {
     rule: "exported-interface-placement",
     name: "an exported interface after a function",
     source: "export function f(): void {}\nexport interface IOther {\n  readonly b: number;\n}\n",

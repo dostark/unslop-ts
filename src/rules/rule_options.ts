@@ -136,6 +136,10 @@ const RequireScriptUsageOptions = z.object({
   maxHeaderLines: z.number().int().positive().default(15),
 }).strict();
 
+const InterfacePrefixOptions = z.object({
+  prefix: z.string().min(1).default("I"),
+}).strict();
+
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
 export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -170,6 +174,8 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "test-inline-multiline-fixture": TestInlineFixtureOptions,
   "require-module-header": RequireModuleHeaderOptions,
   "ephemeral-filename": EphemeralFilenameOptions,
+  "exported-interface-naming": InterfacePrefixOptions,
+  "no-interface-rename-on-import": InterfacePrefixOptions,
 };
 
 /** Option schemas of the Deno rule pack, keyed by bare rule key. */
