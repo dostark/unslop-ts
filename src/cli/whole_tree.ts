@@ -12,6 +12,7 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
  */
 
 import { relative } from "@std/path";
@@ -25,6 +26,8 @@ import {
 } from "../rules/whole_tree/optional_params.ts";
 import { checkRepository as checkUnusedExports } from "../rules/whole_tree/unused_exports.ts";
 import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
+import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
+import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
 import {
   type IConstantRestatementSettings,
   type IOptionalParamsSettings,
@@ -33,7 +36,14 @@ import {
   parseWholeTreeSettings,
 } from "../rules/whole_tree/options.ts";
 
-const RULES: readonly string[] = ["constant-restatement", "unused-exports", "optional-params", ...DUPLICATE_RULES];
+const MAGIC_RULE = "magic-literals";
+const RULES: readonly string[] = [
+  "constant-restatement",
+  "unused-exports",
+  "optional-params",
+  MAGIC_RULE,
+  ...DUPLICATE_RULES,
+];
 const USAGE_EXIT = 2;
 
 function flagValue(args: readonly string[], name: string): string | undefined {
@@ -219,6 +229,34 @@ async function runOptionalParams(
   }
 }
 
+async function runMagicLiterals(catalogPath: string, includeTests: boolean): Promise<void> {
+  let catalog: JsonValue;
+  try {
+    catalog = JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue;
+  } catch (error) {
+    return exitWithUsage(
+      `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  let violations;
+  try {
+    violations = await checkMagicLiterals(Deno.cwd(), catalog, includeTests);
+  } catch (error) {
+    if (error instanceof CatalogError) return exitWithUsage(error.message);
+    throw error;
+  }
+  if (violations.length === 0) {
+    console.log("✅ No magic value violations detected");
+    return;
+  }
+  console.error("❌ Magic value violations detected:\n");
+  for (const violation of violations) {
+    for (const line of formatMagicViolation(violation, (path) => path)) console.error(line);
+  }
+  console.error(`${violations.length} violation(s) found`);
+  Deno.exit(1);
+}
+
 function isDuplicateRule(rule: string): rule is DuplicateRuleKey {
   return DUPLICATE_RULES.some((candidate) => candidate === rule);
 }
@@ -285,6 +323,7 @@ async function main(): Promise<void> {
   const catalogPath = flagValue(Deno.args, "catalog");
   if (catalogPath === undefined) exitWithUsage("Missing --catalog=<path>.");
   if (isDuplicateRule(rule)) return await runDuplicates(rule, catalogPath);
+  if (rule === MAGIC_RULE) return await runMagicLiterals(catalogPath, Deno.args.includes("--include-tests"));
   const settings = await loadSettings(catalogPath);
   const args = Deno.args;
   if (rule === "constant-restatement") {

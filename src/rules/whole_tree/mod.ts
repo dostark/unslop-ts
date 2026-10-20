@@ -9,6 +9,15 @@
 
 export { findDuplicateConstants, validateConstantAllowEntries } from "./duplicate_constant.ts";
 export { findDuplicateTypes, validateTypeAllowEntries } from "./duplicate_type.ts";
+export {
+  detectMagicLiterals,
+  formatMagicViolation,
+  type IMagicFileBreakdown,
+  type IMagicLiteralFile,
+  type IMagicViolation,
+  type MagicLiteralKind,
+  type MagicViolationScope,
+} from "./magic_literals.ts";
 export type { IDuplicate, IDuplicateAllowEntry, ISourceUnit } from "./duplicate_groups.ts";
 export {
   DuplicateConstantOptionsSchema,
@@ -16,4 +25,6 @@ export {
   type IDuplicateAllowInput,
   type IDuplicateConstantInput,
   type IDuplicateTypeInput,
+  type IMagicLiteralInput,
+  MagicLiteralOptionsSchema,
 } from "./options.ts";

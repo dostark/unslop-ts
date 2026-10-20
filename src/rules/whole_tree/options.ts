@@ -12,6 +12,51 @@ import { CatalogError, type JsonValue } from "../../engine/catalog.ts";
 
 const WHOLE_TREE_KEY = "wholeTree";
 
+const DEFAULT_LOCAL_STRING_THRESHOLD = 3;
+const DEFAULT_GLOBAL_STRING_THRESHOLD = 5;
+const DEFAULT_LOCAL_NUMBER_THRESHOLD = 4;
+const DEFAULT_GLOBAL_NUMBER_THRESHOLD = 6;
+const DEFAULT_MIN_NUMBER = 100;
+const DEFAULT_MIN_STRING_LENGTH = 4;
+const DEFAULT_ROUND_NUMBER_STEP = 50;
+const DEFAULT_ROUND_NUMBER_MAX = 1000;
+const DEFAULT_HTTP_STATUS_MIN = 100;
+const DEFAULT_HTTP_STATUS_MAX = 599;
+const DEFAULT_TEST_SCAFFOLD_PATTERN = "^(test|mock|fake|dummy)[-_]";
+
+const MagicThresholdsSchema = z.object({
+  localString: z.number().int().nonnegative().default(DEFAULT_LOCAL_STRING_THRESHOLD),
+  globalString: z.number().int().nonnegative().default(DEFAULT_GLOBAL_STRING_THRESHOLD),
+  localNumber: z.number().int().nonnegative().default(DEFAULT_LOCAL_NUMBER_THRESHOLD),
+  globalNumber: z.number().int().nonnegative().default(DEFAULT_GLOBAL_NUMBER_THRESHOLD),
+}).strict();
+
+/** Options of the magic-literal detector. Every list that names a project vocabulary is an option. */
+export const MagicLiteralOptionsSchema = z.object({
+  checkNumbers: z.boolean().default(true),
+  thresholds: MagicThresholdsSchema.default(() => MagicThresholdsSchema.parse({})),
+  /** Strings that never count, on top of the built-in structural words. */
+  additionalStrings: z.array(z.string()).default([]),
+  minStringLength: z.number().int().nonnegative().default(DEFAULT_MIN_STRING_LENGTH),
+  minNumber: z.number().nonnegative().default(DEFAULT_MIN_NUMBER),
+  roundNumberStep: z.number().positive().default(DEFAULT_ROUND_NUMBER_STEP),
+  roundNumberMax: z.number().nonnegative().default(DEFAULT_ROUND_NUMBER_MAX),
+  httpStatusRange: z.tuple([z.number(), z.number()]).default([DEFAULT_HTTP_STATUS_MIN, DEFAULT_HTTP_STATUS_MAX]),
+  /** Property names whose string value is descriptive text, not a value. */
+  metadataProperties: z.array(z.string()).default(["description", "title", "label", "placeholder"]),
+  /** Property names whose array of strings is structural, such as a list of required fields. */
+  structuralArrayProperties: z.array(z.string()).default(["required", "args", "enum"]),
+  /** Strings that name states of a project domain and never count. */
+  statusLiterals: z.array(z.string()).default([]),
+  /** Path suffixes of files that define constants or enums. They never count, and they make a literal reusable. */
+  definitionFileSuffixes: z.array(z.string()).default(["constants.ts", "enums.ts"]),
+  /** A string that matches this pattern in a test file is test scaffolding. */
+  testScaffoldPattern: z.string().default(DEFAULT_TEST_SCAFFOLD_PATTERN),
+}).strict();
+
+/** Magic-literal options before defaults apply. */
+export type IMagicLiteralInput = z.input<typeof MagicLiteralOptionsSchema>;
+
 /** Schema of the catalog `wholeTree` section. Each section is optional, and an unknown key is rejected. */
 const WholeTreeSettingsSchema = z.object({
   optionalParams: z.object({
@@ -41,6 +86,7 @@ const WholeTreeSettingsSchema = z.object({
     testRoots: z.array(z.string()),
     minRestatedElements: z.number().int().positive(),
   }).strict(),
+  magicLiterals: MagicLiteralOptionsSchema,
 }).partial().strict();
 
 const DuplicateAllowEntrySchema = z.object({

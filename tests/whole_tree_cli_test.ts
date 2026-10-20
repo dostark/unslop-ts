@@ -146,3 +146,53 @@ Deno.test("whole_tree exits 2 when the catalog has no entry for the duplicate ru
     assertStringIncludes(result.stderr, "duplicate-type");
   });
 });
+
+const MAGIC_CATALOG = {
+  version: "1",
+  scopes: { test: ["**/tests/**"], fixture: [] },
+  wholeTree: { magicLiterals: { statusLiterals: ["skipped-state"] } },
+};
+
+const MAGIC_SOURCE = Array.from({ length: 4 }, (_, index) => `export const v${index} = ["repeated literal text"];`)
+  .join("\n");
+
+async function writeMagicProject(dir: string): Promise<void> {
+  await Deno.mkdir(join(dir, "src"));
+  await Deno.mkdir(join(dir, "tests"));
+  await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(MAGIC_CATALOG));
+  await Deno.writeTextFile(join(dir, "src/a.ts"), MAGIC_SOURCE);
+  await Deno.writeTextFile(join(dir, "tests/a_test.ts"), MAGIC_SOURCE.replaceAll("repeated", "another"));
+}
+
+Deno.test("whole_tree reports a repeated literal in production files and skips test files", async () => {
+  await inTempDir(async (dir) => {
+    await writeMagicProject(dir);
+    const result = await runDeno(["run", "-A", CLI, "--rule=magic-literals", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stderr, '"repeated literal text"');
+    assertStringIncludes(result.stderr, "src/a.ts: 4 occurrences");
+    assertEquals(result.stderr.includes("another literal text"), false);
+  });
+});
+
+Deno.test("whole_tree counts test files with --include-tests", async () => {
+  await inTempDir(async (dir) => {
+    await writeMagicProject(dir);
+    const result = await runDeno(
+      ["run", "-A", CLI, "--rule=magic-literals", "--catalog=catalog.json", "--include-tests"],
+      dir,
+    );
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stderr, "another literal text");
+  });
+});
+
+Deno.test("whole_tree passes a tree whose repeated literal is a listed status word", async () => {
+  await inTempDir(async (dir) => {
+    await writeMagicProject(dir);
+    await Deno.writeTextFile(join(dir, "src/a.ts"), MAGIC_SOURCE.replaceAll("repeated literal text", "skipped-state"));
+    const result = await runDeno(["run", "-A", CLI, "--rule=magic-literals", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, 0);
+    assertStringIncludes(result.stdout, "No magic value violations detected");
+  });
+});

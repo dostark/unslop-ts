@@ -51,11 +51,12 @@ Deno script headers. A project can add its own packs, so project-specific rules 
 - `src/rules/` — rule implementations, their option schemas, and the two packs. `src/rules/deno/` holds
   the Deno pack.
 - `src/rules/whole_tree/` — checks that need the whole tree. The Deno-only entry `@dostark/unslop-ts/whole-tree`
-  exports `findDuplicateTypes` and `findDuplicateConstants` with their allow-list checks, so a host script can
-  call them in-process.
+  exports `findDuplicateTypes`, `findDuplicateConstants`, and `detectMagicLiterals` with their option schemas,
+  so a host script can call them in-process.
 - `src/cli/` — `rule_report.ts` ranks one rule's findings, `whole_tree.ts` runs the whole-tree rules with
   settings from `--catalog=<path>` (`duplicate-type` and `duplicate-constant` read the `options`, `include`, and
-  `scope` of their `rules` entry), and `rule_ceiling.ts` holds per-package finding counts.
+  `scope` of their `rules` entry, and `magic-literals` reads `wholeTree.magicLiterals`), and `rule_ceiling.ts`
+  holds per-package finding counts.
 - `examples/` — a catalog and a plugin entry for any Deno project.
 - `docs/style_guide.md` — the generic TypeScript style rules.
 
