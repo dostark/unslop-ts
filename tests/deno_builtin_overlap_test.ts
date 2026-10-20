@@ -432,6 +432,18 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "import-boundaries",
+    name: "an import that a zone denies",
+    source: 'import { value } from "./forbidden.ts";\nexport const other = value;\n',
+    expectedBuiltins: {},
+  },
+  {
+    rule: "import-boundaries",
+    name: "a re-export that a zone denies",
+    source: 'export { value } from "./forbidden.ts";\n',
+    expectedBuiltins: {},
+  },
+  {
     rule: "exported-interface-placement",
     name: "an exported interface after a function",
     source: "export function f(): void {}\nexport interface IOther {\n  readonly b: number;\n}\n",

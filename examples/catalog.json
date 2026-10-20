@@ -15,6 +15,9 @@
     },
     "naming": {
       "description": "Rules about names."
+    },
+    "boundary": {
+      "description": "Rules about what a file group may import."
     }
   },
   "rules": {
@@ -61,6 +64,32 @@
       ],
       "options": {
         "prefix": "I"
+      }
+    },
+    "demo/import-boundaries": {
+      "engine": "plugin",
+      "severity": "off",
+      "optIn": true,
+      "reason": "Opt-in: the zones describe one project layout. Replace the example zone with your own, then select the rule with DEMO_LINT_RULES.",
+      "scope": "all",
+      "tags": [
+        "boundary"
+      ],
+      "options": {
+        "zones": [
+          {
+            "id": "ui-data",
+            "files": [
+              "src/ui/**"
+            ],
+            "deny": [
+              {
+                "specifier": "^(\\.\\./)+data/",
+                "message": "UI files must not import from the data layer."
+              }
+            ]
+          }
+        ]
       }
     }
   }

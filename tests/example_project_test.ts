@@ -44,3 +44,31 @@ Deno.test("the example plugin lints a project outside the engine repository", as
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("the example boundary zone reports an import in a project outside the engine repository", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "example_zone_" });
+  try {
+    await Deno.mkdir(join(dir, "examples"));
+    for (const name of EXAMPLE_FILES) {
+      await Deno.copyFile(new URL(`../examples/${name}`, import.meta.url), join(dir, "examples", name));
+    }
+    await Deno.writeTextFile(join(dir, "deno.json"), await projectConfig());
+    await Deno.mkdir(join(dir, "src", "ui"), { recursive: true });
+    await Deno.mkdir(join(dir, "src", "data"), { recursive: true });
+    await Deno.writeTextFile(
+      join(dir, "src", "ui", "view.ts"),
+      'import { db } from "../data/db.ts";\nexport const view = db;\n',
+    );
+    await Deno.writeTextFile(join(dir, "src", "data", "db.ts"), "export const db = 1;\n");
+    const silent = JSON.parse((await runDeno(["lint", "--json", "src"], dir)).stdout) as ILintReport;
+    assertEquals(
+      (silent.diagnostics ?? []).map((diagnostic) => diagnostic.code).includes("demo/import-boundaries"),
+      false,
+    );
+    const selected = await runDeno(["lint", "--json", "src"], dir, { DEMO_LINT_RULES: "demo/import-boundaries" });
+    const codes = ((JSON.parse(selected.stdout) as ILintReport).diagnostics ?? []).map((diagnostic) => diagnostic.code);
+    assertArrayIncludes(codes, ["demo/import-boundaries"]);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

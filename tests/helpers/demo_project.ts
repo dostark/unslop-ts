@@ -32,9 +32,16 @@ export const DEMO_TAG = "demo";
 const ENGINE_ALIAS = "engine";
 const PLUGIN_FILE = "plugin.ts";
 const CONFIG_FILE = "deno.json";
-const DEMO_OPTIONS: Readonly<Record<string, Record<string, number>>> = {
+const DEMO_OPTIONS: Readonly<Record<string, Record<string, JsonValue>>> = {
   "max-cyclomatic-complexity": { max: 1 },
   "max-class-size": { minClassLines: 1, threshold: 1 },
+  "import-boundaries": {
+    zones: [{
+      id: "demo-zone",
+      files: ["**/*.ts"],
+      deny: [{ specifier: "^\\./forbidden", message: "Do not import it." }],
+    }],
+  },
 };
 
 /** Every bare rule key of the TypeScript and Deno packs. */

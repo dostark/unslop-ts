@@ -140,6 +140,55 @@ const InterfacePrefixOptions = z.object({
   prefix: z.string().min(1).default("I"),
 }).strict();
 
+const BoundaryDenySchema = z.object({
+  specifier: z.string().optional(),
+  target: z.array(z.string()).min(1).optional(),
+  outside: z.array(z.string()).min(1).optional(),
+  message: z.string(),
+}).strict();
+
+const BoundaryZoneSchema = z.object({
+  id: z.string().min(1),
+  files: z.array(z.string()).min(1),
+  except: z.array(z.string()).default([]),
+  deny: z.array(BoundaryDenySchema).min(1),
+}).strict();
+
+function describeEntry(zoneId: string, index: number): string {
+  return `zone '${zoneId}' deny entry ${index + 1}`;
+}
+
+/** Options of the import-boundaries rule: the zones, each with the imports that its files may not make. */
+export const ImportBoundariesOptions = z.object({
+  zones: z.array(BoundaryZoneSchema).default([]),
+}).strict().superRefine((value, context) => {
+  const seen = new Set<string>();
+  for (const zone of value.zones) {
+    if (seen.has(zone.id)) context.addIssue({ code: "custom", message: `zone '${zone.id}' is defined twice` });
+    seen.add(zone.id);
+    zone.deny.forEach((entry, index) => {
+      if (entry.specifier === undefined && entry.target === undefined && entry.outside === undefined) {
+        context.addIssue({
+          code: "custom",
+          message: `${describeEntry(zone.id, index)} needs a specifier, a target, or an outside condition`,
+        });
+      }
+      if (entry.specifier === undefined) return;
+      try {
+        new RegExp(entry.specifier);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message: `${describeEntry(zone.id, index)} has a specifier that is not a valid regular expression`,
+        });
+      }
+    });
+  }
+});
+
+export type BoundaryZone = z.infer<typeof BoundaryZoneSchema>;
+export type BoundaryDeny = z.infer<typeof BoundaryDenySchema>;
+
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
 export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -176,6 +225,7 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "ephemeral-filename": EphemeralFilenameOptions,
   "exported-interface-naming": InterfacePrefixOptions,
   "no-interface-rename-on-import": InterfacePrefixOptions,
+  "import-boundaries": ImportBoundariesOptions,
 };
 
 /** Option schemas of the Deno rule pack, keyed by bare rule key. */
