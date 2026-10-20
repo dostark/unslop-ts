@@ -44,6 +44,11 @@ import {
 import { createIgnoreNeedsReason } from "./deno/ignore_needs_reason.ts";
 import { createNoForbiddenLintIgnore } from "./deno/no_forbidden_lint_ignore.ts";
 import { createRequireDenoShebang } from "./deno/require_deno_shebang.ts";
+import { createRequireScriptUsage } from "./deno/require_script_usage.ts";
+import { createDecorativeComment, createEphemeralComment, createLongComment } from "./comment_rules.ts";
+import { createEphemeralFilename, createRequireModuleHeader } from "./header_rules.ts";
+import { createMaxParams } from "./max_params.ts";
+import { createTestInlineMultilineFixture } from "./test_fixture_rules.ts";
 import type { IRulePack } from "../engine/registry.ts";
 import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
 
@@ -76,6 +81,13 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "promise-response-return": { create: createPromiseResponseReturn },
     "ts-suppression-pragmas": { create: createTsSuppressionPragmas },
     "magic-union-type": { create: createMagicUnionType },
+    "long-comment": { create: createLongComment },
+    "ephemeral-comment": { create: createEphemeralComment },
+    "decorative-comment": { create: createDecorativeComment },
+    "max-params": { create: createMaxParams },
+    "test-inline-multiline-fixture": { create: createTestInlineMultilineFixture },
+    "require-module-header": { create: createRequireModuleHeader },
+    "ephemeral-filename": { create: createEphemeralFilename },
   },
   optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
 };
@@ -87,6 +99,7 @@ export const DENO_RULE_PACK: IRulePack = {
     "ignore-needs-reason": { create: createIgnoreNeedsReason },
     "no-forbidden-lint-ignore": { create: createNoForbiddenLintIgnore },
     "require-deno-shebang": { create: createRequireDenoShebang },
+    "require-script-usage": { create: createRequireScriptUsage },
   },
   optionSchemas: DENO_OPTION_SCHEMAS,
 };

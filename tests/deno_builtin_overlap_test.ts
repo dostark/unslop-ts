@@ -24,6 +24,8 @@ interface IOverlapCase {
   readonly name: string;
   readonly source: string;
   readonly isTestFile?: boolean;
+  /** A file name that replaces the generated one, for a rule that reads the name. */
+  readonly fileName?: string;
   /** Every built-in code that fires on the snippet, with the reason it may. */
   readonly expectedBuiltins: Readonly<Record<string, OverlapKind>>;
 }
@@ -40,6 +42,7 @@ const DECLARATIONS = "declare const input: string;\n";
 const IMPORT_CALL = "import";
 const RESPONSE_PROMISE = ["Promise", "<Response>"].join("");
 const PRAGMA_IGNORE = ["@ts", "ignore"].join("-");
+const MULTILINE_YAML = "export const yaml = `\na: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6\ng: 7\n`;\n";
 const FAST_OR_SLOW = ['"fast"', '"slow"'].join(" | ");
 
 const CASES: readonly IOverlapCase[] = [
@@ -317,6 +320,94 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "long-comment",
+    name: "a four-line comment below the code",
+    source: "export const first = 1;\n// one\n// two\n// three\n// four\nexport const second = 2;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "long-comment",
+    name: "a five-line block comment below the code",
+    source: "export const first = 1;\n/*\n * one\n * two\n * three\n */\nexport const second = 2;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "ephemeral-comment",
+    name: "a calendar date in a comment",
+    source: "// done on 2026-10-20\nexport const value = 1;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "ephemeral-comment",
+    name: "a narration of a prior attempt",
+    source: "export const first = 1;\n// we tried a loop first\nexport const second = 2;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "decorative-comment",
+    name: "a separator line of equal signs",
+    source: "export const first = 1;\n// ==========\nexport const second = 2;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "decorative-comment",
+    name: "a separator line inside a block comment",
+    source: "export const first = 1;\n/*\n * ------\n */\nexport const second = 2;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "max-params",
+    name: "a function with eight parameters",
+    source:
+      "export function take(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): number {\n  return a + b + c + d + e + f + g + h;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "max-params",
+    name: "an arrow function with eight parameters",
+    source:
+      "export const take = (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): number =>\n  a + b + c + d + e + f + g + h;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "test-inline-multiline-fixture",
+    name: "a named multi-line template",
+    source: MULTILINE_YAML,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "test-inline-multiline-fixture",
+    name: "a document fixture of any size",
+    source: "export const anything = `\nschema_version: 1\n`;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "require-module-header",
+    name: "a file with no comment",
+    source: "export const value = 1;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "require-module-header",
+    name: "a file whose only comment follows the code",
+    source: "export const value = 1;\n// late note\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "ephemeral-filename",
+    name: "a numbered phase in a test file name",
+    source: "export const value = 1;\n",
+    isTestFile: true,
+    fileName: "case_phase12_test.ts",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "require-script-usage",
+    name: "a header without a usage section",
+    source: "/**\n * @module S\n */\nexport const value = 1;\n",
+    expectedBuiltins: {},
+  },
+  {
     rule: "exported-interface-placement",
     name: "an exported interface after a function",
     source: "export function f(): void {}\nexport interface IOther {\n  readonly b: number;\n}\n",
@@ -396,7 +487,7 @@ const EMPTY_INTERFACE_CASE: IOverlapCase = {
 };
 
 function caseFileName(index: number, entry: IOverlapCase): string {
-  return `case_${index}${entry.isTestFile ? "_test" : ""}.ts`;
+  return entry.fileName ?? `case_${index}${entry.isTestFile ? "_test" : ""}.ts`;
 }
 
 /** The built-in rule codes of the installed Deno. */

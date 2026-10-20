@@ -99,6 +99,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
     console.error(`[${name}-lint] ${envName} active: ${[...selection].join(", ")}`);
   }
 
+  const ignored = (catalog.ignore ?? []).map((entry) => entry.glob);
   const rules: Record<string, Deno.lint.Rule> = {};
   for (const id of registry.catalogIds()) {
     const implementation = registry.implementation(id);
@@ -112,6 +113,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
       create(context) {
         if (!active) return {};
         const repoPath = repoRelative(context.filename);
+        if (matchesAnyGlob(repoPath, ignored)) return {};
         const pathClass = classifyPath(repoPath, catalog.scopes);
         if (!allows(repoPath, pathClass, settings)) return {};
         return implementation.create(context, {

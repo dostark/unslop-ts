@@ -92,6 +92,50 @@ const MagicUnionTypeOptions = z.object({
   hint: z.string().default("Define a named type alias or an enum."),
 }).strict();
 
+const LongCommentOptions = z.object({
+  maxLines: z.number().int().positive().default(3),
+}).strict();
+
+const EphemeralPhrase = z.object({
+  pattern: z.string(),
+  flags: z.string().default("i"),
+  hint: z.string(),
+}).strict();
+
+const DEFAULT_EPHEMERAL_PHRASES = [
+  { pattern: "\\btried\\b", flags: "i", hint: "a narration of a prior attempt" },
+  { pattern: "\\b(?:didn't|did not)\\s+work\\b", flags: "i", hint: "what didn't work" },
+];
+
+const EphemeralCommentOptions = z.object({
+  phrases: z.array(EphemeralPhrase).default(DEFAULT_EPHEMERAL_PHRASES),
+  checkDates: z.boolean().default(true),
+}).strict();
+
+const MaxParamsOptions = z.object({
+  max: z.number().int().positive().default(7),
+}).strict();
+
+const TestInlineFixtureOptions = z.object({
+  minLines: z.number().int().positive().default(7),
+  variableNames: z.array(z.string()).default(["markdown", "yaml", "json", "input", "payload", "text", "content"]),
+  fixturesDirectory: z.string().default(""),
+}).strict();
+
+const RequireModuleHeaderOptions = z.object({
+  maxStartLine: z.number().int().positive().default(5),
+}).strict();
+
+const EphemeralFilenameOptions = z.object({
+  pattern: z.string().default("(?:^|[_.-])phase[-_]?(\\d+)(?:[_.-]|$)"),
+  label: z.string().default("phase"),
+}).strict();
+
+const RequireScriptUsageOptions = z.object({
+  marker: z.string().default("Usage:"),
+  maxHeaderLines: z.number().int().positive().default(15),
+}).strict();
+
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
 export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -119,6 +163,13 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "promise-response-return": NoOptions,
   "ts-suppression-pragmas": NoOptions,
   "magic-union-type": MagicUnionTypeOptions,
+  "long-comment": LongCommentOptions,
+  "ephemeral-comment": EphemeralCommentOptions,
+  "decorative-comment": NoOptions,
+  "max-params": MaxParamsOptions,
+  "test-inline-multiline-fixture": TestInlineFixtureOptions,
+  "require-module-header": RequireModuleHeaderOptions,
+  "ephemeral-filename": EphemeralFilenameOptions,
 };
 
 /** Option schemas of the Deno rule pack, keyed by bare rule key. */
@@ -126,4 +177,5 @@ export const DENO_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "ignore-needs-reason": IgnoreNeedsReasonOptions,
   "no-forbidden-lint-ignore": NoForbiddenLintIgnoreOptions,
   "require-deno-shebang": RequireDenoShebangOptions,
+  "require-script-usage": RequireScriptUsageOptions,
 };

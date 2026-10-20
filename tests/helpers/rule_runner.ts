@@ -20,6 +20,8 @@ export interface IRuleRun {
   readonly source: string;
   readonly filename: string;
   readonly options: Record<string, JsonValue>;
+  /** Path globs the catalog entry limits the rule to. */
+  readonly include?: readonly string[];
 }
 
 const DEFAULT_FILENAME = "packages/x/src/a.ts";
@@ -35,7 +37,11 @@ export function runAt(source: string, filename: string, options: Record<string, 
   return { source, filename, options };
 }
 
-function catalogFor(key: string, options: Record<string, JsonValue>): Record<string, JsonValue> {
+function catalogFor(
+  key: string,
+  options: Record<string, JsonValue>,
+  include: readonly string[] | undefined,
+): Record<string, JsonValue> {
   return {
     version: "1",
     scopes: { test: ["**/tests/**", "**/*_test.ts"], fixture: ["**/tests/fixtures/**"] },
@@ -47,6 +53,7 @@ function catalogFor(key: string, options: Record<string, JsonValue>): Record<str
         scope: "all",
         tags: ["module-structure"],
         options,
+        ...(include ? { include: [...include] } : {}),
       },
     },
   };
@@ -54,7 +61,7 @@ function catalogFor(key: string, options: Record<string, JsonValue>): Record<str
 
 /** The findings of the rule `key` on one run, in source order. */
 export function findingsOf(key: string, run: IRuleRun): IRuleFinding[] {
-  const plugin = createTestPlugin(loadTestCatalog(catalogFor(key, run.options)));
+  const plugin = createTestPlugin(loadTestCatalog(catalogFor(key, run.options, run.include)));
   return runPlugin(plugin, run.filename, run.source).map((diagnostic) => ({
     line: run.source.slice(0, diagnostic.range[0]).split(NEWLINE).length,
     message: diagnostic.message,

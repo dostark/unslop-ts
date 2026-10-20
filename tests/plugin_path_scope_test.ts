@@ -51,3 +51,15 @@ Deno.test("an exclude glob removes a matching path", () => {
   assertEquals(count(filters, "packages/yes/src/a.ts") > 0, true);
   assertEquals(count(filters, "packages/no/src/a.ts"), 0);
 });
+
+function countWithIgnore(ignore: JsonValue, filename: string): number {
+  const catalog = { ...buildCatalog({}), ignore };
+  const plugin = createTestPlugin(loadTestCatalog(catalog));
+  return runPlugin(plugin, filename, SOURCE).length;
+}
+
+Deno.test("a catalog ignore glob skips the file for every plugin rule", () => {
+  const ignore = [{ glob: "**/self_check.ts", reason: "The checker holds the violation shapes." }];
+  assertEquals(countWithIgnore(ignore, "packages/x/src/a.ts") > 0, true);
+  assertEquals(countWithIgnore(ignore, "packages/x/src/self_check.ts"), 0);
+});
