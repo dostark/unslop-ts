@@ -60,7 +60,7 @@ export function createPromiseResponseAlias(context: Deno.lint.RuleContext, ctx: 
       context.report({
         node: rawNode,
         message: `A type alias that masks '${WEAK_TYPE}' is not allowed; define a specific response type.`,
-        hint: `Name the response shape. See ${ctx.codeStyle ?? "CODE_STYLE.md#strict-type-safety"}.`,
+        hint: `Name the response shape. See ${ctx.codeStyle ?? "the strict type safety rules"}.`,
       });
     },
   };
@@ -83,7 +83,7 @@ export function createPromiseResponseReturn(context: Deno.lint.RuleContext, ctx:
       context.report({
         node: rawNode,
         message: `'${WEAK_TYPE}' as a type annotation is too weak; define an interface for the response shape.`,
-        hint: `Name the response shape. See ${ctx.codeStyle ?? "CODE_STYLE.md#strict-type-safety"}.`,
+        hint: `Name the response shape. See ${ctx.codeStyle ?? "the strict type safety rules"}.`,
       });
     },
   };
@@ -100,7 +100,7 @@ export function createTsSuppressionPragmas(context: Deno.lint.RuleContext, ctx: 
         context.report({
           range: comment.range,
           message: "A TypeScript suppression pragma hides a type error even with a description; fix the error.",
-          hint: `Fix the type error. See ${ctx.codeStyle ?? "CODE_STYLE.md#strict-type-safety"}.`,
+          hint: `Fix the type error. See ${ctx.codeStyle ?? "the strict type safety rules"}.`,
         });
       }
     },

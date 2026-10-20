@@ -22,7 +22,7 @@ import type { IPluginRuleContext, LintVisitor } from "./types.ts";
 type Report = (node: Deno.lint.Node, message: string) => void;
 
 function makeReporter(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): Report {
-  const codeStyle = ctx.codeStyle ?? "CODE_STYLE.md#strict-type-safety";
+  const codeStyle = ctx.codeStyle ?? "the strict type safety rules";
   return (node, message) => {
     context.report({ node, message, hint: `Keep type evidence. See ${codeStyle}.` });
   };

@@ -3,7 +3,7 @@
 > The generic TypeScript style rules. Rule ids and severities come from the rule catalog
 > of the project that loads the engine.
 
-## 1. Strict Type Safety {#strict-type-safety}
+## Strict Type Safety {#strict-type-safety}
 
 - **Every** variable, parameter, return value, and data structure **must** have an
   explicit type annotation. Never rely on implicit inference to avoid writing a
@@ -197,7 +197,115 @@ export class MyClass {
 }
 ```
 
-## 11. Function & Method Complexity {#complexity-rules}
+## No Magic Values {#no-magic-values}
+
+- Never hardcode a numeric literal or a string constant in production or test
+  code: timeouts, status values, provider names, and similar values need a name.
+- Give a value that a module owns a descriptive constant in a module-scoped
+  constants file, and group related values.
+- Whenever a set of fixed strings is used (statuses, types, providers), define
+  a TypeScript `enum` in the package that owns the concept and reference it.
+  Compare against `Status.PENDING`, never against the literal string.
+- An inline union of string literals (`"a" | "b"`) is the same problem. Name the
+  union with a type alias or an enum, and use the name.
+- A named constant with the same name and the same value in two files is a
+  duplicate. Keep one owner and import it.
+
+### Automated enforcement
+
+| Check                | Detects                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `magic-literals`     | A string or number literal that repeats often enough to need a name (a whole-tree check) |
+| `magic-union-type`   | An inline union of string literals outside a named type alias                            |
+| `duplicate-constant` | A top-level constant with the same name and static value in two files                    |
+| `duplicate-type`     | An interface or object type with the same name and members in two files                  |
+
+## Imports at the Top {#imports-at-the-top}
+
+All import declarations **must** appear at the top of the file, before any type
+declaration or functional code, and **must not** be nested inside any other
+statement (a function, a conditional, or a loop). A static import is top-level only.
+
+```ts
+if (condition) {
+  await import("./foo.ts"); // ❌ Not allowed
+}
+
+function loadModule() {
+  return import("./bar.ts"); // ❌ Not allowed
+}
+```
+
+A dynamic import that a module genuinely needs is allowed with a justification
+comment, as the Dynamic Imports section describes.
+
+| Check                     | Detects                                                     |
+| ------------------------- | ----------------------------------------------------------- |
+| `import-inside-statement` | An import call nested inside a function, block, or loop     |
+| `import-placement`        | A static import below a type declaration or functional code |
+
+## Interface Conventions {#interface-conventions}
+
+These rules are opt-in, because they describe a naming convention that a project
+chooses.
+
+- **Prefix:** every exported interface starts with a capital `I` (the `prefix`
+  option changes the letter). A prefixed name makes it obvious at a glance that
+  the symbol is an interface and not a class or a type alias.
+- **Placement:** exported interfaces are declared at the top of the module,
+  right after the imports and the header comment, before any class, function, or
+  variable initialization. The API surface of a module is then visible at a glance.
+- **No rename on import:** an interface is imported under its own name. A rename
+  such as `IFoo as Foo` hides that the symbol is an interface.
+
+| Check                           | Detects                                                        |
+| ------------------------------- | -------------------------------------------------------------- |
+| `exported-interface-naming`     | An exported interface without the prefix                       |
+| `exported-interface-placement`  | An exported interface below a constant, a function, or a class |
+| `no-interface-rename-on-import` | An import specifier that renames a prefixed interface          |
+
+## Import Boundaries {#import-boundaries}
+
+A project describes which file groups may not import which paths as zones. A zone
+names the files it covers, the files it excepts, and the imports it denies. A deny
+entry matches the text of the specifier (a regular expression), the repository path
+that the specifier resolves to (globs), or a path outside a glob, and every
+condition that an entry gives must hold. The rule reads static imports and
+re-exports, including an import clause that spans lines.
+
+| Check               | Detects                                     |
+| ------------------- | ------------------------------------------- |
+| `import-boundaries` | An import that a zone of the catalog denies |
+
+## Module Order {#module-order}
+
+Every module follows this order:
+
+1. **Header comment:** a brief description of the module.
+1. **Imports:** all import declarations.
+1. **Exports:** all exported interfaces, types, and enums.
+1. **Functional code:** classes, functions, and variable initializations.
+
+| Check                   | Detects                                            |
+| ----------------------- | -------------------------------------------------- |
+| `require-module-header` | A module that does not start with a header comment |
+| `import-placement`      | An import below a type or functional code          |
+
+## Test Fixtures {#test-fixtures}
+
+A multi-line structured input (YAML, markdown, JSON, or a TOML document) in a test
+belongs in a fixture file that the test loads, not in an inline template string.
+The `test-inline-multiline-fixture` check reports a named template of the
+configured size, and a template that opens a document, wherever it appears.
+
+## Deno Scripts {#deno-scripts}
+
+- A runnable script starts with the Deno shebang `#!/usr/bin/env -S deno run -A`
+  on line 1, before any header comment (`require-deno-shebang`).
+- The header of a script holds a `Usage:` section with at least one example
+  command (`require-script-usage`).
+
+## Function & Method Complexity {#complexity-rules}
 
 - **Parameter Limit:** Functions and methods **must not** exceed **7 parameters**.
 - If a method requires 8 or more parameters, it **must** be refactored to use:
@@ -257,9 +365,9 @@ async launch(launch: ISessionLaunch, traceId: string, delegateProviderEnv?: Reco
 
 1. **Reveal root cause, don't use `?` as a Band-Aid.** If a function has too
    many parameters and you're tempted to mark some optional, refactor to a
-   parameter object instead (see §11 parameter limit).
+   parameter object instead (see Function & Method Complexity).
 
-## 16. Comment Discipline {#comment-discipline}
+## Comment Discipline {#comment-discipline}
 
 Code must be self-explanatory in the vast majority of cases: clear naming,
 small functions, and obvious control flow do the job a comment would
@@ -280,8 +388,8 @@ the next line already says.
   what previously didn't work. That belongs in the commit message and the
   phase-plan doc, which are the durable record of _why_; the code itself is
   only a record of _what it does now_. This does not apply to the module's
-  own header comment, whose Implementation Plan reference is a distinct,
-  mandatory field under §7.
+  own header comment, whose plan reference is a distinct, mandatory field of
+  the header (see Module Order).
 - **No plan-phase numbers in test file names.** A test file's own name
   (`*_test.ts` / `*.test.ts`, or any file under a `tests/` directory) must
   not embed a numbered plan-phase reference (`phase147_...`,
@@ -303,7 +411,7 @@ the next line already says.
 - **No document-section references.** A comment must not cite a section
   number via the `§` symbol — neither a phase-plan/spec section (e.g. `§5.9`,
   `(§6.1, F12)`) nor a section of this file or another project doc (e.g.
-  `CODE_STYLE.md §15`). Restate the rule or rationale in the comment's own
+  a section of a style guide). Restate the rule or rationale in the comment's own
   words instead of pointing at a section number, which drifts silently as
   documents are restructured.
 - **No decorative comment separators.** A comment line must not use a run

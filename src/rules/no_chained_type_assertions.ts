@@ -98,7 +98,7 @@ export function createNoChainedTypeAssertions(
 ): LintVisitor {
   const allowPartialMock = ctx.options.allowPartialMockInTests !== false;
   const allowNeverAnyMock = ctx.options.allowNeverAnyMockInTests !== false;
-  const codeStyle = ctx.codeStyle ?? "CODE_STYLE.md#strict-type-safety";
+  const codeStyle = ctx.codeStyle ?? "the strict type safety rules";
   const sourceCode = context.sourceCode;
 
   const check = (rawNode: Deno.lint.Node): void => {

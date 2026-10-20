@@ -19,7 +19,7 @@ export interface IPluginRuleContext {
   readonly repoPath: string;
   /** True when the file under lint is a test file. */
   readonly isTestFile: boolean;
-  /** CODE_STYLE.md anchor the report hint links to. */
+  /** The style guide anchor that the report hint links to. */
   readonly codeStyle?: string;
   /** The name the plugin is registered under, which prefixes its catalog ids. */
   readonly pluginName: string;
