@@ -7,7 +7,7 @@
  * @related-files [src/rules/mod.ts, tests/no_chained_type_assertions_test.ts]
  */
 
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import { type IPluginRuleContext, type LintVisitor, TYPE_SAFETY_GUIDE } from "./types.ts";
 
 interface ILintNode {
   readonly type: string;
@@ -98,7 +98,7 @@ export function createNoChainedTypeAssertions(
 ): LintVisitor {
   const allowPartialMock = ctx.options.allowPartialMockInTests !== false;
   const allowNeverAnyMock = ctx.options.allowNeverAnyMockInTests !== false;
-  const codeStyle = ctx.codeStyle ?? "the strict type safety rules";
+  const codeStyle = ctx.codeStyle ?? TYPE_SAFETY_GUIDE;
   const sourceCode = context.sourceCode;
 
   const check = (rawNode: Deno.lint.Node): void => {

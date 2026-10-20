@@ -27,7 +27,6 @@ function buildCatalog(ruleOverrides: Record<string, JsonValue> = {}): Record<str
         engine: "plugin",
         severity: "error",
         scope: "all",
-        codeStyle: "CODE_STYLE.md#strict-type-safety",
         tags: ["type-safety", "deslop"],
         options: { allowPartialMockInTests: true },
         ...ruleOverrides,
@@ -80,7 +79,7 @@ Deno.test("no-chained-type-assertions invalid cases report one diagnostic", () =
 Deno.test("no-chained-type-assertions message names the defect and the hint links the style anchor", () => {
   const diagnostics = run("const value = input as unknown as User;");
   assertStringIncludes(diagnostics[0].message, "Chained type assertions");
-  assertStringIncludes(diagnostics[0].hint ?? "", "CODE_STYLE.md#strict-type-safety");
+  assertStringIncludes(diagnostics[0].hint ?? "", "docs/style_guide.md#strict-type-safety");
 });
 
 Deno.test("no-chained-type-assertions allowPartialMockInTests:false reports the test-file partial chain", () => {
@@ -108,4 +107,11 @@ Deno.test("no-chained-type-assertions severity off reports nothing", () => {
 Deno.test("no-chained-type-assertions respects the rule scope (test-only rule skips production)", () => {
   const diagnostics = run("const value = input as unknown as User;", PROD, { scope: "test" });
   assertEquals(diagnostics.length, 0);
+});
+
+Deno.test("no-chained-type-assertions uses a consumer catalog style-guide override", () => {
+  const codeStyle = "consumer-guide.md#type-evidence";
+  const diagnostics = run("const value = input as unknown as User;", PROD, { codeStyle });
+  assertEquals(diagnostics.length, 1);
+  assertStringIncludes(diagnostics[0].hint ?? "", codeStyle);
 });

@@ -34,7 +34,7 @@ function baseCatalog(): Record<string, JsonValue> {
         engine: "plugin",
         severity: "error",
         scope: "all",
-        codeStyle: "CODE_STYLE.md#strict-type-safety",
+        codeStyle: "docs/consumer-guide.md#type-evidence",
         tags: ["type-safety", "deslop"],
         options: { allowPartialMockInTests: true },
       },

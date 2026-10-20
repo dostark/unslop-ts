@@ -5,7 +5,7 @@
  *   evasion forms found in the Phase 213 review. Rule ideas from deslop / anti-slop (MIT).
  */
 
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { type JsonValue, runPlugin } from "../mod.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
@@ -149,4 +149,15 @@ Deno.test("no-unsafe-dictionary forbiddenValueTypes narrows the value set", () =
 Deno.test("no-object-parameters reports a parameter typed object", () => {
   expectRule("demo/no-object-parameters", "function f(o: object): void {}", true);
   expectRule("demo/no-object-parameters", "function f(o: { a: string }): void {}", false);
+});
+
+Deno.test("type-safety reporter links its own guide unless a consumer overrides it", () => {
+  const id = "demo/no-explicit-unknown";
+  for (const codeStyle of [null, "consumer-guide.md#type-evidence"]) {
+    const overrides: Record<string, Record<string, JsonValue>> = codeStyle === null ? {} : { [id]: { codeStyle } };
+    const plugin = createTestPlugin(loadTestCatalog(buildCatalog(overrides, id)));
+    const diagnostics = runPlugin(plugin, PROD, "const value: unknown = input;");
+    assertEquals(diagnostics.length, 1);
+    assertStringIncludes(diagnostics[0].hint ?? "", codeStyle ?? "docs/style_guide.md#strict-type-safety");
+  }
 });

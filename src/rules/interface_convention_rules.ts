@@ -11,7 +11,7 @@ import { asNode, type ILintNode } from "../engine/type_environment.ts";
 import type { IPluginRuleContext, LintVisitor } from "./types.ts";
 
 const DEFAULT_PREFIX = "I";
-const DEFAULT_CODE_STYLE = "the interface naming rules";
+const DEFAULT_GUIDE = "the interface naming rules";
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g;
 
 function prefixOf(ctx: IPluginRuleContext): string {
@@ -26,7 +26,7 @@ function hasInterfacePrefix(name: string, prefix: string): boolean {
 
 export function createExportedInterfaceNaming(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
   const prefix = prefixOf(ctx);
-  const codeStyle = ctx.codeStyle ?? DEFAULT_CODE_STYLE;
+  const codeStyle = ctx.codeStyle ?? DEFAULT_GUIDE;
   return {
     "ExportNamedDeclaration > TSInterfaceDeclaration"(node: Deno.lint.TSInterfaceDeclaration): void {
       const name = node.id.name;
@@ -49,7 +49,7 @@ function nameOf(node: ILintNode | undefined): string | null {
 export function createNoInterfaceRenameOnImport(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
   const prefix = prefixOf(ctx);
   const interfaceName = new RegExp(`^${prefix.replace(REGEX_SPECIALS, "\\$&")}[A-Z]`);
-  const codeStyle = ctx.codeStyle ?? DEFAULT_CODE_STYLE;
+  const codeStyle = ctx.codeStyle ?? DEFAULT_GUIDE;
   return {
     ImportSpecifier(rawNode: Deno.lint.Node): void {
       const node = asNode(rawNode);

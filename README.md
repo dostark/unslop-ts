@@ -4,8 +4,8 @@ A Deno lint plugin engine for TypeScript projects. It turns a validated JSON **c
 rules into a `Deno.lint.Plugin` that runs inside `deno lint`, so the same diagnostics appear in the
 editor, on the command line, and in a pre-commit gate.
 
-The engine ships two rule packs. `TYPESCRIPT_RULE_PACK` holds 15 rules for type evidence, test
-assertions, and size limits. `DENO_RULE_PACK` holds three rules about `deno-lint-ignore` comments and
+The engine ships two rule packs. `TYPESCRIPT_RULE_PACK` holds 35 rules for type evidence, imports,
+module layout, comments, interface conventions, test assertions, and size limits. `DENO_RULE_PACK` holds 4 rules about `deno-lint-ignore` comments and
 Deno script headers. A project can add its own packs, so project-specific rules stay in the project.
 
 ## Use in a Deno project
@@ -74,6 +74,17 @@ Deno script headers. A project can add its own packs, so project-specific rules 
 
 `deno task test`, `deno task lint`, `deno task check`, and `deno task fmt --check` run in this
 repository alone. The engine tests import the package by relative path.
+
+## Rule ownership and guide links
+
+The TypeScript pack owns generic checks, including configurable import-boundary zones and opt-in
+interface conventions. Consumer names, paths, severities, and rule options belong in the project's
+catalog. Default type-safety hints link to [the engine guide](docs/style_guide.md#strict-type-safety);
+a catalog `codeStyle` value replaces that link.
+
+The Deno-only whole-tree entry exports the duplicate-type, duplicate-constant, and repeated-literal
+checkers. A host script calls them in-process with catalog data. These checks are library functions,
+not per-file plugin rules.
 
 ## Analysis boundaries
 

@@ -14,7 +14,7 @@ import { type BoundaryDeny, type BoundaryZone, ImportBoundariesOptions } from ".
 import type { IPluginRuleContext, LintVisitor } from "./types.ts";
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
-const DEFAULT_CODE_STYLE = "the import boundary rules";
+const DEFAULT_GUIDE = "the import boundary rules";
 
 /** The repository-relative path that a specifier names, or null for a URL or a scheme specifier. */
 function resolveSpecifier(repoPath: string, specifier: string): string | null {
@@ -45,7 +45,7 @@ export function createImportBoundaries(context: Deno.lint.RuleContext, ctx: IPlu
     matchesAnyGlob(ctx.repoPath, zone.files) && !matchesAnyGlob(ctx.repoPath, zone.except)
   );
   if (zones.length === 0) return {};
-  const codeStyle = ctx.codeStyle ?? DEFAULT_CODE_STYLE;
+  const codeStyle = ctx.codeStyle ?? DEFAULT_GUIDE;
   const check = (node: Deno.lint.Node, source: unknown): void => {
     const specifier = sourceText(source);
     if (specifier === null) return;

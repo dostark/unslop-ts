@@ -17,12 +17,12 @@ import {
   typeReferenceName,
   unwrap,
 } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import { type IPluginRuleContext, type LintVisitor, TYPE_SAFETY_GUIDE } from "./types.ts";
 
 type Report = (node: Deno.lint.Node, message: string) => void;
 
 function makeReporter(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): Report {
-  const codeStyle = ctx.codeStyle ?? "the strict type safety rules";
+  const codeStyle = ctx.codeStyle ?? TYPE_SAFETY_GUIDE;
   return (node, message) => {
     context.report({ node, message, hint: `Keep type evidence. See ${codeStyle}.` });
   };

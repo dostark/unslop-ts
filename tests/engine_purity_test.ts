@@ -22,7 +22,12 @@ const SCANNED_FILES = ["mod.ts", "README.md", "deno.json"];
 const SCANNED_EXTENSIONS = [".ts", ".md", ".json"];
 const ALLOWED_PACKAGES = ["@std/", "zod", "typescript", "@dostark/unslop-ts"];
 // The words are joined here so that this file does not contain them.
-const FORBIDDEN_WORDS = [["ex", "aix"].join(""), ["lint", "policy"].join("-"), ["scripts", "config"].join("/")];
+const FORBIDDEN_WORDS = [
+  ["ex", "aix"].join(""),
+  ["lint", "policy"].join("-"),
+  ["scripts", "config"].join("/"),
+  ["code", "style"].join("_"),
+];
 const IMPORT_PATTERN = /^(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^import\s*["']([^"']+)["']/gm;
 
 function isAllowedImport(specifier: string): boolean {
@@ -68,4 +73,10 @@ Deno.test("the purity check reports a consumer import and a consumer name in a f
   const violations = purityViolations([{ path: "fixture.ts", text: consumerImport }]);
   assertEquals(violations.length, 2);
   assertEquals(purityViolations([{ path: "ok.ts", text: 'import { join } from "@std/path";\n' }]), []);
+});
+
+Deno.test("the purity check rejects a consumer style-guide name in a seeded engine file", () => {
+  const guideName = ["CODE", "STYLE"].join("_");
+  const violations = purityViolations([{ path: "src/fixture.ts", text: `const guide = "${guideName}.md";` }]);
+  assertEquals(violations, [`src/fixture.ts: names '${guideName.toLowerCase()}'`]);
 });

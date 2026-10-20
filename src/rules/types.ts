@@ -19,7 +19,7 @@ export interface IPluginRuleContext {
   readonly repoPath: string;
   /** True when the file under lint is a test file. */
   readonly isTestFile: boolean;
-  /** The style guide anchor that the report hint links to. */
+  /** A consumer-provided guide anchor that replaces the rule default. */
   readonly codeStyle?: string;
   /** The name the plugin is registered under, which prefixes its catalog ids. */
   readonly pluginName: string;
@@ -28,3 +28,5 @@ export interface IPluginRuleContext {
 export interface IPluginRule {
   create(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor;
 }
+
+export const TYPE_SAFETY_GUIDE = "docs/style_guide.md#strict-type-safety";
