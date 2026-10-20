@@ -13,6 +13,7 @@ import { createTestPlugin, loadTestCatalog, TEST_PLUGIN_NAME } from "./registry.
 export interface IRuleFinding {
   readonly line: number;
   readonly message: string;
+  readonly hint: string;
 }
 
 export interface IRuleRun {
@@ -57,6 +58,7 @@ export function findingsOf(key: string, run: IRuleRun): IRuleFinding[] {
   return runPlugin(plugin, run.filename, run.source).map((diagnostic) => ({
     line: run.source.slice(0, diagnostic.range[0]).split(NEWLINE).length,
     message: diagnostic.message,
+    hint: diagnostic.hint ?? "",
   }));
 }
 

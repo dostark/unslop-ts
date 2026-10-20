@@ -35,6 +35,12 @@ import {
   createReExportImported,
 } from "./import_rules.ts";
 import { createExportedInterfacePlacement, createImportPlacement } from "./module_layout_rules.ts";
+import {
+  createMagicUnionType,
+  createPromiseResponseAlias,
+  createPromiseResponseReturn,
+  createTsSuppressionPragmas,
+} from "./type_pattern_rules.ts";
 import { createIgnoreNeedsReason } from "./deno/ignore_needs_reason.ts";
 import { createNoForbiddenLintIgnore } from "./deno/no_forbidden_lint_ignore.ts";
 import { createRequireDenoShebang } from "./deno/require_deno_shebang.ts";
@@ -66,6 +72,10 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "re-export-imported": { create: createReExportImported },
     "import-placement": { create: createImportPlacement },
     "exported-interface-placement": { create: createExportedInterfacePlacement },
+    "promise-response-alias": { create: createPromiseResponseAlias },
+    "promise-response-return": { create: createPromiseResponseReturn },
+    "ts-suppression-pragmas": { create: createTsSuppressionPragmas },
+    "magic-union-type": { create: createMagicUnionType },
   },
   optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
 };

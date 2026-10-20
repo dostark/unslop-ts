@@ -79,7 +79,7 @@ Deno.test("an option schema without a rule throws a RuleRegistryError naming the
   assertStringIncludes(error.message, "orphan");
 });
 
-const TYPESCRIPT_PACK_RULE_COUNT = 21;
+const TYPESCRIPT_PACK_RULE_COUNT = 25;
 const DENO_PACK_RULE_KEYS = ["ignore-needs-reason", "no-forbidden-lint-ignore", "require-deno-shebang"];
 
 Deno.test("the TypeScript rule pack holds the engine rules, each with an option schema and no prefix", () => {

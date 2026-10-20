@@ -38,6 +38,9 @@ const CONSUMER_BUILTIN_RULES = ["explicit-module-boundary-types"];
 const DECLARATIONS = "declare const input: string;\n";
 
 const IMPORT_CALL = "import";
+const RESPONSE_PROMISE = ["Promise", "<Response>"].join("");
+const PRAGMA_IGNORE = ["@ts", "ignore"].join("-");
+const FAST_OR_SLOW = ['"fast"', '"slow"'].join(" | ");
 
 const CASES: readonly IOverlapCase[] = [
   {
@@ -319,6 +322,54 @@ const CASES: readonly IOverlapCase[] = [
     source: "export function f(): void {}\nexport interface IOther {\n  readonly b: number;\n}\n",
     expectedBuiltins: {},
   },
+  {
+    rule: "promise-response-alias",
+    name: "an alias of the weak promise",
+    source: `export type Fetcher = ${RESPONSE_PROMISE};\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "promise-response-alias",
+    name: "an alias of a function that returns the weak promise",
+    source: `export type Fetcher = () => ${RESPONSE_PROMISE};\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "promise-response-return",
+    name: "a function that returns the weak promise",
+    source: `export function get(): ${RESPONSE_PROMISE} {\n  return fetch("x");\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "promise-response-return",
+    name: "a method signature that returns the weak promise",
+    source: `export interface IClient {\n  send(): ${RESPONSE_PROMISE};\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "ts-suppression-pragmas",
+    name: "a suppression pragma with a description",
+    source: `// ${PRAGMA_IGNORE} legacy value\nexport const value = 1;\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "ts-suppression-pragmas",
+    name: "a block comment pragma with a description",
+    source: `/* ${PRAGMA_IGNORE} legacy value */\nexport const value = 1;\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "magic-union-type",
+    name: "a parameter with a string union",
+    source: `export function mode(value: ${FAST_OR_SLOW}): string {\n  return value;\n}\n`,
+    expectedBuiltins: {},
+  },
+  {
+    rule: "magic-union-type",
+    name: "an interface member with a string union",
+    source: `export interface IOptions {\n  readonly speed: ${FAST_OR_SLOW};\n}\n`,
+    expectedBuiltins: {},
+  },
 ];
 
 /** A cast to any, which the built-in no-explicit-any reports. */
@@ -414,6 +465,19 @@ Deno.test("every built-in that fires on a case is declared, and none is a duplic
 Deno.test("an as any case is reported as an undeclared no-explicit-any", async () => {
   const [collected] = await collect([SEEDED_ANY_CASE]);
   assertArrayIncludes(undeclared(SEEDED_ANY_CASE, collected), ["no-explicit-any"]);
+});
+
+Deno.test("an undescribed pragma is reported by ban-ts-comment only, and the pack rule stays silent", async () => {
+  const bare: IOverlapCase = {
+    rule: "ts-suppression-pragmas",
+    name: "a suppression pragma without a description",
+    source: `// ${PRAGMA_IGNORE}\nexport const value: number = "x";\n`,
+    expectedBuiltins: { "ban-ts-comment": OVERLAP_KIND.related },
+  };
+  const [collected] = await collect([bare]);
+  assertEquals(collected.ownRuleReported, false);
+  assertArrayIncludes([...collected.builtins], ["ban-ts-comment"]);
+  assertEquals(undeclared(bare, collected), []);
 });
 
 Deno.test("an empty interface declared incidental passes", async () => {

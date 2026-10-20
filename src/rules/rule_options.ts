@@ -88,6 +88,10 @@ const ImportCallOptions = z.object({
   allowDynamicImports: z.array(DynamicAllowance).default([]),
 }).strict();
 
+const MagicUnionTypeOptions = z.object({
+  hint: z.string().default("Define a named type alias or an enum."),
+}).strict();
+
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
 export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
@@ -111,6 +115,10 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "re-export-imported": NoOptions,
   "import-placement": NoOptions,
   "exported-interface-placement": NoOptions,
+  "promise-response-alias": NoOptions,
+  "promise-response-return": NoOptions,
+  "ts-suppression-pragmas": NoOptions,
+  "magic-union-type": MagicUnionTypeOptions,
 };
 
 /** Option schemas of the Deno rule pack, keyed by bare rule key. */
