@@ -86,6 +86,33 @@ The Deno-only whole-tree entry exports the duplicate-type, duplicate-constant, a
 checkers. A host script calls them in-process with catalog data. These checks are library functions,
 not per-file plugin rules.
 
+## Option validation
+
+A regular expression option is checked when the catalog is parsed. A pattern that does not compile, a
+repeated or unknown flag, and a pattern that fails with its own flags are `CatalogError`s that name the
+field. The whole-tree command reports the same error and exits with code 2. The fields are the
+`specifiers` of `allowDynamicImports`, the `pattern` and `flags` of each `ephemeral-comment` phrase,
+the `pattern` of `ephemeral-filename`, and `testScaffoldPattern` of `wholeTree.magicLiterals`.
+
+```json
+{
+  "rules": {
+    "demo/ephemeral-comment": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": ["demo"],
+      "options": { "phrases": [{ "pattern": "\\btried\\b", "flags": "gi", "hint": "State the fact." }] }
+    }
+  },
+  "wholeTree": { "magicLiterals": { "checkNumbers": false, "testScaffoldPattern": "^scaffold-" } }
+}
+```
+
+The flags `g` and `y` are accepted. Each comment is tested from the start of the pattern, so an earlier
+match never hides a later one. In a host, `checkNumbers: false` turns number checks off when no command
+line flag is present. A host flag such as `--no-numbers` also turns them off, and no flag turns them on.
+
 ## Analysis boundaries
 
 Plugin rules run per file with no type information; imported aliases and cross-file
