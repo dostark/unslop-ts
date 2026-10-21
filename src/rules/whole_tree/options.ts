@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { CatalogError, type JsonValue } from "../../engine/catalog.ts";
+import { RegexSourceSchema } from "../../engine/regex_option.ts";
 
 const WHOLE_TREE_KEY = "wholeTree";
 
@@ -51,7 +52,7 @@ export const MagicLiteralOptionsSchema = z.object({
   /** Path suffixes of files that define constants or enums. They never count, and they make a literal reusable. */
   definitionFileSuffixes: z.array(z.string()).default(["constants.ts", "enums.ts"]),
   /** A string that matches this pattern in a test file is test scaffolding. */
-  testScaffoldPattern: z.string().default(DEFAULT_TEST_SCAFFOLD_PATTERN),
+  testScaffoldPattern: RegexSourceSchema.default(DEFAULT_TEST_SCAFFOLD_PATTERN),
 }).strict();
 
 /** Magic-literal options before defaults apply. */

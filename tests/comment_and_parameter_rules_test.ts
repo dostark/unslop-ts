@@ -201,3 +201,32 @@ Deno.test("test-inline-multiline-fixture takes minLines, variableNames, and the 
   assertStringIncludes(findingsOf("test-inline-multiline-fixture", directory)[0].message, "under spec/data/");
   assertStringIncludes(findingsOf("test-inline-multiline-fixture", named)[0].message, "into a fixture file");
 });
+
+const TWO_RUNS = "export const a = 1;\n\n// phase one\nexport const b = 2;\n// phase two\nexport const c = 3;\n";
+
+Deno.test("global_and_sticky_phrases_report_all_runs", () => {
+  for (const flags of ["g", "y", "gi", "iy"]) {
+    const options = { phrases: [{ pattern: "// phase", flags, hint: "a phase" }] };
+    assertEquals(linesOf("ephemeral-comment", runAt(TWO_RUNS, "packages/x/src/a.ts", options)), [3, 5], flags);
+  }
+});
+
+Deno.test("phrase_results_are_stable_across_runs_and_invocations", () => {
+  const options = { phrases: [{ pattern: "// phase", flags: "g", hint: "a phase" }] };
+  const mixed = [
+    "export const a = 1;",
+    "",
+    "// phase one",
+    "export const b = 2;",
+    "// a plain note",
+    "export const c = 3;",
+    "// phase three",
+    "export const d = 4;",
+    "",
+  ].join("\n");
+  const run = runAt(mixed, "packages/x/src/a.ts", options);
+  const first = linesOf("ephemeral-comment", run);
+  assertEquals(first, [3, 7]);
+  assertEquals(linesOf("ephemeral-comment", run), first);
+  assertEquals(linesOf("ephemeral-comment", runAt(TWO_RUNS, "packages/x/src/a.ts", options)), [3, 5]);
+});

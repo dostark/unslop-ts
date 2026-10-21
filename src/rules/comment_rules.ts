@@ -73,7 +73,11 @@ function phrasesOf(ctx: IPluginRuleContext): { regex: RegExp; hint: string }[] {
 
 function firstPhraseHint(run: ICommentRun, phrases: readonly { regex: RegExp; hint: string }[]): string | null {
   const text = run.lines.join("\n");
-  return phrases.find((phrase) => phrase.regex.test(text))?.hint ?? null;
+  return phrases.find((phrase) => {
+    // A global or sticky expression keeps its cursor between tests, so each run starts from the beginning.
+    phrase.regex.lastIndex = 0;
+    return phrase.regex.test(text);
+  })?.hint ?? null;
 }
 
 export function createEphemeralComment(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {

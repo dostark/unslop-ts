@@ -151,7 +151,9 @@ function validateRuleOptions(id: string, entry: IRuleEntry, schema: z.ZodTypeAny
   if (!schema) return;
   const options = schema.safeParse(entry.options ?? {});
   if (!options.success) {
-    throw new CatalogError(`rules.${id}.options`, options.error.issues[0]?.message ?? "invalid options");
+    const issue = options.error.issues[0];
+    const field = issue && issue.path.length > 0 ? `.${issue.path.join(".")}` : "";
+    throw new CatalogError(`rules.${id}.options${field}`, issue?.message ?? "invalid options");
   }
 }
 

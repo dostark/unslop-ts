@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { compilesAsRegex, RegexFlagsSchema, RegexSourceSchema } from "../engine/regex_option.ts";
 import { DEFAULT_REASON_SEPARATOR } from "./deno/ignore_directive.ts";
 import { DEFAULT_FORBIDDEN_IGNORES } from "./deno/no_forbidden_lint_ignore.ts";
 import { DEFAULT_DENO_SHEBANG } from "./deno/require_deno_shebang.ts";
@@ -81,7 +82,7 @@ const RequireDenoShebangOptions = z.object({
 
 const DynamicAllowance = z.object({
   files: z.array(z.string()).min(1),
-  specifiers: z.array(z.string()).default([]),
+  specifiers: z.array(RegexSourceSchema).default([]),
 }).strict();
 
 const ImportCallOptions = z.object({
@@ -97,10 +98,13 @@ const LongCommentOptions = z.object({
 }).strict();
 
 const EphemeralPhrase = z.object({
-  pattern: z.string(),
-  flags: z.string().default("i"),
+  pattern: RegexSourceSchema,
+  flags: RegexFlagsSchema.default("i"),
   hint: z.string(),
-}).strict();
+}).strict().refine((phrase) => compilesAsRegex(phrase.pattern, phrase.flags), {
+  message: "does not compile with its flags",
+  path: ["pattern"],
+});
 
 const DEFAULT_EPHEMERAL_PHRASES = [
   { pattern: "\\btried\\b", flags: "i", hint: "a narration of a prior attempt" },
@@ -127,7 +131,7 @@ const RequireModuleHeaderOptions = z.object({
 }).strict();
 
 const EphemeralFilenameOptions = z.object({
-  pattern: z.string().default("(?:^|[_.-])phase[-_]?(\\d+)(?:[_.-]|$)"),
+  pattern: RegexSourceSchema.default("(?:^|[_.-])phase[-_]?(\\d+)(?:[_.-]|$)"),
   label: z.string().default("phase"),
 }).strict();
 
