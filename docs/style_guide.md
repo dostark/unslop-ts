@@ -1,426 +1,458 @@
 # Style guide
 
-> The generic TypeScript style rules. Rule ids and severities come from the rule catalog
-> of the project that loads the engine.
+The generic TypeScript and Deno style rules that the engine checks. A project that loads the engine
+chooses which rules run, at what severity, and with which options in its rule catalog.
+
+- Rule ids in this guide are bare keys, such as `import-placement`. The catalog lists a rule under the
+  plugin name of the project, such as `<plugin>/import-placement`.
+- A rule blocks the build only when the catalog sets it to `error`. A rule marked opt-in is off until the
+  project turns it on.
+- Each section ends with the rules that check it. A rule can check part of a section. Sections that
+  describe a convention without a rule say so.
 
 ## Strict Type Safety {#strict-type-safety}
 
-- **Every** variable, parameter, return value, and data structure **must** have an
-  explicit type annotation. Never rely on implicit inference to avoid writing a
-  type.
-- **No `any`.** Explicit `any` and implicit `any` (from missing annotations) are
-  forbidden. Use generics (`<T>`), named interfaces, or Zod-inferred types.
-- **No `as any` casting.** Do not bypass the type system; use proper guards,
-  narrowing, or define the correct type instead.
-- **No `as typeof var` casting.** This is equivalent to `any` and defeats
-  safety – define explicit interfaces or use proper inference.
-- **No `unknown` as a stored type.** `unknown` may only appear briefly inside a
-  `catch (e: unknown)` block or during runtime narrowing. It must **never** be
-  used as a parameter type, return type, field type, or alias. Name the shape
-  with an interface or a type alias instead.
-- **No double casting (`... as unknown as ...`).** This pattern hides bugs and is
-  prohibited. Use type guards or structural typing to narrow correctly.
-- **No TypeScript suppression pragmas.** Never use `@ts-expect-error`,
-  `@ts-ignore`, `@ts-nocheck`, or similar comments to bypass the compiler. All
-  type errors must be resolved by writing correct types or refactoring the
-  code; suppressing them defeats the purpose of TypeScript and is strictly
-  prohibited. (This rule applies equally in test code.)
-- **No lint ignores for `any`.** Never add
-  `// deno-lint-ignore no-explicit-any` to silence problems. Address the root
-  cause with proper typing.
-- **No `Promise<Response>` return types.** Using `Promise<Response>` as a
-  function return type is prohibited because it hides the actual response
-  structure. Instead, define a specific interface describing the expected
-  response shape and return `Promise<YourResponseType>`. This ensures callers
-  have proper type information and prevents runtime errors from unexpected
-  response formats.
-- **No aliasing raw `unknown` or `Promise<Response>`.** Do not create type
-  aliases that merely rename a weak type, such as `type UnknownValue = unknown;`
-  or `type MockFetch = () => Promise<Response>;`. These fake aliases disguise
-  poor typing and make it harder to reason about actual data shapes. Define the
-  real structure explicitly with a named interface or type alias, or use runtime
-  validation and narrow from `unknown` at the point of access.
-- **No deceptive type aliases for mocks.** Do not create type aliases like
-  `type MockFetch = () => Promise<Response>` to hide weak typing. This pattern
-  is deceptive because it gives the appearance of strong typing while still
-  obscuring the actual response structure. Instead:
-  - Use `as typeof globalThis.fetch` when mocking fetch in tests – this
-    preserves the actual fetch signature and is the recommended approach
-  - Define interfaces with specific response types for custom mocks
-  - Use dependency injection with properly typed interfaces
-- **No `as typeof <var>` casting in production code.** Casting via
-  `as typeof variable` is treated as an 'any' escape and is forbidden in
-  production code. Exception: `as typeof globalThis.fetch` is allowed in test
-  code for mocking the fetch API, as this preserves the correct type signature.
-- **Intersection type extensions.** Casting that includes an intersection (e.g., `as typeof Deno & { ... }`) is permitted to extend global or core namespaces with additional properties.
-- **Always name it.** If a type doesn't exist yet, create one explicitly. When
-  the keys are known, prefer specific interfaces over `Record<string, …>`.
-- **No `Record<string, any>`.** This type is extremely weak and effectively
-  re-introduces `any` for every property. Define a precise interface or type
-  alias describing the expected shape.
+Keep type evidence. A type that names the real shape lets the compiler find mistakes. A weak type, a cast,
+or a suppression hides them.
 
-- **No `Record<string, unknown>` or `{ [key: string]: unknown }`.** Both are prohibited. Instead:
-  - Define a specific interface describing the expected shape
-  - Use a type alias for known structures (but not as a mask for `Record<string, unknown>` or `{ [key: string]: unknown }`)
-  - Use generics with constraints when the structure varies
-  - When the structure is truly dynamic, use a runtime schema validator (e.g., Zod) and narrow from `unknown` at the point of access
+### Annotate and name every type
 
-- **No masking type aliases.** Do not create type aliases that simply mask or rename `Record<string, unknown>` or `{ [key: string]: unknown }` (e.g., `type CopilotObject = Record<string, unknown>`). This is strictly prohibited. Always define a specific interface or use runtime validation and proper narrowing.
+- Give every variable, parameter, return value, and data structure an explicit type. Do not use inference to
+  avoid writing a type.
+- When a type does not exist yet, create it. When the keys of an object are known, write an interface
+  instead of `Record<string, …>`.
 
-These rules are referenced by multiple existing checklists (pre‑commit, CI,
-etc.). Whether a rule blocks the build depends on its severity in the rule catalog.
+### No `any`
 
-### No Re-exporting {#no-re-exporting}
+- Do not write `any`, explicit or implicit. Use a generic (`<T>`), a named interface, or a type inferred from
+  a schema such as Zod.
+- Do not cast with `as any`. Use a type guard, narrow the value, or define the correct type.
+- Do not silence the built-in `no-explicit-any` rule with a `deno-lint-ignore` comment. Fix the type.
 
-Exporting entities imported from other modules is prohibited. Each module must only export the entities it definitionally contains (classes, functions, interfaces, etc., defined within the file). This maintains clear module boundaries and avoids "barrel" files which can obfuscate the origin of symbols and complicate dependency analysis.
+### No `unknown` as a stored type
 
-**Prohibited:**
+`unknown` is for values you have not checked yet. It must not describe data that your code keeps.
 
-```ts
-export { Foo } from "./bar.ts"; // ❌ Inline re-export
-export * from "./bar.ts"; // ❌ Wildcard re-export
+- Use `unknown` only for a `catch` binding, the subject of a type-predicate function, and a generic
+  constraint.
+- Do not use `unknown` for a parameter, a return type, a field, or an alias. Name the shape with an
+  interface or a type alias.
+- When the shape is truly dynamic, validate the value with a runtime schema at the point of access and
+  narrow it there.
+- Do not rename `unknown` with an alias such as `type UnknownValue = unknown`. The alias hides the weak type
+  without making it stronger.
 
-import { Baz } from "./qux.ts";
-export { Baz }; // ❌ Explicit re-export
-```
+### No weak dictionaries
 
-**Allowed exception:** package entrypoint files like `mod.ts` or `index.ts` may re-export public interfaces, types, or values defined in other modules within the same package to expose the package's public API. This is only allowed for same-package modules owned by that package root surface; re-exporting from external packages, repo root retired `src/*` paths, or another package's source directories remains prohibited. This restriction is enforced as `[src-barrel-re-export]` for barrel files under the retired `src/`.
+Do not use `Record<string, any>`, `Record<string, unknown>`, `{ [key: string]: unknown }`, or a `Map` with
+a value type of `any`, `unknown`, `object`, or `{}`. Each one lets every property escape type checking.
 
-**Prohibited in package entrypoints:**
+- Define an interface that lists the expected members.
+- Use a generic with a constraint when the shape varies.
+- A generic constraint, such as `T extends Record<string, unknown>`, is allowed.
+- Do not hide a weak dictionary behind an alias such as `type Payload = Record<string, unknown>`.
 
-```ts
-export * from "../../apps/other_app/src/some_export.ts";
-```
+### Type assertions
 
-Package entrypoints must only expose package-local source exports, not direct imports from other packages' source trees.
+- Do not use `as typeof <variable>`. It copies a type that you did not state and acts like `any`. The only
+  default exception is `as typeof globalThis.fetch` in test code that mocks `fetch`. The catalog can allow
+  other targets.
+- An assertion that adds members through an intersection, such as `as typeof Deno & { … }`, is not a
+  `typeof` escape and is allowed.
+- Do not chain assertions, as in `value as unknown as User`. A chain discards what the compiler knows. Parse
+  the value at its boundary, or use a type guard. Test code may use two mock shapes by default,
+  `as Partial<T> as T` and `as never as T` (or `as any as T`). Each exception is an option.
+- Where a single assertion is unavoidable in production code, state the invariant in a
+  `// SAFETY: <reason>` comment before it. The marker word is an option.
+- Do not compare `typeof x === "string"` to narrow a value by shape. Use a type guard function. A
+  comparison with `"undefined"` and a comparison inside a type guard are allowed.
+- Do not spread a conditional with an empty-object branch, such as `...(flag ? { key } : {})`. It hides a
+  missing field. Build the object explicitly.
 
-<a id="no-prod-tests-dependency"></a>
+### Aliases and weak types
 
-### Multi-line Named Imports
+- Do not create an alias that only renames another alias of the same file. It adds indirection without
+  adding meaning.
+- Do not use `Promise<Response>` as a return type. Define an interface that describes the response and
+  return `Promise<YourResponse>`. Callers then know what the body holds.
+- Do not mask `Promise<Response>` behind an alias, such as `type MockFetch = () => Promise<Response>`. To
+  mock `fetch`, cast with `as typeof globalThis.fetch` in test code, define an interface for the custom mock,
+  or inject a typed dependency.
+- Do not type a parameter as `object`. It names no shape. Declare the members that the function reads.
 
-The style checker does not enforce a specific format for named imports. Use your judgment to balance readability and conciseness. `deno fmt` will automatically format imports according to its configured line width.
+### Suppressions
 
-**Example:**
+- Do not use `@ts-ignore`, `@ts-expect-error`, or `@ts-nocheck`. Fix the type error. This applies to test
+  code as well.
+- Every `deno-lint-ignore` comment for a rule of the project plugin needs a reason after the separator
+  (`--` by default).
 
-```ts
-// Single-line for a few imports
-import { BarService, FooService } from "./services.ts";
+### Rules
 
-// Multi-line for many imports (optional, for readability)
-import { BarService, BazService, FooService, QuuxService, QuxService } from "./services.ts";
-```
+| Rule                                 | Reports                                                                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `no-explicit-unknown`                | `unknown` outside a catch binding, a type-predicate subject, or a generic parameter (opt-in)  |
+| `no-unsafe-dictionary`               | `Record`, `Map`, or an index signature with a weak value type (opt-in)                        |
+| `no-typeof-escape`                   | An `as typeof <variable>` assertion outside the allowed targets (opt-in)                      |
+| `no-chained-type-assertions`         | Two or more assertions in a chain                                                             |
+| `require-safety-comment`             | A non-`const` assertion without a `SAFETY:` comment (opt-in)                                  |
+| `no-runtime-typeof`                  | A `typeof` comparison used to narrow a value (opt-in)                                         |
+| `no-conditional-empty-object-spread` | A spread of a conditional with an empty-object branch (opt-in)                                |
+| `no-pass-through-type-alias`         | An alias that names another top-level alias of the same file                                  |
+| `promise-response-return`            | `Promise<Response>` as a type annotation (opt-in)                                             |
+| `promise-response-alias`             | An alias that masks `Promise<Response>`                                                       |
+| `no-object-parameters`               | A parameter typed `object` (opt-in)                                                           |
+| `ts-suppression-pragmas`             | A `@ts-*` pragma that carries a description. The built-in `ban-ts-comment` reports the rest.  |
+| `no-forbidden-lint-ignore`           | A `deno-lint-ignore` comment for a forbidden rule. `no-explicit-any` is forbidden by default. |
+| `ignore-needs-reason`                | A `deno-lint-ignore` comment for a project rule that has no reason                            |
 
-### Dynamic Imports {#dynamic-imports}
+## Imports {#imports}
 
-Dynamic imports with `await import()` are **discouraged**. If you must use a dynamic import (for example, to load a large optional module, for conditional loading, or to break a circular dependency), you **must** document the rationale in a comment immediately above the import statement explaining why a static import is not possible or not desirable.
+Imports show where code comes from. Keep them static, explicit, and at the top of the file.
 
-**Good:**
+### Imports at the Top {#imports-at-the-top}
 
-```ts
-// Dynamic import required to break circular dependency between X and Y.
-const { Y } = await import("./y.ts");
-```
-
-**Bad:**
-
-```ts
-// No explanation for dynamic import
-const { join } = await import("@std/path");
-```
-
-The code style checker will strictly enforce that all imports appear at the top level. Dynamic imports should only be used when absolutely necessary and always provide a justification comment.
-
-### No Inline Type Imports {#no-inline-type-imports}
-
-Using `import(...)` inside a type annotation or return type — instead of a top-level `import type` statement — is **prohibited**. All imports, including type-only imports, must be explicit top-level declarations.
-
-**Prohibited:**
-
-```ts
-// ❌ Inline import inside a type annotation
-function foo(): Promise<import("./bar.ts").IBar | null> { ... }
-
-// ❌ Inline import in a method return type
-getKnowledge(alias: string): Promise<import("../shared/schemas/portal_knowledge.ts").IPortalKnowledge | null> { ... }
-```
-
-**Required:**
-
-```ts
-// ✅ Top-level import declaration
-import type { IBar } from "./bar.ts";
-import type { IPortalKnowledge } from "../shared/schemas/portal_knowledge.ts";
-
-function foo(): Promise<IBar | null> { ... }
-getKnowledge(alias: string): Promise<IPortalKnowledge | null> { ... }
-```
-
-The style checker enforces this as an **error** (`inline-type-import` rule).
-
-### No Aliasing Interfaces on Import
-
-Renaming interfaces during import (using the `as` keyword) to remove the `I` prefix or otherwise change their name is prohibited. Exported interfaces must be used with their original defined names to maintain consistency and clarity across the codebase.
-
-**Prohibited:**
-
-```ts
-import { ILogEntry as LogEntry } from "./logger.ts"; // ❌ Removing I prefix
-import { IRequest as UserRequest } from "./request.ts"; // ❌ Renaming interface
-```
-
-**Allowed:**
-
-```ts
-import { ILogEntry } from "./logger.ts";
-import { IRequest } from "./request.ts";
-```
-
-If a naming conflict occurs, it is better to refactor the local names or the conflicting modules than to alias the interfaces.
-
-Good:
-
-```ts
-import { join } from "@std/path";
-import { MyService } from "./service.ts";
-
-export class MyClass { ... }
-```
-
-Bad:
-
-```ts
-export class MyClass {
-  async method() {
-    const { join } = await import("@std/path");
-    // …
-  }
-}
-```
-
-## No Magic Values {#no-magic-values}
-
-- Never hardcode a numeric literal or a string constant in production or test
-  code: timeouts, status values, provider names, and similar values need a name.
-- Give a value that a module owns a descriptive constant in a module-scoped
-  constants file, and group related values.
-- Whenever a set of fixed strings is used (statuses, types, providers), define
-  a TypeScript `enum` in the package that owns the concept and reference it.
-  Compare against `Status.PENDING`, never against the literal string.
-- An inline union of string literals (`"a" | "b"`) is the same problem. Name the
-  union with a type alias or an enum, and use the name.
-- A named constant with the same name and the same value in two files is a
-  duplicate. Keep one owner and import it.
-
-### Automated enforcement
-
-| Check                | Detects                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `magic-literals`     | A string or number literal that repeats often enough to need a name (a whole-tree check) |
-| `magic-union-type`   | An inline union of string literals outside a named type alias                            |
-| `duplicate-constant` | A top-level constant with the same name and static value in two files                    |
-| `duplicate-type`     | An interface or object type with the same name and members in two files                  |
-
-## Imports at the Top {#imports-at-the-top}
-
-All import declarations **must** appear at the top of the file, before any type
-declaration or functional code, and **must not** be nested inside any other
-statement (a function, a conditional, or a loop). A static import is top-level only.
+Put every import declaration at the top of the file, before any type declaration or functional code. An
+import call must not sit inside another statement, such as a function, a condition, or a loop.
 
 ```ts
 if (condition) {
-  await import("./foo.ts"); // ❌ Not allowed
+  await import("./foo.ts"); // ❌ nested in a condition
 }
 
 function loadModule() {
-  return import("./bar.ts"); // ❌ Not allowed
+  return import("./bar.ts"); // ❌ nested in a function
 }
 ```
 
-A dynamic import that a module genuinely needs is allowed with a justification
-comment, as the Dynamic Imports section describes.
+A type definition must come after the last import. A static import must come before functional code.
 
-| Check                     | Detects                                                     |
-| ------------------------- | ----------------------------------------------------------- |
-| `import-inside-statement` | An import call nested inside a function, block, or loop     |
-| `import-placement`        | A static import below a type declaration or functional code |
+| Rule                      | Reports                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| `import-inside-statement` | An import call nested in a function, a block, or a loop                              |
+| `import-placement`        | A type definition above the last import, or an import below functional code (opt-in) |
+
+### Dynamic Imports {#dynamic-imports}
+
+Avoid `await import()`. Use it only to load a large optional module, to load a module under a condition, or
+to break a circular dependency. Record the reason in the place where the rule can read it: a
+`deno-lint-ignore` comment with a reason, or an allowance in the catalog.
+
+```ts
+// ✅ The reason is part of the ignore comment
+// deno-lint-ignore <plugin>/dynamic-import -- breaks the cycle between the registry and the loader
+const { Loader } = await import("./loader.ts");
+
+// ❌ No reason
+const { join } = await import("@std/path");
+```
+
+| Rule                      | Reports                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `dynamic-import`          | Any dynamic import that has no allowance in the catalog and no ignore comment |
+| `import-inside-statement` | A dynamic import nested in a function, a block, or a loop                     |
+
+An allowance in the catalog names the files that may use dynamic imports and, optionally, the specifiers that
+they may load.
+
+### No Inline Type Imports {#no-inline-type-imports}
+
+Do not name a type through an import expression inside a type annotation, as in the example below. Declare an
+`import type` at the top of the file. A `typeof` query on an import expression is allowed.
+
+```ts
+// ❌ Inline import in a type annotation
+function read(): Promise<import("./bar.ts").IBar | null> {}
+
+// ✅ Top-level import declaration
+import type { IBar } from "./bar.ts";
+function read(): Promise<IBar | null> {}
+```
+
+| Rule                 | Reports                                                  |
+| -------------------- | -------------------------------------------------------- |
+| `inline-type-import` | An import type with a member access in a type annotation |
+
+### No Re-exporting {#no-re-exporting}
+
+A module exports only what it defines. Do not forward a name that another module defines. Re-exports hide the
+origin of a symbol and make dependencies harder to trace.
+
+```ts
+export { Foo } from "./bar.ts"; // ❌ forwards a name
+export * from "./bar.ts"; // ❌ forwards every name
+
+import { Baz } from "./qux.ts";
+export { Baz }; // ❌ exports an imported name
+```
+
+Import a name from the module that defines it. A project can exempt its package entry points, such as `mod.ts`,
+so that a package can expose its public interface from one place.
+
+| Rule                 | Reports                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `re-export-imported` | `export … from`, `export *`, and an export of an imported name (opt-in) |
+
+### Named Imports
+
+The engine has no rule for the layout of named imports. Let the formatter wrap them.
+
+## No Magic Values {#no-magic-values}
+
+A value that carries meaning needs a name.
+
+- Do not write a numeric literal or a string constant in production or test code when it stands for a
+  timeout, a status, a provider name, or a similar value. Give it a descriptive constant.
+- Put a constant that one module owns in a constants file of that module, and group related values.
+- Define a fixed set of strings, such as statuses, types, and providers, as an enum or a frozen object in the
+  module that owns the concept. Compare with `Status.PENDING`, never with the literal string.
+- Name an inline union of string literals (`"a" | "b"`) with a type alias or an enum.
+- Keep one owner for a constant. A constant with the same name and the same value in two files is a duplicate.
+- Keep one owner for a type. An interface or object type with the same name and members in two files is a
+  duplicate.
+
+### How the detector counts
+
+The `magic-literals` check counts repeated string and number literals and reports a value that repeats more
+often than a threshold. A report ranks higher when a constants file already holds the value.
+
+| Scope                  | Strings          | Numbers          |
+| ---------------------- | ---------------- | ---------------- |
+| Module (within a file) | more than 3 uses | more than 4 uses |
+| Global (across files)  | more than 5 uses | more than 6 uses |
+
+These are the defaults. The catalog changes them. The detector skips these values:
+
+- Numbers: `0`, `1`, `-1`, any number with an absolute value below 100, HTTP status codes (100–599), and
+  multiples of 50 up to 1000.
+- Strings: strings shorter than 4 characters, empty and whitespace strings, `true`, `false`, `null`,
+  `undefined`, the names that `typeof` returns, words in upper case, UUIDs, semantic versions, paths and file
+  names, command-line flags, MIME types, e-mail addresses, and ids that end in a number. The catalog adds
+  project words and status words.
+- Positions: property names, values of descriptive properties (`description`, `title`, `label`,
+  `placeholder`), lists of structural names (`required`, `args`, `enum`), enum members, the value of an
+  upper-case constant, import and export paths, decorator arguments, JSX attribute values, template literal
+  parts, literal types, and element-access keys.
+- Files that end in `constants.ts` or `enums.ts` define values. They never count as uses.
+- In test files, strings that match the scaffold pattern, such as `test-…` and `mock-…`.
+
+### Rules
+
+| Check                | Reports                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `magic-literals`     | A string or number that repeats above the threshold (whole-tree check)  |
+| `magic-union-type`   | An inline union of string literals outside a named type alias (opt-in)  |
+| `duplicate-constant` | A top-level constant with the same name and static value in two files   |
+| `duplicate-type`     | An interface or object type with the same name and members in two files |
 
 ## Interface Conventions {#interface-conventions}
 
-These rules are opt-in, because they describe a naming convention that a project
-chooses.
+These rules are opt-in. They describe a naming convention that a project chooses.
 
-- **Prefix:** every exported interface starts with a capital `I` (the `prefix`
-  option changes the letter). A prefixed name makes it obvious at a glance that
-  the symbol is an interface and not a class or a type alias.
-- **Placement:** exported interfaces are declared at the top of the module,
-  right after the imports and the header comment, before any class, function, or
-  variable initialization. The API surface of a module is then visible at a glance.
-- **No rename on import:** an interface is imported under its own name. A rename
-  such as `IFoo as Foo` hides that the symbol is an interface.
+- **Prefix:** start the name of every exported interface with a capital `I`, such as `IUserService`. The
+  letter after the prefix must not be lowercase, so `Item` does not count as prefixed. The `prefix` option
+  changes the letter. The prefix shows at a glance that a symbol is an interface and not a class or an alias.
+- **Placement:** declare exported interfaces at the top of the module, after the imports and the header
+  comment and before any class, function, or variable. A reader then sees the API surface first.
+- **No rename on import:** import an interface under its own name. A rename such as `IFoo as Foo` hides the
+  interface. If two names collide, rename the local code or the other module.
 
-| Check                           | Detects                                                        |
-| ------------------------------- | -------------------------------------------------------------- |
-| `exported-interface-naming`     | An exported interface without the prefix                       |
-| `exported-interface-placement`  | An exported interface below a constant, a function, or a class |
-| `no-interface-rename-on-import` | An import specifier that renames a prefixed interface          |
+```ts
+import { ILogEntry } from "./logger.ts"; // ✅
+import { ILogEntry as LogEntry } from "./logger.ts"; // ❌ hides the interface
+```
+
+| Rule                            | Reports                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `exported-interface-naming`     | An exported interface without the prefix                                |
+| `exported-interface-placement`  | An exported interface below a constant, a function, or a class (opt-in) |
+| `no-interface-rename-on-import` | An import specifier that renames a prefixed interface (opt-in)          |
 
 ## Import Boundaries {#import-boundaries}
 
-A project describes which file groups may not import which paths as zones. A zone
-names the files it covers, the files it excepts, and the imports it denies. A deny
-entry matches the text of the specifier (a regular expression), the repository path
-that the specifier resolves to (globs), or a path outside a glob, and every
-condition that an entry gives must hold. The rule reads static imports and
-re-exports, including an import clause that spans lines.
+A project describes which files may not import which code. Each description is a zone. A zone names:
 
-| Check               | Detects                                     |
+- the files it covers (`files`) and the files it excepts (`except`), as globs;
+- the imports it denies (`deny`). Each deny entry has a message and at least one condition.
+
+A deny entry can use three conditions:
+
+- `specifier`: a regular expression that must match the text of the import specifier;
+- `target`: globs that must match the path the specifier resolves to. A relative specifier resolves against
+  the importing file. Any other specifier is matched as written;
+- `outside`: globs that the resolved path must not match.
+
+An import is denied only when every condition of an entry holds. The message can use `{specifier}` and
+`{target}`. The rule reads static imports and re-exports, including a clause that spans several lines.
+Malformed regular expressions fail when the catalog is parsed.
+
+| Rule                | Reports                                     |
 | ------------------- | ------------------------------------------- |
 | `import-boundaries` | An import that a zone of the catalog denies |
 
 ## Module Order {#module-order}
 
-Every module follows this order:
+Every module follows the same order.
 
-1. **Header comment:** a brief description of the module.
+1. **Header comment:** a short description of the module. It starts within the first lines of the file. The
+   `maxStartLine` option sets how many (5 by default).
 1. **Imports:** all import declarations.
-1. **Exports:** all exported interfaces, types, and enums.
+1. **Exported types:** interfaces, types, and enums.
 1. **Functional code:** classes, functions, and variable initializations.
 
-| Check                   | Detects                                            |
-| ----------------------- | -------------------------------------------------- |
-| `require-module-header` | A module that does not start with a header comment |
-| `import-placement`      | An import below a type or functional code          |
+| Rule                           | Reports                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------- |
+| `require-module-header`        | A module that does not start with a header comment                        |
+| `import-placement`             | A type definition above the last import, or an import below code (opt-in) |
+| `exported-interface-placement` | An exported interface below functional code (opt-in)                      |
 
 ## Test Fixtures {#test-fixtures}
 
-A multi-line structured input (YAML, markdown, JSON, or a TOML document) in a test
-belongs in a fixture file that the test loads, not in an inline template string.
-The `test-inline-multiline-fixture` check reports a named template of the
-configured size, and a template that opens a document, wherever it appears.
+Put a multi-line structured input, such as YAML, Markdown, JSON, or a TOML document, in a fixture file that
+the test loads. Do not write it as an inline template string.
+
+The `test-inline-multiline-fixture` check reports a template string in a test file when one of these holds:
+
+- it is assigned to a variable with a name such as `markdown`, `yaml`, `json`, `input`, `payload`, `text`, or
+  `content`, it has no interpolation, and it has at least 7 lines;
+- it starts a document, such as a TOML table header or a `schema_version:` key;
+- it has no interpolation, has at least 7 lines, and its first line starts with `---` or `#`.
+
+The minimum line count, the variable names, and the fixture directory in the message are options.
+
+## Test Assertions {#test-assertions}
+
+Write assertions that show the failing value.
+
+- Do not wrap a string or array check in a boolean assertion. Use a dedicated assertion, such as
+  `assertStringIncludes(text, part)` or `assertArrayIncludes(list, [item])`, instead of
+  `assert(text.includes(part))`.
+- Do not repeat an assertion on the same call in two adjacent statements. Assert once on the result, or assert
+  on the value that differs.
+- Do not assert on a substring that restates an imported constant as a literal. Assert on the value of the
+  constant, or on the behavior that uses it.
+
+| Rule                           | Reports                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| `no-boolean-assert`            | `assert(x.includes(y))` and `assertEquals(x.includes(y), true)` (opt-in)   |
+| `no-repeated-assert-call`      | Two adjacent assertions that take the same call as first argument (opt-in) |
+| `no-constant-substring-assert` | A substring assertion that restates an imported constant (opt-in)          |
 
 ## Deno Scripts {#deno-scripts}
 
-- A runnable script starts with the Deno shebang `#!/usr/bin/env -S deno run -A`
-  on line 1, before any header comment (`require-deno-shebang`).
-- The header of a script holds a `Usage:` section with at least one example
-  command (`require-script-usage`).
+- A runnable script starts with the Deno shebang `#!/usr/bin/env -S deno run -A` on line 1, before the header
+  comment. The `shebang` option changes the line.
+- The header of a script has a `Usage:` section with at least one example command. The section must appear in
+  the first 15 lines of the file by default.
+
+| Rule                   | Reports                                               |
+| ---------------------- | ----------------------------------------------------- |
+| `require-deno-shebang` | A file whose first line is not the shebang            |
+| `require-script-usage` | A script with a header but without a `Usage:` section |
 
 ## Function & Method Complexity {#complexity-rules}
 
-- **Parameter Limit:** Functions and methods **must not** exceed **7 parameters**.
-- If a method requires 8 or more parameters, it **must** be refactored to use:
-  - A structured **Parameter Object** (a dedicated interface for the arguments).
-  - A shared context object (like `IApplicationContext`).
-  - Smaller, more focused methods.
-- This rule applies to constructors, regular functions, and class methods alike. Refactoring into a parameter object improves readability, maintainability, and makes it easier to add optional parameters in the future.
+Keep functions and classes small enough to read in one pass.
 
-### REDUNDANT_OPTIONAL — param is `?` but all callers pass it
+- **Parameters:** a function, method, or constructor takes at most 7 parameters. For more, pass a parameter
+  object (an interface that describes the arguments), pass a shared context object, or split the function.
+- **Cyclomatic complexity:** a function scores 1 plus one for each `if`, loop, `catch`, conditional
+  expression, `case` with a test, and `&&` or `||` operator. The default limit is 15. Nested functions are
+  scored on their own.
+- **Class size:** a class of at least 200 lines gets a score from its method count, constructor parameters,
+  length, longest method, imports, and fields. A score of 60 or more is a god object. Split it into focused
+  classes.
 
-A parameter declared optional that **every** production caller supplies a value
-for should be required. The `?` misleads readers into thinking the caller has a
-choice when in practice no caller ever omits it.
+| Rule                        | Reports                                                 |
+| --------------------------- | ------------------------------------------------------- |
+| `max-params`                | A function with more parameters than the limit (opt-in) |
+| `max-cyclomatic-complexity` | A function whose complexity exceeds the limit           |
+| `max-class-size`            | A class whose size score reaches the threshold (opt-in) |
 
-```ts
-// ❌ REDUNDANT — all callers pass `logger`, so it's never truly optional
-function doSomething(task: string, logger?: ILogger) { ... }
-// call site: doSomething("x", logger)  ← always passes logger
+## Optional Parameters {#optional-parameters}
 
-// ✅ Correct — required parameter
-function doSomething(task: string, logger: ILogger) { ... }
-```
+A `?` on a parameter says that a caller may leave it out. When the call sites disagree, the `?` misleads the
+reader or hides a wiring gap. The whole-tree `optional-params` check compares each optional parameter with
+every call site that has the same name.
 
-### UNUSED_OPTIONAL — param is `?`, used in body, but no caller passes it
+### Redundant optional
 
-The most dangerous pattern. A parameter is marked optional, referenced in the
-function body (so changing it would change behavior), yet **zero** production
-callers supply a value. This is either:
-
-1. **A wiring gap** — the value was meant to be injected but never connected.
-1. **Dead code** — the parameter is consumed by default-value logic that always
-   fires. Either way, the `?` is a red flag.
+The parameter is optional, but every caller passes it. Make it required.
 
 ```ts
-// 🔴 UNUSED — body uses `delegateProviderEnv` but no caller passes it
-async launch(launch: ISessionLaunch, traceId: string, delegateProviderEnv?: Record<string, string>) {
-  const childEnv = delegateProviderEnv ? mergeDelegateEnv(sanitizedEnv, delegateProviderEnv) : sanitizedEnv;
-  // ...
-}
-// all callers: launcher.launch(launch, traceId)  ← never passes delegateProviderEnv
+// ❌ Every caller passes logger
+function run(task: string, logger?: ILogger) {}
+
+// ✅ Required
+function run(task: string, logger: ILogger) {}
 ```
+
+### Unused optional
+
+The parameter is optional and the body reads it, but no caller passes it. This is the most dangerous case.
+Either the value was meant to be injected and the wiring is missing, or the default branch is dead code.
+Find which one and fix it.
+
+### Marked, not optional
+
+The parameter uses the optional wrapper, described below, but has neither `?` nor a default value. The wrapper
+then states something false. A wrapped parameter that a required parameter follows is fine, because `?` cannot
+precede a required parameter.
+
+### Bare optional
+
+The parameter is optional through a bare `?` or `| undefined`, without the wrapper. The wrapper records why
+the parameter is optional. The full-tree check reports this case as advice. The staged-file mode of the check enforces it, and the
+opt-in `require-optional-wrapper` rule finds it during linting.
+
+### The optional wrapper
+
+A project can define a wrapper type, `Opt` by default, that takes the parameter type and a reason from a
+closed set: `Opt<T, Reason.X>`. The wrapper is `T | undefined` at run time. A wrapped parameter is exempt from
+the call-site checks, because the reason shows that someone reviewed the choice.
 
 ### Guidelines
 
-1. **Prefer required by default.** A parameter should only be `?` when there is
-   at least one known production call site that omits it. Speculative
-   "future-proofing" with `?` is the leading cause of both anti-patterns.
+1. **Prefer required.** Mark a parameter optional only when at least one known production call site omits it.
+   Optionality added for the future is the main cause of the two dangerous cases.
+1. **A default is not optionality.** When a parameter has a default and every caller passes a value, remove
+   the default and the `?`.
+1. **`| undefined` is not optionality.** `param: T | undefined` still forces every caller to pass a value.
+   Use `param?: T` for a real option, wrapped as above.
+1. **Do not use `?` to hide size.** When a function takes too many parameters, use a parameter object
+   instead of making some of them optional. See [Function & Method Complexity](#complexity-rules).
 
-1. **Defaults are not optionality.** When a parameter has a default value but
-   every production caller provides it anyway, remove the `?` and make it
-   required. The default adds noise when it never triggers.
-
-1. **`| undefined` is not optionality.** Writing `param: T | undefined` instead
-   of `param?: T` does not make the parameter optional — callers must still
-   pass `undefined` explicitly. Use `?` for true optionality, and add `Opt`
-   to document why.
-
-1. **Reveal root cause, don't use `?` as a Band-Aid.** If a function has too
-   many parameters and you're tempted to mark some optional, refactor to a
-   parameter object instead (see Function & Method Complexity).
+| Check or rule              | Reports                                         |
+| -------------------------- | ----------------------------------------------- |
+| `optional-params`          | The four cases above (whole-tree check)         |
+| `require-optional-wrapper` | A bare `?` or `\| undefined` parameter (opt-in) |
 
 ## Comment Discipline {#comment-discipline}
 
-Code must be self-explanatory in the vast majority of cases: clear naming,
-small functions, and obvious control flow do the job a comment would
-otherwise have to do. Insert a comment only when the code's quality would
-genuinely be worse without it — a non-obvious invariant, a subtle
-constraint, or a workaround for a specific bug, not a restatement of what
-the next line already says.
+Clear names, small functions, and simple control flow replace most comments. Write a comment only when the code
+would be worse without it: a non-obvious invariant, a subtle constraint, or a workaround for a specific
+bug. Do not restate what the next line says.
 
-- **No multiline in-module comments longer than three lines.** A block
-  comment (`/* … */`, `/** … */`) or a run of consecutive `//` lines that
-  spans more than three physical lines, anywhere past the module's own
-  header comment, is a violation. If an explanation genuinely needs more
-  than three lines, it belongs in the module's own documentation (a
-  README or the project's design documentation) — not inline in the source.
-- **No ephemeral implementation history.** A comment must not reference a
-  plan phase/step number, a specific GAP identifier (e.g. `GAP-1`, `GAP #2`),
-  pre/post-gap analysis notes, narrate what was tried and abandoned, or explain
-  what previously didn't work. That belongs in the commit message and the
-  phase-plan doc, which are the durable record of _why_; the code itself is
-  only a record of _what it does now_. This does not apply to the module's
-  own header comment, whose plan reference is a distinct, mandatory field of
-  the header (see Module Order).
-- **No plan-phase numbers in test file names.** A test file's own name
-  (`*_test.ts` / `*.test.ts`, or any file under a `tests/` directory) must
-  not embed a numbered plan-phase reference (`phase147_...`,
-  `phase_2_...`) — the same ephemeral-history problem as in a comment,
-  just moved into the path. Name the file after the behavior it verifies;
-  the phase-plan doc is the durable record of which phase introduced it.
-  This does **not** apply to the bare word "phase" or to "step" in any
-  form (with or without a number) — "step" is an established domain term
-  in this codebase (flow/execution steps, `PhaseStepManifestParser`, step
-  durability) independent of plan-phase numbering, and banning it would
-  flag dozens of correctly-named files.
-- **No calendar dates in any comment.** Dates are ephemeral context and must
-  not survive in code comments in numeric, ISO, compact, named-month,
-  month/year, quarter/year, or date-time form. Put time-specific history in
-  version control or project documentation. Unlike the other in-module
-  comment-discipline rules, this applies to inline comments and the module's
-  own header comment as well as standalone line and block comments. Date-shaped
-  runtime strings and other executable data are not comments and remain valid.
-- **No document-section references.** A comment must not cite a section
-  number via the `§` symbol — neither a phase-plan/spec section (e.g. `§5.9`,
-  `(§6.1, F12)`) nor a section of this file or another project doc (e.g.
-  a section of a style guide). Restate the rule or rationale in the comment's own
-  words instead of pointing at a section number, which drifts silently as
-  documents are restructured.
-- **No decorative comment separators.** A comment line must not use a run
-  of repeated punctuation as a banner or wrapper — `// ============`,
-  `// ---------------`, `// ─────────────`, or text wrapped in dashes like
-  `// ===== Section =====`. These add characters without adding meaning.
-  Write a plain, undecorated comment for a section label (`// Helpers`)
-  instead of dressing it up.
-- **Long or stale comments must be cut, not kept.** When a comment grows
-  past what these rules allow, either delete it — most code is clear
-  without it — or rewrite it as a short, concrete statement of the one
-  non-obvious fact a reader needs.
+- **Keep in-module comments short.** A block comment or a run of `//` lines longer than three lines is a
+  violation, after the module header. Put a longer explanation in the documentation of the module.
+- **Leave out implementation history.** A comment must not narrate what was tried and abandoned, or what did
+  not work. The commit message and the plan document record why. The code records what it does now. A
+  project can add phrases to check, such as plan phase numbers, issue identifiers, or section numbers.
+- **Do not cite a document section by number.** Section numbers drift when documents change. Restate the rule
+  in the comment's own words.
+- **Leave out calendar dates.** Dates are ephemeral. The rule checks numeric, ISO, compact, named-month, and
+  quarter forms, in every comment including the module header. Date-like strings in executable code are not
+  comments and stay valid.
+- **Do not decorate.** A comment must not use a run of repeated punctuation as a banner, such as
+  `// ======` or `// ----- Section -----`. Write a plain label, such as `// Helpers`.
+- **Name test files after behavior.** A test file name must not contain a numbered plan phase, such as
+  `phase147_…`. The words "phase" and "step" without a number are fine, because they are domain terms.
+- **Cut long or stale comments.** Delete the comment, or rewrite it as one short statement of the non-obvious
+  fact.
+
+| Rule                 | Reports                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `long-comment`       | A comment longer than the line limit, after the header (opt-in)                                                                  |
+| `ephemeral-comment`  | A calendar date, or a phrase from the configured list (opt-in). The default phrases name prior attempts: "tried", "didn't work". |
+| `decorative-comment` | A comment line with repeated-punctuation separators                                                                              |
+| `ephemeral-filename` | A test file name that contains a numbered plan phase                                                                             |
