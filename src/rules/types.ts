@@ -8,6 +8,7 @@
  */
 
 import type { JsonValue } from "../engine/catalog.ts";
+import type { IRuleMeta } from "./meta.ts";
 
 /** The Deno lint visitor type, derived because the namespace exports no `Visitor`. */
 export type LintVisitor = ReturnType<Deno.lint.Rule["create"]>;
@@ -26,6 +27,8 @@ export interface IPluginRuleContext {
 }
 
 export interface IPluginRule {
+  /** Description, category, guide anchor, preset, and limits of the rule. */
+  readonly meta: IRuleMeta;
   create(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor;
 }
 

@@ -4,7 +4,7 @@
  * @description The TypeScript and Deno rule packs: the plugin rules the engine ships, keyed by bare rule key.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [src/engine/registry.ts, src/rules/rule_options.ts]
+ * @related-files [src/engine/registry.ts, src/rules/rule_options.ts, src/rules/meta.ts]
  */
 
 import { createNoChainedTypeAssertions } from "./no_chained_type_assertions.ts";
@@ -58,41 +58,360 @@ import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.t
 export const TYPESCRIPT_RULE_PACK: IRulePack = {
   name: "typescript",
   rules: {
-    "no-chained-type-assertions": { create: createNoChainedTypeAssertions },
-    "no-explicit-unknown": { create: createNoExplicitUnknown },
-    "no-unsafe-dictionary": { create: createNoUnsafeDictionary },
-    "no-typeof-escape": { create: createNoTypeofEscape },
-    "no-pass-through-type-alias": { create: createNoPassThroughTypeAlias },
-    "no-object-parameters": { create: createNoObjectParameters },
-    "require-safety-comment": { create: createRequireSafetyComment },
-    "no-runtime-typeof": { create: createNoRuntimeTypeof },
-    "no-conditional-empty-object-spread": { create: createNoConditionalEmptyObjectSpread },
-    "no-boolean-assert": { create: createNoBooleanAssert },
-    "no-repeated-assert-call": { create: createNoRepeatedAssertCall },
-    "no-constant-substring-assert": { create: createNoConstantSubstringAssert },
-    "max-cyclomatic-complexity": { create: createMaxCyclomaticComplexity },
-    "max-class-size": { create: createMaxClassSize },
-    "require-optional-wrapper": { create: createRequireOptionalWrapper },
-    "import-inside-statement": { create: createImportInsideStatement },
-    "dynamic-import": { create: createDynamicImport },
-    "inline-type-import": { create: createInlineTypeImport },
-    "re-export-imported": { create: createReExportImported },
-    "import-placement": { create: createImportPlacement },
-    "exported-interface-placement": { create: createExportedInterfacePlacement },
-    "promise-response-alias": { create: createPromiseResponseAlias },
-    "promise-response-return": { create: createPromiseResponseReturn },
-    "ts-suppression-pragmas": { create: createTsSuppressionPragmas },
-    "magic-union-type": { create: createMagicUnionType },
-    "long-comment": { create: createLongComment },
-    "ephemeral-comment": { create: createEphemeralComment },
-    "decorative-comment": { create: createDecorativeComment },
-    "max-params": { create: createMaxParams },
-    "test-inline-multiline-fixture": { create: createTestInlineMultilineFixture },
-    "require-module-header": { create: createRequireModuleHeader },
-    "ephemeral-filename": { create: createEphemeralFilename },
-    "exported-interface-naming": { create: createExportedInterfaceNaming },
-    "no-interface-rename-on-import": { create: createNoInterfaceRenameOnImport },
-    "import-boundaries": { create: createImportBoundaries },
+    "no-chained-type-assertions": {
+      meta: {
+        description: "Two or more type assertions in one chain.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "recommended",
+        limits: "Imported aliases are not resolved; only syntactic assertions in this file are seen.",
+      },
+      create: createNoChainedTypeAssertions,
+    },
+    "no-explicit-unknown": {
+      meta: {
+        description: "An unknown type outside a catch binding, a type-predicate subject, or a generic parameter.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits: "Imported aliases are not resolved; only syntactic shapes in this file are seen.",
+      },
+      create: createNoExplicitUnknown,
+    },
+    "no-unsafe-dictionary": {
+      meta: {
+        description: "A Record, Map, or index signature whose value type is weak.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits:
+          "Local aliases and union members are resolved; interfaces, mapped types, and generic alias expansion are not followed.",
+      },
+      create: createNoUnsafeDictionary,
+    },
+    "no-typeof-escape": {
+      meta: {
+        description: "An as typeof assertion outside the allowed targets.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits:
+          "Only an as typeof cast is reported; the target is compared as source text. Only test files may use an allowed target.",
+      },
+      create: createNoTypeofEscape,
+    },
+    "no-pass-through-type-alias": {
+      meta: {
+        description: "An alias that names another top-level alias of the same file.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "recommended",
+        limits: "Only aliases that name another top-level local alias are reported.",
+      },
+      create: createNoPassThroughTypeAlias,
+    },
+    "no-object-parameters": {
+      meta: {
+        description: "A parameter typed object.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits:
+          "Only a direct object annotation is checked; a default value or a local alias of object is not resolved.",
+      },
+      create: createNoObjectParameters,
+    },
+    "require-safety-comment": {
+      meta: {
+        description: "A non-const type assertion that has no safety comment.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits: "Only non-const assertions in production files are checked.",
+      },
+      create: createRequireSafetyComment,
+    },
+    "no-runtime-typeof": {
+      meta: {
+        description: "A typeof comparison that narrows a value at run time.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits: "An existence probe against undefined is allowed.",
+      },
+      create: createNoRuntimeTypeof,
+    },
+    "no-conditional-empty-object-spread": {
+      meta: {
+        description: "A spread of a conditional with an empty-object branch.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits: "Only a conditional with an empty object branch is checked.",
+      },
+      create: createNoConditionalEmptyObjectSpread,
+    },
+    "no-boolean-assert": {
+      meta: {
+        description: "A string or array check wrapped in a boolean assertion.",
+        category: "test-quality",
+        docs: "#test-assertions",
+        preset: "strict",
+        limits: "Only a direct call subject is matched; a message argument does not clear the report.",
+      },
+      create: createNoBooleanAssert,
+    },
+    "no-repeated-assert-call": {
+      meta: {
+        description: "Two adjacent assertions that take the same call as their first argument.",
+        category: "test-quality",
+        docs: "#test-assertions",
+        preset: "strict",
+        limits: "Only adjacent statements inside one block are compared; a non-block body is not scanned.",
+      },
+      create: createNoRepeatedAssertCall,
+    },
+    "no-constant-substring-assert": {
+      meta: {
+        description: "A substring assertion that restates an imported constant as a literal.",
+        category: "test-quality",
+        docs: "#test-assertions",
+        preset: "strict",
+        limits: "Only named imports are considered; a namespace or default import is not matched.",
+      },
+      create: createNoConstantSubstringAssert,
+    },
+    "max-cyclomatic-complexity": {
+      meta: {
+        description: "A function whose cyclomatic complexity exceeds the limit.",
+        category: "complexity",
+        docs: "#complexity-rules",
+        preset: "recommended",
+        limits:
+          "A switch case counts only with a test, and a logical expression only for || and &&. Nested functions are scored alone.",
+      },
+      create: createMaxCyclomaticComplexity,
+    },
+    "max-class-size": {
+      meta: {
+        description: "A class whose size score reaches the threshold.",
+        category: "complexity",
+        docs: "#complexity-rules",
+        preset: "strict",
+        limits: "The score is per class; a class under the minimum line count is skipped before scoring.",
+      },
+      create: createMaxClassSize,
+    },
+    "require-optional-wrapper": {
+      meta: {
+        description: "An optional parameter that the wrapper convention does not declare.",
+        category: "optional-parameters",
+        docs: "#optional-parameters",
+        preset: "opt-in",
+        limits: "Only function, method, and constructor parameters are checked.",
+      },
+      create: createRequireOptionalWrapper,
+    },
+    "import-inside-statement": {
+      meta: {
+        description: "An import call nested in a function, a block, or a loop.",
+        category: "imports",
+        docs: "#imports-at-the-top",
+        preset: "recommended",
+        limits: "Only a dynamic import call is inspected.",
+      },
+      create: createImportInsideStatement,
+    },
+    "dynamic-import": {
+      meta: {
+        description: "A dynamic import with no catalog allowance.",
+        category: "imports",
+        docs: "#dynamic-imports",
+        preset: "strict",
+        limits: "An allowance names the files that may load a specifier; an empty specifier list allows every target.",
+      },
+      create: createDynamicImport,
+    },
+    "inline-type-import": {
+      meta: {
+        description: "An import() type with a member access inside a type annotation.",
+        category: "imports",
+        docs: "#no-inline-type-imports",
+        preset: "recommended",
+        limits: "A typeof query on an import expression is allowed.",
+      },
+      create: createInlineTypeImport,
+    },
+    "re-export-imported": {
+      meta: {
+        description: "An export that forwards a name another module defines.",
+        category: "imports",
+        docs: "#no-re-exporting",
+        preset: "strict",
+        limits: "Only named imports are tracked; a namespace or default import is not matched.",
+      },
+      create: createReExportImported,
+    },
+    "import-placement": {
+      meta: {
+        description: "A type definition above the last import, or an import below code.",
+        category: "imports",
+        docs: "#imports-at-the-top",
+        preset: "strict",
+        limits: "A type definition above the last import and an import below functional code are reported.",
+      },
+      create: createImportPlacement,
+    },
+    "exported-interface-placement": {
+      meta: {
+        description: "An exported interface below functional code.",
+        category: "interfaces",
+        docs: "#interface-conventions",
+        preset: "opt-in",
+        limits: "Only an exported interface below the first functional statement is reported.",
+      },
+      create: createExportedInterfacePlacement,
+    },
+    "promise-response-alias": {
+      meta: {
+        description: "A type alias that masks Promise<Response>.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "recommended",
+        limits: "A direct alias body or a function return type is inspected; nested references are not followed.",
+      },
+      create: createPromiseResponseAlias,
+    },
+    "promise-response-return": {
+      meta: {
+        description: "A Promise<Response> type annotation.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "strict",
+        limits: "A function type alias body is exempt; only a direct type annotation is reported.",
+      },
+      create: createPromiseResponseReturn,
+    },
+    "ts-suppression-pragmas": {
+      meta: {
+        description: "A @ts-ignore, @ts-expect-error, or @ts-nocheck comment with a description.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "recommended",
+        limits: "Only a pragma that carries a description is reported; the built-in ban-ts-comment reports the rest.",
+      },
+      create: createTsSuppressionPragmas,
+    },
+    "magic-union-type": {
+      meta: {
+        description: "An inline union of string literals outside a named type alias.",
+        category: "magic-values",
+        docs: "#no-magic-values",
+        preset: "strict",
+        limits: "A union that is the whole alias body, possibly inside parentheses or a wider union, is allowed.",
+      },
+      create: createMagicUnionType,
+    },
+    "long-comment": {
+      meta: {
+        description: "A comment block longer than the line limit, after the module header.",
+        category: "comments",
+        docs: "#comment-discipline",
+        preset: "strict",
+        limits: "Only comment runs after the module header are measured.",
+      },
+      create: createLongComment,
+    },
+    "ephemeral-comment": {
+      meta: {
+        description: "A comment with a calendar date or a configured prior-attempt phrase.",
+        category: "comments",
+        docs: "#comment-discipline",
+        preset: "strict",
+        limits: "Dates and phrases are matched in comments only; executable strings stay valid.",
+      },
+      create: createEphemeralComment,
+    },
+    "decorative-comment": {
+      meta: {
+        description: "A comment line with a repeated-punctuation banner separator.",
+        category: "comments",
+        docs: "#comment-discipline",
+        preset: "recommended",
+        limits: "Only a run of four or more repeated punctuation characters is reported.",
+      },
+      create: createDecorativeComment,
+    },
+    "max-params": {
+      meta: {
+        description: "A function, method, or constructor with more parameters than the limit.",
+        category: "complexity",
+        docs: "#complexity-rules",
+        preset: "strict",
+        limits: "Only function, method, and constructor declarations are counted.",
+      },
+      create: createMaxParams,
+    },
+    "test-inline-multiline-fixture": {
+      meta: {
+        description: "A multi-line structured input written as an inline template in a test.",
+        category: "test-quality",
+        docs: "#test-fixtures",
+        preset: "strict",
+        limits: "A template with interpolation is never reported; the minimum line count and names are options.",
+      },
+      create: createTestInlineMultilineFixture,
+    },
+    "require-module-header": {
+      meta: {
+        description: "A module that does not start with a header comment.",
+        category: "module-structure",
+        docs: "#module-order",
+        preset: "opt-in",
+        limits: "The header must start within the configured number of first lines.",
+      },
+      create: createRequireModuleHeader,
+    },
+    "ephemeral-filename": {
+      meta: {
+        description: "A test file name that contains a numbered plan phase.",
+        category: "comments",
+        docs: "#comment-discipline",
+        preset: "recommended",
+        limits: "Only test file names are matched against the phase pattern.",
+      },
+      create: createEphemeralFilename,
+    },
+    "exported-interface-naming": {
+      meta: {
+        description: "An exported interface that does not use the configured prefix.",
+        category: "interfaces",
+        docs: "#interface-conventions",
+        preset: "opt-in",
+        limits: "Only exported interfaces are checked; the prefix is an option.",
+      },
+      create: createExportedInterfaceNaming,
+    },
+    "no-interface-rename-on-import": {
+      meta: {
+        description: "An import that renames a prefixed interface.",
+        category: "interfaces",
+        docs: "#interface-conventions",
+        preset: "opt-in",
+        limits: "Only a named import of a prefixed interface is compared.",
+      },
+      create: createNoInterfaceRenameOnImport,
+    },
+    "import-boundaries": {
+      meta: {
+        description: "An import that a configured zone denies.",
+        category: "boundaries",
+        docs: "#import-boundaries",
+        preset: "opt-in",
+        limits: "The rule reads static imports and re-exports; a malformed regular expression fails catalog parsing.",
+      },
+      create: createImportBoundaries,
+    },
   },
   optionSchemas: TYPESCRIPT_OPTION_SCHEMAS,
 };
@@ -101,10 +420,46 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
 export const DENO_RULE_PACK: IRulePack = {
   name: "deno",
   rules: {
-    "ignore-needs-reason": { create: createIgnoreNeedsReason },
-    "no-forbidden-lint-ignore": { create: createNoForbiddenLintIgnore },
-    "require-deno-shebang": { create: createRequireDenoShebang },
-    "require-script-usage": { create: createRequireScriptUsage },
+    "ignore-needs-reason": {
+      meta: {
+        description: "A deno-lint-ignore comment for a plugin rule with no reason.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "recommended",
+        limits: "Only ignores that name a plugin rule are checked.",
+      },
+      create: createIgnoreNeedsReason,
+    },
+    "no-forbidden-lint-ignore": {
+      meta: {
+        description: "A deno-lint-ignore comment for a forbidden rule.",
+        category: "type-safety",
+        docs: "#strict-type-safety",
+        preset: "recommended",
+        limits: "The default forbidden list contains no-explicit-any; file-wide ignores are included unless disabled.",
+      },
+      create: createNoForbiddenLintIgnore,
+    },
+    "require-deno-shebang": {
+      meta: {
+        description: "A file whose first line is not the Deno shebang.",
+        category: "scripts",
+        docs: "#deno-scripts",
+        preset: "opt-in",
+        limits: "Only the first line is read.",
+      },
+      create: createRequireDenoShebang,
+    },
+    "require-script-usage": {
+      meta: {
+        description: "A script header without a Usage section and an example command.",
+        category: "scripts",
+        docs: "#deno-scripts",
+        preset: "opt-in",
+        limits: "The section must appear within the configured number of header lines.",
+      },
+      create: createRequireScriptUsage,
+    },
   },
   optionSchemas: DENO_OPTION_SCHEMAS,
 };

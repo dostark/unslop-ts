@@ -58,35 +58,44 @@ export const MagicLiteralOptionsSchema = z.object({
 /** Magic-literal options before defaults apply. */
 export type IMagicLiteralInput = z.input<typeof MagicLiteralOptionsSchema>;
 
+/** Options of the optional-parameter check. Every field is project-specific, so none has a default. */
+export const OptionalParamsSettingsSchema = z.object({
+  wrapperType: z.string(),
+  wrapperImport: z.string(),
+  reasonExamples: z.array(z.string()),
+  testSegments: z.array(z.string()),
+  testSuffixes: z.array(z.string()),
+  skipSegments: z.array(z.string()),
+  walkSkipSegments: z.array(z.string()),
+  /** Catalog id of the plugin rule that enforces the wrapper on staged files. */
+  pluginRuleId: z.string(),
+}).strict();
+
+/** Options of the unused-exports check. Every field is project-specific, so none has a default. */
+export const UnusedExportsSettingsSchema = z.object({
+  productionRoots: z.array(z.string()),
+  testSegments: z.array(z.string()),
+  testSuffixes: z.array(z.string()),
+  entrypointSuffixes: z.array(z.string()),
+  mainEntrypointSuffixes: z.array(z.string()),
+  scriptRoot: z.string(),
+  walkSkipPatterns: z.array(z.string()),
+  strictSkipPrefixes: z.array(z.string()),
+  strictSkipSegments: z.array(z.string()),
+}).strict();
+
+/** Options of the constant-restatement check. Every field is project-specific, so none has a default. */
+export const ConstantRestatementSettingsSchema = z.object({
+  constantModules: z.array(z.string()),
+  testRoots: z.array(z.string()),
+  minRestatedElements: z.number().int().positive(),
+}).strict();
+
 /** Schema of the catalog `wholeTree` section. Each section is optional, and an unknown key is rejected. */
 const WholeTreeSettingsSchema = z.object({
-  optionalParams: z.object({
-    wrapperType: z.string(),
-    wrapperImport: z.string(),
-    reasonExamples: z.array(z.string()),
-    testSegments: z.array(z.string()),
-    testSuffixes: z.array(z.string()),
-    skipSegments: z.array(z.string()),
-    walkSkipSegments: z.array(z.string()),
-    /** Catalog id of the plugin rule that enforces the wrapper on staged files. */
-    pluginRuleId: z.string(),
-  }).strict(),
-  unusedExports: z.object({
-    productionRoots: z.array(z.string()),
-    testSegments: z.array(z.string()),
-    testSuffixes: z.array(z.string()),
-    entrypointSuffixes: z.array(z.string()),
-    mainEntrypointSuffixes: z.array(z.string()),
-    scriptRoot: z.string(),
-    walkSkipPatterns: z.array(z.string()),
-    strictSkipPrefixes: z.array(z.string()),
-    strictSkipSegments: z.array(z.string()),
-  }).strict(),
-  constantRestatement: z.object({
-    constantModules: z.array(z.string()),
-    testRoots: z.array(z.string()),
-    minRestatedElements: z.number().int().positive(),
-  }).strict(),
+  optionalParams: OptionalParamsSettingsSchema,
+  unusedExports: UnusedExportsSettingsSchema,
+  constantRestatement: ConstantRestatementSettingsSchema,
   magicLiterals: MagicLiteralOptionsSchema,
 }).partial().strict();
 

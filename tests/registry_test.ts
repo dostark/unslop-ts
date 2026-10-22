@@ -7,17 +7,28 @@
  */
 
 import { assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";
+import { fromFileUrl } from "@std/path";
 import { z } from "zod";
 import {
   createRuleRegistry,
   DENO_RULE_PACK,
   type IPluginRule,
+  type IRuleMeta,
   type IRulePack,
   RuleRegistryError,
   TYPESCRIPT_RULE_PACK,
 } from "../mod.ts";
 
-const NOOP_RULE: IPluginRule = { create: () => ({}) };
+const PACKAGE_ROOT = fromFileUrl(new URL("..", import.meta.url));
+const META_FIXTURE = "tests/fixtures/meta_missing_rule.ts";
+const NOOP_META: IRuleMeta = {
+  description: "A rule with no visitor, used to probe the registry contract.",
+  category: "module-structure",
+  docs: "#module-order",
+  preset: "opt-in",
+  limits: null,
+};
+const NOOP_RULE: IPluginRule = { meta: NOOP_META, create: () => ({}) };
 const NO_OPTIONS = z.object({}).strict();
 
 function pack(name: string, keys: readonly string[]): IRulePack {
@@ -99,4 +110,14 @@ Deno.test("the Deno rule pack holds the Deno rules, each with an option schema, 
   assertEquals(Object.keys(DENO_RULE_PACK.optionSchemas).sort(), DENO_PACK_RULE_KEYS);
   const shared = Object.keys(DENO_RULE_PACK.rules).filter((key) => key in TYPESCRIPT_RULE_PACK.rules);
   assertEquals(shared, []);
+});
+
+Deno.test("existing_engine_regression", async () => {
+  const output = await new Deno.Command(Deno.execPath(), {
+    args: ["check", META_FIXTURE],
+    cwd: PACKAGE_ROOT,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  assertEquals(output.success, true, new TextDecoder().decode(output.stderr));
 });
