@@ -225,3 +225,41 @@ Deno.test("effective_equality_fails_when_a_field_is_dropped", () => {
   assertEquals(effectiveEquals(left, right), false);
   assertEquals(effectiveEquals(left, left), true);
 });
+
+Deno.test("all_edits_preserve_authored_limits", () => {
+  const limited = {
+    version: 2,
+    plugin: "demo",
+    rules: {
+      "demo/max-params": { level: "error", options: { max: 3 }, limits: "A custom limit." },
+    },
+  } as JsonValue;
+  const disabled = disableRule(limited, context(limited), "demo/max-params", "Measured later.", false);
+  assertEquals(record(record(record(disabled).rules)["demo/max-params"]).limits, "A custom limit.");
+  const enabled = enableRule(disabled, context(disabled), "demo/max-params");
+  assertEquals(record(record(record(enabled).rules)["demo/max-params"]).limits, "A custom limit.");
+  assertEquals(compiledOf(enabled).rules["demo/max-params"].meta.limits, "A custom limit.");
+
+  const set = setOption(limited, context(limited), "demo/max-params", "max", 5);
+  assertEquals(record(record(record(set).rules)["demo/max-params"]).limits, "A custom limit.");
+  const unset = unsetOption(set, context(set), "demo/max-params", "max");
+  assertEquals(record(record(record(unset).rules)["demo/max-params"]).limits, "A custom limit.");
+  assertEquals(compiledOf(unset).rules["demo/max-params"].meta.limits, "A custom limit.");
+
+  const empty = {
+    version: 2,
+    plugin: "demo",
+    rules: { "demo/max-params": { level: "error", limits: "" } },
+  } as JsonValue;
+  const emptyEdit = setOption(empty, context(empty), "demo/max-params", "max", 5);
+  assertEquals(record(record(record(emptyEdit).rules)["demo/max-params"]).limits, "");
+  assertEquals(compiledOf(emptyEdit).rules["demo/max-params"].meta.limits, "");
+
+  const plain = { version: 2, plugin: "demo", rules: { "demo/max-params": "error" } } as JsonValue;
+  const plainEdit = setOption(plain, context(plain), "demo/max-params", "max", 5);
+  assert(!JSON.stringify(plainEdit).includes('"limits"'));
+  assertEquals(
+    compiledOf(plainEdit).rules["demo/max-params"].meta.limits,
+    compiledOf(plain).rules["demo/max-params"].defaultLimits,
+  );
+});

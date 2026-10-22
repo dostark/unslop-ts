@@ -301,3 +301,41 @@ Deno.test("migrate_of_a_valid_catalog_is_unchanged", async () => {
     assertEquals(validated.code, 0, validated.stderr);
   });
 });
+
+Deno.test("limits_survive_actual_migrate_query_and_edit_routes", async () => {
+  await withV1Project(async (paths) => {
+    const catalog = structuredClone(V1_CATALOG);
+    catalog.rules["project-check"].limits = "A custom limit.";
+    await Deno.writeTextFile(paths.catalog, JSON.stringify(catalog, null, 2));
+    const migrated = await runMigrateCli(paths.dir, MIGRATE_ARGS);
+    assertEquals(migrated.code, 0, migrated.stderr);
+    const config = JSON.parse(await Deno.readTextFile(paths.config)) as {
+      rules: Record<string, { limits?: string }>;
+    };
+    assertEquals(config.rules["project-check"].limits, "A custom limit.");
+
+    const own = JSON.parse(await Deno.readTextFile(join(paths.dir, "deno.json")));
+    await Deno.writeTextFile(join(paths.dir, "examples", "lint_plugin.ts"), V2_PLUGIN_SOURCE);
+    await Deno.writeTextFile(
+      join(paths.dir, "deno.json"),
+      lintConfig(own.imports["@dostark/unslop-ts"], own.imports.zod, "./examples/lint_plugin.ts"),
+    );
+    const shown = await runDeno(
+      ["run", "--allow-read", "--allow-env", CLI_PATH, "rules", "show", "project-check", "--format=json"],
+      paths.dir,
+    );
+    assertEquals(shown.code, 0, shown.stderr);
+    const shownRule = JSON.parse(shown.stdout) as {
+      rule: { meta: { limits: string }; sources: { fields: Record<string, string> } };
+    };
+    assertEquals(shownRule.rule.meta.limits, "A custom limit.");
+    assertEquals(shownRule.rule.sources.fields.limits, "config:rules.project-check");
+
+    const edited = await runMigrateCli(paths.dir, ["rules", "set", "project-check", "threshold=3"]);
+    assertEquals(edited.code, 0, edited.stderr);
+    const after = JSON.parse(await Deno.readTextFile(paths.config)) as {
+      rules: Record<string, { limits?: string }>;
+    };
+    assertEquals(after.rules["project-check"].limits, "A custom limit.");
+  });
+});

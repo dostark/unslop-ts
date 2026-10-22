@@ -214,12 +214,6 @@ function settingFor(
   if (entry.options && Object.keys(entry.options).length > 0 && !controls.editable.includes("options")) {
     throw new ConfigError(`rules.${id}.options`, `the ${owner.engine} host does not read options`);
   }
-  if (entry.limits !== undefined && entry.limits !== owner.meta.limits) {
-    throw new ConfigError(
-      `rules.${id}.limits`,
-      "a custom engine limit has no version 2 field; align it with the rule metadata",
-    );
-  }
 
   const setting: Record<string, JsonValue> = { level: entry.severity };
   if (entry.options && Object.keys(entry.options).length > 0) {
@@ -232,6 +226,7 @@ function settingFor(
   if (entry.reason !== undefined) setting.reason = entry.reason;
   const defaultDocs = owner.engineOwned ? `${docsBase}${owner.meta.docs}` : owner.meta.docs;
   if (entry.codeStyle !== undefined && entry.codeStyle !== defaultDocs) setting.docs = entry.codeStyle;
+  if (entry.limits !== undefined && entry.limits !== owner.meta.limits) setting.limits = entry.limits;
   if (!sameList(entry.tags, [owner.meta.category])) setting.tags = entry.tags;
   if (entry.exclusionCodes !== undefined) {
     if (owner.engine !== "script") {

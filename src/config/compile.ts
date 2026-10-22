@@ -56,6 +56,7 @@ interface ISetting {
   readonly optIn: boolean;
   readonly reason: string | null;
   readonly docs: string | null;
+  readonly limits: string | null;
   readonly tags: readonly string[] | null;
   readonly exclusionCodes: Readonly<Record<string, string>> | null;
 }
@@ -108,6 +109,7 @@ interface INormalizedInput {
   readonly optIn: boolean;
   readonly reason: string | null;
   readonly docs: string | null;
+  readonly limits: string | null;
   readonly tags: readonly string[] | null;
   readonly exclusionCodes: Readonly<Record<string, string>> | null;
 }
@@ -122,6 +124,7 @@ function normalizeInput(raw: IRawSetting): INormalizedInput {
     optIn: false,
     reason: null,
     docs: null,
+    limits: null,
     tags: null,
     exclusionCodes: null,
   };
@@ -140,14 +143,27 @@ function normalizeInput(raw: IRawSetting): INormalizedInput {
     optIn: raw.optIn ?? false,
     reason: raw.reason ?? null,
     docs: raw.docs ?? null,
+    limits: raw.limits ?? null,
     tags: raw.tags ?? null,
     exclusionCodes: raw.exclusionCodes ?? null,
   };
 }
 
 function normalizeSetting(entry: IRegistryEntry, key: string, raw: IRawSetting): ISetting {
-  const { level, options, optionsSupplied, scope, include, exclude, optIn, reason, docs, tags, exclusionCodes } =
-    normalizeInput(raw);
+  const {
+    level,
+    options,
+    optionsSupplied,
+    scope,
+    include,
+    exclude,
+    optIn,
+    reason,
+    docs,
+    limits,
+    tags,
+    exclusionCodes,
+  } = normalizeInput(raw);
   const controls = entry.controls;
 
   if ((level === OFF || optIn) && !reason?.trim()) {
@@ -191,6 +207,7 @@ function normalizeSetting(entry: IRegistryEntry, key: string, raw: IRawSetting):
     optIn,
     reason,
     docs,
+    limits,
     tags,
     exclusionCodes,
   };
@@ -208,6 +225,7 @@ function presetSetting(entry: IRegistryEntry, presetId: string): ISetting {
     optIn: false,
     reason: null,
     docs: null,
+    limits: null,
     tags: null,
     exclusionCodes: null,
   };
@@ -304,6 +322,7 @@ function sourcesFor(setting: ISetting | undefined): IRuleSources {
     options: "default",
     scope: "default",
     docs: "default",
+    limits: "default",
     tags: "default",
   };
   if (!setting) return { fields };
@@ -315,6 +334,7 @@ function sourcesFor(setting: ISetting | undefined): IRuleSources {
         options: "default",
         scope: "default",
         docs: "default",
+        limits: "default",
         tags: "default",
       },
     };
@@ -323,6 +343,7 @@ function sourcesFor(setting: ISetting | undefined): IRuleSources {
   fields.options = setting.optionsSupplied ? origin : "default";
   fields.scope = setting.scope !== null ? origin : "default";
   fields.docs = setting.docs !== null ? origin : "default";
+  fields.limits = setting.limits !== null ? origin : "default";
   fields.tags = setting.tags !== null ? origin : "default";
   if (setting.include) fields.include = origin;
   if (setting.exclude) fields.exclude = origin;
@@ -344,11 +365,13 @@ function resolveRule(
   const optIn = setting?.optIn ?? true;
   const reason = setting === undefined ? NOT_ENABLED_REASON : setting.reason;
   const docs = setting?.docs ?? (entry.engineOwned ? `${config.docsBase}${entry.meta.docs}` : entry.meta.docs);
+  const limits = setting?.limits ?? entry.meta.limits;
+  const meta = limits === entry.meta.limits ? entry.meta : { ...entry.meta, limits };
   const tags = validateRuleTags(id, setting?.tags ?? [entry.meta.category], scope, config.tags);
   return {
     id,
     engine: entry.engine,
-    meta: entry.meta,
+    meta,
     configuredLevel: level,
     effectiveLevel: level,
     configuredOptions: options.configured,
@@ -362,6 +385,7 @@ function resolveRule(
     exclusionCodes: setting?.exclusionCodes ?? null,
     docs,
     tags,
+    defaultLimits: entry.meta.limits,
     controls: entry.controls,
     command: entry.command,
     sources: sourcesFor(setting),
@@ -383,7 +407,7 @@ function catalogRule(entry: IRegistryEntry, resolved: IResolvedRule): ICatalogRu
     ...(options && Object.keys(options).length > 0 ? { options } : {}),
     ...(entry.engineOwned || !exclusionCodes ? {} : { exclusionCodes: { ...exclusionCodes } }),
     tags: [...resolved.tags],
-    ...(entry.meta.limits ? { limits: entry.meta.limits } : {}),
+    ...(resolved.meta.limits === null ? {} : { limits: resolved.meta.limits }),
   };
 }
 

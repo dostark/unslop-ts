@@ -108,6 +108,7 @@ function materialize(rule: IResolvedRule, state: IMaterialized): Record<string, 
     setting.exclusionCodes = { ...state.exclusionCodes };
   }
   if (rule.docs !== defaultDocs(rule)) setting.docs = rule.docs;
+  if (rule.meta.limits !== rule.defaultLimits) setting.limits = rule.meta.limits;
   if (!sameList(rule.tags, defaultTags(rule))) setting.tags = [...rule.tags];
   return setting;
 }
@@ -123,6 +124,7 @@ export function effectiveEquals(left: IResolvedRule, right: IResolvedRule): bool
     left.reason === right.reason &&
     JSON.stringify(left.exclusionCodes) === JSON.stringify(right.exclusionCodes) &&
     left.docs === right.docs &&
+    left.meta.limits === right.meta.limits &&
     sameList(left.tags, right.tags) &&
     JSON.stringify(left.effectiveOptions) === JSON.stringify(right.effectiveOptions) &&
     JSON.stringify(left.defaultOptions) === JSON.stringify(right.defaultOptions);

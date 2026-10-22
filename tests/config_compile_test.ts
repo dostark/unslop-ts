@@ -372,3 +372,37 @@ Deno.test("a_configured_field_overrides_the_preset_origin", () => {
   assertEquals(fields.docs, "default");
   assertEquals(fields.tags, "default");
 });
+
+Deno.test("limits_override_preserves_owner_defaults_and_provenance", () => {
+  const descriptor = testDescriptor();
+  const owner = TYPESCRIPT_RULE_PACK.rules["max-params"].meta.limits;
+  const config = {
+    version: 2,
+    plugin: "demo",
+    rules: { "demo/max-params": { level: "error", limits: "A custom limit." } },
+  } as JsonValue;
+  const compiled = compileConfig(config, descriptor);
+  const rule = compiled.rules["demo/max-params"];
+  assertEquals(rule.meta.limits, "A custom limit.");
+  assertEquals(rule.defaultLimits, owner);
+  assertEquals(rule.sources.fields.limits, "config:rules.demo/max-params");
+  assertEquals(compiled.catalog.rules["demo/max-params"].limits, "A custom limit.");
+  assertEquals(TYPESCRIPT_RULE_PACK.rules["max-params"].meta.limits, owner);
+
+  const empty = compileConfig({
+    version: 2,
+    plugin: "demo",
+    rules: { "demo/max-params": { level: "error", limits: "" } },
+  } as JsonValue, descriptor);
+  assertEquals(empty.rules["demo/max-params"].meta.limits, "");
+  assertEquals(empty.catalog.rules["demo/max-params"].limits, "");
+
+  const plain = compileConfig({
+    version: 2,
+    plugin: "demo",
+    rules: { "demo/max-params": "error" },
+  } as JsonValue, descriptor);
+  assertEquals(plain.rules["demo/max-params"].meta.limits, owner);
+  assertEquals(plain.catalog.rules["demo/max-params"].limits, owner);
+  assertEquals(plain.rules["demo/max-params"].sources.fields.limits, "default");
+});

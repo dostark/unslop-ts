@@ -7,7 +7,7 @@
  * @related-files [src/config/json_schema.ts, src/config/schema.ts, src/config/compile.ts]
  */
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { ValidateFunction } from "ajv";
 import addFormatsModule from "ajv-formats";
 import { Ajv2020 } from "ajv/dist/2020.js";
@@ -53,4 +53,16 @@ Deno.test("json_schema_accepts_the_example_and_rejects_an_unknown_key", async ()
   } satisfies JsonValue;
   assertEquals(validate(unknownOption), true);
   assertThrows(() => compileConfig(unknownOption, testDescriptor()), ConfigError);
+});
+
+Deno.test("limits_schema_accepts_strings_and_rejects_other_values", () => {
+  const validate = validator();
+  const base = { version: 2, plugin: "demo" };
+  assertEquals(validate({ ...base, rules: { "demo/max-params": { level: "error", limits: "" } } }), true);
+  assertEquals(validate({ ...base, rules: { "demo/max-params": { level: "error", limits: "A limit." } } }), true);
+  assertEquals(validate({ ...base, rules: { "demo/max-params": { level: "error", limits: 3 } } }), false);
+  assertEquals(validate({ ...base, rules: { "demo/max-params": ["error", { max: 2 }] } }), true);
+  assertEquals(validate({ ...base, rules: { "demo/max-params": "error" } }), true);
+  const schema = configJsonSchema() as { properties?: { rules?: unknown } };
+  assert(schema.properties?.rules);
 });

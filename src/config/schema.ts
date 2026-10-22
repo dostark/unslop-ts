@@ -68,6 +68,7 @@ const LONG_FORM = z.object({
   optIn: z.boolean().optional(),
   reason: z.string().optional(),
   docs: z.string().optional(),
+  limits: z.string().optional(),
   tags: z.array(z.string().min(1)).optional(),
   exclusionCodes: z.record(z.string(), z.string()).optional(),
 }).strict();

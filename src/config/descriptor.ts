@@ -85,6 +85,8 @@ export interface IResolvedRule {
   readonly exclusionCodes: Readonly<Record<string, string>> | null;
   readonly docs: string;
   readonly tags: readonly string[];
+  /** The engine owner's limit, before an authored override. */
+  readonly defaultLimits: string | null;
   readonly controls: IRuleControls;
   readonly command: readonly string[] | null;
   readonly sources: IRuleSources;

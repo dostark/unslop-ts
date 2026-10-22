@@ -1,21 +1,15 @@
 /**
  * @module ConfigMigrateTest
  * @path tests/config_migrate_test.ts
- * @description Version 1 migration preserves the semantic projection, splits layout, refuses custom limits, and shrinks the large fixture.
+ * @description Version 1 migration preserves the semantic projection, splits layout, carries custom limits, and shrinks the large fixture.
  * @architectural-layer Test
  * @dependencies []
  * @related-files [src/config/migrate.ts, tests/helpers/migration_descriptor.ts, tests/cases/catalog_v1_example.json]
  */
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import { type JsonValue, NOT_ENABLED_REASON } from "../mod.ts";
-import {
-  compileConfig,
-  ConfigError,
-  migrateCatalog,
-  semanticCatalogProjection,
-  semanticCompiledProjection,
-} from "../mod.ts";
+import { assert, assertEquals } from "@std/assert";
+import { type JsonValue, NOT_ENABLED_REASON, TYPESCRIPT_RULE_PACK } from "../mod.ts";
+import { compileConfig, migrateCatalog, semanticCatalogProjection, semanticCompiledProjection } from "../mod.ts";
 import { migrationDescriptor } from "./helpers/migration_descriptor.ts";
 
 const EXAMPLE_URL = new URL("./cases/catalog_v1_example.json", import.meta.url);
@@ -108,10 +102,8 @@ Deno.test("migration_splits_layout_out", async () => {
     ...ruleOf(mutated, "demo/max-params"),
     limits: "A custom limit.",
   };
-  assertEquals(
-    assertThrows(() => migrateCatalog(mutated, descriptor), ConfigError).path,
-    "rules.demo/max-params.limits",
-  );
+  const custom = migrateCatalog(mutated, descriptor).config;
+  assertEquals(ruleOf(custom, "demo/max-params").limits, "A custom limit.");
 
   const largeText = await Deno.readTextFile(LARGE_URL);
   const large = JSON.parse(largeText) as JsonValue;
@@ -124,4 +116,27 @@ Deno.test("migration_splits_layout_out", async () => {
     semanticCompiledProjection(largeCompiled, descriptor, largeIds),
     semanticCatalogProjection(large, descriptor, largeIds),
   );
+});
+
+Deno.test("legacy_limits_round_trip_without_projection_loss", async () => {
+  const v1 = await readFixture(EXAMPLE_URL);
+  const descriptor = migrationDescriptor();
+  const ownerLimits = TYPESCRIPT_RULE_PACK.rules["max-params"].meta.limits;
+  const mutated = structuredClone(v1);
+  record(record(mutated).rules)["demo/max-params"] = {
+    ...ruleOf(mutated, "demo/max-params"),
+    limits: "A custom limit.",
+  };
+  const { config } = migrateCatalog(mutated, descriptor);
+  const compiled = compileConfig(config, descriptor);
+  const ids = originalIds(mutated);
+  assertEquals(
+    semanticCompiledProjection(compiled, descriptor, ids),
+    semanticCatalogProjection(mutated, descriptor, ids),
+  );
+  assertEquals(record(ruleOf(config, "demo/max-params")).limits, "A custom limit.");
+  assertEquals(compiled.rules["demo/max-params"].meta.limits, "A custom limit.");
+  assertEquals(compiled.rules["demo/max-params"].defaultLimits, ownerLimits);
+  assertEquals(compiled.catalog.rules["demo/max-params"].limits, "A custom limit.");
+  assertEquals(TYPESCRIPT_RULE_PACK.rules["max-params"].meta.limits, ownerLimits);
 });

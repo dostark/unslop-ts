@@ -32,6 +32,7 @@ const RULE: IResolvedRule = {
   exclusionCodes: null,
   docs: "#rule",
   tags: ["type-safety", "project"],
+  defaultLimits: null,
   controls: {
     editable: ["level"],
     fixedLevel: null,
