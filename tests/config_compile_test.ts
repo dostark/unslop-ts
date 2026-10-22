@@ -17,10 +17,12 @@ import {
   type IRuleControls,
   type IRuleMeta,
   type IScriptRuleSpec,
+  type IWholeTreeHostSpec,
   type JsonValue,
   parseCatalog,
   parseWholeTreeSettings,
   TYPESCRIPT_RULE_PACK,
+  WHOLE_TREE_CHECKS,
 } from "../mod.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
 import { TEST_REGISTRY } from "./helpers/registry.ts";
@@ -227,7 +229,7 @@ Deno.test("invalid_configs_report_the_field", () => {
           minimal(),
           testDescriptor({ wholeTreeHosts: { "magic-literals": { controls: SCRIPT_CONTROLS, command: ["x"] } } }),
         ),
-      path: "wholeTreeHosts.magic-literals",
+      path: "wholeTreeHosts.magic-literals.controls",
     },
   ];
   for (const { run, path } of cases) assertEquals(errorPath(run), path);
@@ -405,4 +407,61 @@ Deno.test("limits_override_preserves_owner_defaults_and_provenance", () => {
   assertEquals(plain.rules["demo/max-params"].meta.limits, owner);
   assertEquals(plain.catalog.rules["demo/max-params"].limits, owner);
   assertEquals(plain.rules["demo/max-params"].sources.fields.limits, "default");
+});
+
+Deno.test("whole_tree_command_overrides_do_not_widen_controls", () => {
+  const ids = [
+    "duplicate-type",
+    "duplicate-constant",
+    "magic-literals",
+    "constant-restatement",
+    "unused-exports",
+    "optional-params",
+  ] as const;
+  const hosts: Record<string, IWholeTreeHostSpec> = {};
+  for (const id of ids) {
+    hosts[id] = { controls: WHOLE_TREE_CHECKS[id].controls, command: ["deno", "task", `check:${id}`] };
+  }
+  const descriptor = testDescriptor({ wholeTreeHosts: hosts });
+  const compiled = compileConfig({ version: 2, plugin: "demo" } as JsonValue, descriptor);
+  for (const id of ids) {
+    assertEquals(compiled.rules[id].command, ["deno", "task", `check:${id}`]);
+  }
+
+  const widened = testDescriptor({
+    wholeTreeHosts: {
+      ...hosts,
+      "unused-exports": {
+        controls: { ...WHOLE_TREE_CHECKS["unused-exports"].controls, fixedScope: "prod" },
+        command: ["deno", "task", "check:unused-exports"],
+      },
+    },
+  });
+  assertEquals(
+    assertThrows(() => compileConfig({ version: 2, plugin: "demo" } as JsonValue, widened), ConfigError).path,
+    "wholeTreeHosts.unused-exports.controls",
+  );
+
+  const empty = testDescriptor({
+    wholeTreeHosts: {
+      ...hosts,
+      "magic-literals": { controls: WHOLE_TREE_CHECKS["magic-literals"].controls, command: [] },
+    },
+  });
+  assertEquals(
+    assertThrows(() => compileConfig({ version: 2, plugin: "demo" } as JsonValue, empty), ConfigError).path,
+    "wholeTreeHosts.magic-literals.command",
+  );
+
+  const duplicated = testDescriptor({
+    wholeTreeHosts: {
+      ...hosts,
+      "duplicate-type": {
+        controls: { ...WHOLE_TREE_CHECKS["duplicate-type"].controls, fixedScope: "prod" },
+        command: ["deno", "task", "check:style"],
+      },
+    },
+  });
+  const duplicatedCompiled = compileConfig({ version: 2, plugin: "demo" } as JsonValue, duplicated);
+  assertEquals(duplicatedCompiled.rules["duplicate-type"].controls.fixedScope, "prod");
 });

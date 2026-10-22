@@ -129,3 +129,11 @@ Deno.test("draft04_validator_is_test_only", () => {
   ]);
   assertEquals(purityViolations([{ path: "tests/fixture.ts", text: adapterImport }]), []);
 });
+
+Deno.test("consumer_snapshot_stays_out_of_engine", async () => {
+  const consumerPath = ["packages", ["lint", "policy"].join("-")].join("/");
+  const files = await enginePackageFiles();
+  assert(files.every((file) => !file.text.toLowerCase().includes(consumerPath.toLowerCase())));
+  const snapshotImport = `import catalog from "../../${consumerPath}/tests/fixtures/catalog_v1.json";\n`;
+  assert(purityViolations([{ path: "tests/fixture.ts", text: snapshotImport }]).length > 0);
+});

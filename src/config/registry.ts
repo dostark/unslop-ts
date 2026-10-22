@@ -67,18 +67,26 @@ function pluginEntries(descriptor: IProjectDescriptor, index: Map<string, IRegis
 }
 
 function hostSpecFor(descriptor: IProjectDescriptor, id: string): IWholeTreeHostSpec | undefined {
-  return SPECIALIZABLE_CHECKS.has(id) ? descriptor.wholeTreeHosts[id] : undefined;
+  return descriptor.wholeTreeHosts[id];
+}
+
+function sameControls(left: IWholeTreeHostSpec["controls"], right: IWholeTreeHostSpec["controls"]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function validateHostOverrides(descriptor: IProjectDescriptor): void {
-  for (const id of Object.keys(descriptor.wholeTreeHosts)) {
-    if (!(id in WHOLE_TREE_CHECKS)) {
+  for (const [id, spec] of Object.entries(descriptor.wholeTreeHosts)) {
+    const check = WHOLE_TREE_CHECKS[id as WholeTreeCheckKey];
+    if (!check) {
       throw new ConfigError(`wholeTreeHosts.${id}`, "no whole-tree check has this id");
     }
-    if (!SPECIALIZABLE_CHECKS.has(id)) {
+    if (spec.command.length === 0) {
+      throw new ConfigError(`wholeTreeHosts.${id}.command`, "a host command must not be empty");
+    }
+    if (!SPECIALIZABLE_CHECKS.has(id) && !sameControls(spec.controls, check.controls)) {
       throw new ConfigError(
-        `wholeTreeHosts.${id}`,
-        "only duplicate-type and duplicate-constant accept a host override",
+        `wholeTreeHosts.${id}.controls`,
+        "only duplicate-type and duplicate-constant may change the host controls",
       );
     }
   }
