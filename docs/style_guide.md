@@ -1,14 +1,16 @@
 # Style guide
 
 The generic TypeScript and Deno style rules that the engine checks. A project that loads the engine
-chooses which rules run, at what severity, and with which options in its rule catalog.
+chooses which rules run, at what severity, and with which options in its version 2 configuration.
 
-- Rule ids in this guide are bare keys, such as `import-placement`. The catalog lists a rule under the
-  plugin name of the project, such as `<plugin>/import-placement`.
-- A rule blocks the build only when the catalog sets it to `error`. A rule marked opt-in is off until the
+- Rule ids in this guide are bare keys, such as `import-placement`. The configuration lists a plugin rule
+  under the plugin name of the project, such as `<plugin>/import-placement`.
+- A rule blocks the build only when its effective level is `error`. A rule marked opt-in is off until the
   project turns it on.
 - Each section ends with the rules that check it. A rule can check part of a section. Sections that
   describe a convention without a rule say so.
+- Every rule declares its description, category, guide anchor, preset membership, and limits in code.
+  The CLI reads that metadata, and [the metadata section](#rule-metadata) explains statuses and hosts.
 
 ## Strict Type Safety {#strict-type-safety}
 
@@ -456,3 +458,16 @@ bug. Do not restate what the next line says.
 | `ephemeral-comment`  | A calendar date, or a phrase from the configured list (opt-in). The default phrases name prior attempts: "tried", "didn't work". |
 | `decorative-comment` | A comment line with repeated-punctuation separators                                                                              |
 | `ephemeral-filename` | A test file name that contains a numbered plan phase                                                                             |
+
+## Metadata, status, and hosts {#rule-metadata}
+
+Every rule and whole-tree check declares its description, category, guide anchor, preset membership, and
+stated limits in the engine. `unslop rules list` and `unslop rules show` read that metadata. This keeps
+the guide and the CLI aligned: every metadata anchor resolves here, and the stated rule ids and default
+limits are checked against the option schemas.
+
+A query status describes the configuration only. `active`, `parked`, `off`, and `not-selected` say
+whether the current selection enables a rule. They never change how a host runs it. Whole-tree checks
+keep their host modes: `unused-exports` warns until `--strict`, and `optional-params` warns until
+`--fail` or `--staged`. A script rule's configured level does not override a fixed host flag. The CLI
+prints the editable controls and the host modes, so the enforcement owner stays visible.

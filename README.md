@@ -1,26 +1,177 @@
 # @dostark/unslop-ts
 
-A Deno lint plugin engine for TypeScript projects. It turns a validated JSON **catalog** of style
-rules into a `Deno.lint.Plugin` that runs inside `deno lint`, so the same diagnostics appear in the
-editor, on the command line, and in a pre-commit gate.
+A Deno lint plugin engine for TypeScript projects. It turns a validated version 2 **configuration**
+into a `Deno.lint.Plugin` that runs inside `deno lint`, so the same diagnostics appear in the editor,
+on the command line, and in a pre-commit gate. A small CLI lists and explains rules, edits supported
+settings, and migrates a version 1 catalog.
 
 The engine ships two rule packs. `TYPESCRIPT_RULE_PACK` holds 35 rules for type evidence, imports,
-module layout, comments, interface conventions, test assertions, and size limits. `DENO_RULE_PACK` holds 4 rules about `deno-lint-ignore` comments and
-Deno script headers. A project can add its own packs, so project-specific rules stay in the project.
+module layout, comments, interface conventions, test assertions, and size limits. `DENO_RULE_PACK`
+holds 4 rules about `deno-lint-ignore` comments and Deno script headers. Every rule declares its
+description, category, guide anchor, preset membership, and limits in code. A project can add its own
+rule packs and script checks, so project-specific rules stay in the project.
 
 ## Use in a Deno project
 
-1. Write a version 2 configuration. `examples/unslop.config.json` is a small one. It names the
-   plugin, extends a preset, and sets rule overrides. Rule metadata and guide links come from the engine.
+1. Write a version 2 configuration. `examples/unslop.config.json` is a small one. It names the plugin,
+   extends a preset, and sets rule overrides. Rule ids are `<plugin name>/<rule key>` for plugin rules
+   and bare ids for whole-tree checks and consumer scripts.
 1. Write the project descriptor. `examples/unslop.project.ts` exports the plugin name, the rule packs,
-   and the file locations. It reads no configuration file.
+   the configuration location, and any consumer script or whole-tree host descriptors. It reads no
+   configuration file, so it stays importable when the configuration is absent or invalid.
 1. Write the plugin entry. `examples/lint_plugin.ts` compiles the configuration with
    `createUnslopProject({ descriptor, config })` and default-exports `project.plugin`.
-1. Register the entry in the project's `deno.json` with `"lint": { "plugins": ["./lint_plugin.ts"] }`,
+1. Register the entry in the project's `deno.json` with `"lint": { "plugins": ["./examples/lint_plugin.ts"] }`,
    and run `deno lint`.
-1. To run a subset locally, export `<NAME>_LINT_RULES`, where `<NAME>` is the plugin name in upper
-   case (`demo` gives `DEMO_LINT_RULES`). The value is a list of rule ids or `tag:<tag>` selectors.
+1. To run a subset locally, export `<NAME>_LINT_RULES`, where `<NAME>` is the plugin name in upper case
+   (`demo` gives `DEMO_LINT_RULES`). The value is a list of full ids, unambiguous bare keys, or
+   `tag:<tag>` selectors. The CLI `--select` and `--profile` options replace that variable for one call.
    `selectionEnvName(name)` returns the variable name.
+
+## Configuration (version 2)
+
+```json
+{
+  "version": 2,
+  "plugin": "demo",
+  "extends": ["unslop:recommended"],
+  "docsBase": "docs/style_guide.md",
+  "paths": {
+    "test": ["**/*_test.ts"],
+    "fixture": ["**/tests/fixtures/**"],
+    "ignore": [{ "glob": "**/vendor/**", "reason": "Vendored code is not reviewed." }]
+  },
+  "tags": {
+    "project-choice": { "description": "A rule choice of this project.", "requiresScope": ["prod"] }
+  },
+  "profiles": {
+    "comments": ["tag:comments"]
+  },
+  "rules": {
+    "demo/no-runtime-typeof": {
+      "level": "error",
+      "scope": "prod",
+      "options": { "allowInTypeGuards": true }
+    },
+    "demo/max-params": ["error", { "max": 5 }],
+    "demo/exported-interface-naming": {
+      "level": "off",
+      "optIn": true,
+      "reason": "Opt-in naming convention."
+    }
+  }
+}
+```
+
+- `version` must be `2`, and `plugin` must match `^[a-z][a-z0-9-]*$`.
+- `extends` lists `unslop:recommended` and/or `unslop:strict`. The order is the expansion order, and a
+  later entry for the same rule replaces the earlier one completely.
+- `docsBase` is prefixed to engine-owned guide anchors. An explicit rule `docs` value always wins, and
+  consumer script docs are never prefixed.
+- `paths.test` and `paths.fixture` become the classification globs, and each `paths.ignore` entry
+  needs a reason.
+- `tags` overrides a category description and may restrict its scope. Only tags used by an emitted rule
+  enter the compiled vocabulary.
+- `profiles` maps a name to a non-empty selector list for `--profile`.
+- `rules` accepts a level, `[level, options]`, or the long form. The long form adds `scope` (default
+  `all`), `include`, `exclude`, `options`, `optIn`, `reason`, `docs`, `tags`, and consumer-only
+  `exclusionCodes`.
+
+`off` and `optIn: true` require a non-empty reason. Plugin rules accept `error` or `off`; `deno lint`
+reports a selected plugin finding as an error. An omitted rule is registered off and opt-in with the
+reason `Not enabled by the configuration.`, so its ignore code is known to Deno.
+
+## Presets and rule metadata
+
+- Both packs: `unslop:recommended` expands 13 rules and `unslop:strict` expands 34 (the 13 plus 21).
+- TypeScript pack only: 11 and 32.
+- `unslop:strict` includes the recommended rules.
+
+Each rule's metadata drives presets, docs, and limits. `unslop rules list` shows the status, level,
+category, editable controls, and host modes. `unslop rules show <id>` adds the configured, default, and
+effective options, the per-field source, the guide anchor, and the host command.
+
+Statuses describe the configuration, not the host:
+
+- `active`: the rule is enabled and selected.
+- `parked`: the rule is off and opt-in; selecting it runs it and makes its finding an error.
+- `off`: the rule is off and cannot be selected on.
+- `not-selected`: a selection excludes the rule for this call.
+
+A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
+stays a warning until `--strict`, and `optional-params` stays a warning until `--fail` or `--staged`,
+regardless of the configured level shown by the CLI.
+
+## Project descriptor
+
+`IProjectDescriptor` holds `pluginName`, `rootUrl`, `configUrl`, `lintConfigUrl`, `pluginUrl`, `packs`,
+`scriptRules`, and `wholeTreeHosts`. A script rule supplies metadata, an option schema (or `null` for
+no options), controls, and its host command. `wholeTreeHosts` may specialize only the fixed
+applicability and command of `duplicate-type` and `duplicate-constant`. Export the descriptor from a
+project module; migration and `config validate` load it without importing the plugin or a version 2
+file.
+
+## Command line
+
+Run the CLI from a checkout with `deno task cli`, or as the package subpath `@dostark/unslop-ts/cli`.
+
+| Command                                                                        | Effect                                                                            |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `unslop rules list [--category=] [--status=] [--format=table\|json]`           | Every resolved rule with status, level, category, controls, and host modes.       |
+| `unslop rules show <id> [--format=table\|json]`                                | One rule with configured/effective/default options and per-field sources.         |
+| `unslop rules enable <id> [--level=error\|warn] [--dry-run]`                   | Set a supported level and clear obsolete off fields.                              |
+| `unslop rules disable <id> --reason=<text> [--opt-in] [--dry-run]`             | Set the level to off with a reason, optionally parking the rule for selection.    |
+| `unslop rules set <id> <option>=<json> [--dry-run]`                            | Set one supported option and preserve every other effective setting.              |
+| `unslop rules unset <id> <option> [--dry-run]`                                 | Remove one option override and use its engine default.                            |
+| `unslop presets list [--format=table\|json]`                                   | Every preset with the ids its memberships enable for the registered packs.        |
+| `unslop presets show <name> [--format=table\|json]`                            | One preset's expansion.                                                           |
+| `unslop config validate [--descriptor=<entry>]`                                | Read the file from disk and compile it against the descriptor.                    |
+| `unslop config print [--resolved] [--descriptor=<entry>]`                      | The emitted catalog, or the catalog plus the resolved index with `--resolved`.    |
+| `unslop config schema`                                                         | The generated structural JSON Schema.                                             |
+| `unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=]` | Migrate a version 1 catalog without overwriting an input or existing destination. |
+
+Query and edit routes accept `--plugin=<entry>` to select a local plugin entry. Without it, discovery
+walks to the nearest JSON `deno.json` and uses its single configured plugin; several plugins require
+`--plugin`. `--select=<tokens>` and `--profile=<name>` replace the selection variable for that call and
+cannot be combined. An unknown selector, profile, category, status, format, command, or entry is a
+usage error.
+
+Exit codes:
+
+- `0`: success.
+- `1`: invalid file content, a failed compilation or validation, or a failed write.
+- `2`: unknown or unsupported usage, a refused destination, a non-local entry, or a JSONC refusal.
+
+The CLI accepts filesystem paths and local `file:` URLs only. It rejects `data:`, remote, and registry
+schemes before import, and it refuses a JSONC lint configuration instead of parsing it. Local entries
+and their transitive imports are trusted executable project code, not a sandbox; the CLI itself does
+not request, store, or print credentials.
+
+## Editing
+
+`rules enable`, `disable`, `set`, and `unset` re-read the file on every call, validate the result by
+compiling it, and preserve unrelated rules and fields. Because an explicit entry replaces its preset
+entry completely, an edit first materializes the effective level, options, scope, include/exclude, docs,
+and tags, then changes only the target. The command writes the shortest form that compiles to the same
+effective rule.
+
+An edit refuses a control that the named host does not read, a plugin `warn` level, a missing reason,
+and an `unset` whose option has no engine default. A refused or stale edit leaves the bytes unchanged.
+A real edit locks the file, compares the current bytes and inode with the read copy, preserves the mode,
+and replaces it atomically. `--dry-run` prints a unified diff before any lock or temporary file exists.
+
+## Migration
+
+`unslop migrate` reads a version 1 catalog through the descriptor, so it works before any version 2
+file exists. It moves `scopes`, `ignore`, and `tagVocabulary` to their version 2 fields, keeps explicit
+applicability, options, docs, and tags, and maps the four whole-tree setting sections to their rule ids.
+The layout moves to a separate file and requires `--layout-out` when the input has one. An engine limit
+that differs from the rule metadata is refused instead of discarded.
+
+The pair is written without overwriting: canonical parent paths, sibling locks, staged temporary files,
+and no-clobber hard links. Layout commits first and the configuration last. If the second commit fails,
+only the layout inode created by that invocation is removed. If cleanup cannot complete, the command
+exits `1` and reports the exact surviving paths; it never reports a successful partial pair.
 
 ## Working with deno lint
 
@@ -34,64 +185,73 @@ Deno script headers. A project can add its own packs, so project-specific rules 
 - **Deno's suppression is the only suppression.** Use `// deno-lint-ignore <plugin>/<rule> -- <reason>`.
   The built-in `ban-unused-ignore` reports a stale ignore. Rules that read ignore comments report at the
   comment.
-- **Every catalog rule is known to Deno.** A rule that is off, not selected, or out of scope stays
-  registered and reports nothing, so its ignore comments are never `ban-unknown-rule-code`.
+- **Every rule is known to Deno.** A rule that is off, not selected, out of scope, or not named by the
+  configuration stays registered and reports nothing, so its ignore comments are never
+  `ban-unknown-rule-code`.
 - **Deno's rule configuration wins.** `lint.rules.exclude` and `--rules-exclude` turn a plugin rule off.
-  The catalog and `<NAME>_LINT_RULES` only narrow the run further.
+  The configuration and `<NAME>_LINT_RULES` only narrow the run further.
 - **Built-in configuration stays yours.** `unslop-ts` never writes or presets `lint.rules`. Choose the
   built-ins that fit your project, for example `no-explicit-any` with `no-typeof-escape`,
   `ban-ts-comment`, and `ban-unused-ignore`, which are in the recommended set.
 
 ## Layout
 
-- `src/engine/catalog.ts` — catalog zod schema, `parseCatalog`, `classifyPath`, `ruleSettings`.
-- `src/engine/registry.ts` — `createRuleRegistry` and the `IRulePack` contract. A rule pack groups rules
-  and their option schemas under bare rule keys.
-- `src/engine/plugin.ts` — `createLintPlugin(name, catalog, { rulePacks })` and `selectionEnvName`.
-- `src/engine/run_plugin.ts` — `runPlugin` test helper over `Deno.lint.runPlugin`.
-- `src/rules/` — rule implementations, their option schemas, and the two packs. `src/rules/deno/` holds
-  the Deno pack.
-- `src/rules/whole_tree/` — checks that need the whole tree. The Deno-only entry `@dostark/unslop-ts/whole-tree`
-  exports `findDuplicateTypes`, `findDuplicateConstants`, and `detectMagicLiterals` with their option schemas,
-  so a host script can call them in-process.
-- `src/cli/` — `rule_report.ts` ranks one rule's findings, `whole_tree.ts` runs the whole-tree rules with
-  settings from `--catalog=<path>` (`duplicate-type` and `duplicate-constant` read the `options`, `include`, and
-  `scope` of their `rules` entry, and `magic-literals` reads `wholeTree.magicLiterals`), and `rule_ceiling.ts`
-  holds per-package finding counts.
-- `examples/` — a catalog and a plugin entry for any Deno project.
-- `docs/style_guide.md` — the generic TypeScript style rules.
+- `src/engine/` — catalog parsing, path classification, the rule registry, the plugin factory, and the
+  test runner helper.
+- `src/rules/` — rule implementations, option schemas, metadata, and the two packs. `src/rules/deno/`
+  holds the Deno pack. Every pack entry carries the rule's `meta`.
+- `src/rules/whole_tree/` — the six whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
+  descriptors (metadata, controls, host command). The Deno-only entry `@dostark/unslop-ts/whole-tree`
+  exports the duplicate, constant-restatement, optional-parameter, unused-export, and magic-literal
+  checkers so a host script can call them in-process.
+- `src/config/` — the version 2 schema, descriptor contracts, pure compiler and presets, JSON Schema,
+  migration and projection, project factory, and the pure edit functions.
+- `src/cli/` — the CLI dispatcher, local module loader, selection, read and write routes, migration
+  command, safe writer, diff, and output. The older `rule_report.ts`, `whole_tree.ts`, and
+  `rule_ceiling.ts` entry points remain for one-rule reports and whole-tree hosts.
+- `examples/` — a descriptor, a version 2 configuration, and a plugin entry for any Deno project.
+- `docs/style_guide.md` — the generic TypeScript style rules and their metadata notes.
 
 ## Add a rule
 
-1. Implement `create(context, ctx)` in `src/rules/<rule>.ts` and register it in `TYPESCRIPT_RULE_PACK`
-   or, for a Deno-specific rule, `DENO_RULE_PACK` (`src/rules/mod.ts`) under its bare rule key.
+1. Implement `create(context, ctx)` in `src/rules/<rule>.ts` and add the rule to `TYPESCRIPT_RULE_PACK`
+   or `DENO_RULE_PACK` (`src/rules/mod.ts`) with its `meta`: description (at most 120 characters),
+   category, guide anchor, preset membership, and limits.
 1. Add its option schema to `TYPESCRIPT_OPTION_SCHEMAS` or `DENO_OPTION_SCHEMAS` in
    `src/rules/rule_options.ts`.
-1. Add the catalog entry `<plugin name>/<rule key>` to the catalog of the project that loads the engine.
+1. Add the anchor and the rule table row to `docs/style_guide.md`, and let the preset membership or an
+   explicit project setting enable it. Do not add project data to the engine.
 1. Add named valid and invalid cases in `tests/<rule>_test.ts`, and a case in
-   `tests/deno_builtin_overlap_test.ts`.
+   `tests/deno_builtin_overlap_test.ts`. Run `tests/rule_meta_test.ts` and `tests/style_guide_claims_test.ts`.
 
 ## Development
 
-`deno task test`, `deno task lint`, `deno task check`, and `deno task fmt --check` run in this
-repository alone. The engine tests import the package by relative path.
+`deno task test`, `deno task lint`, `deno task check`, and `deno fmt --check` run in this repository
+alone. The engine tests import the package by relative path. `deno task cli` runs the CLI from the
+checkout.
 
 ## Rule ownership and guide links
 
 The TypeScript pack owns generic checks, including configurable import-boundary zones and opt-in
 interface conventions. Consumer names, paths, severities, and rule options belong in the project's
-catalog. Default type-safety hints link to [the engine guide](docs/style_guide.md#strict-type-safety);
-a catalog `codeStyle` value replaces that link.
+configuration. Default type-safety hints link to [the engine guide](docs/style_guide.md#strict-type-safety)
+through the rule metadata; an explicit rule `docs` value replaces that link.
 
 The Deno-only whole-tree entry exports the duplicate-type, duplicate-constant, and repeated-literal
-checkers. A host script calls them in-process with catalog data. These checks are library functions,
-not per-file plugin rules.
+checkers. A host script calls them in-process with compiled settings. These checks are library
+functions, not per-file plugin rules, and their host modes remain authoritative.
+
+## Reports and consumer adoption
+
+Run reports, per-rule observed coverage, Markdown and SARIF output, and the consumer adoption are
+owned by Phase 232 of the development plan. This release documents only the commands implemented here;
+there is no `report` command yet.
 
 ## Option validation
 
-A regular expression option is checked when the catalog is parsed. A pattern that does not compile, a
-repeated or unknown flag, and a pattern that fails with its own flags are `CatalogError`s that name the
-field. The whole-tree command reports the same error and exits with code 2. The fields are the
+A regular expression option is checked when the configuration is compiled. A pattern that does not
+compile, a repeated or unknown flag, and a pattern that fails with its own flags are `ConfigError`s that
+name the field. The whole-tree command reports the same error and exits with code 2. The fields are the
 `specifiers` of `allowDynamicImports`, the `pattern` and `flags` of each `ephemeral-comment` phrase,
 the `pattern` of `ephemeral-filename`, and `testScaffoldPattern` of `wholeTree.magicLiterals`.
 
@@ -99,14 +259,10 @@ the `pattern` of `ephemeral-filename`, and `testScaffoldPattern` of `wholeTree.m
 {
   "rules": {
     "demo/ephemeral-comment": {
-      "engine": "plugin",
-      "severity": "error",
-      "scope": "all",
-      "tags": ["demo"],
+      "level": "error",
       "options": { "phrases": [{ "pattern": "\\btried\\b", "flags": "gi", "hint": "State the fact." }] }
     }
-  },
-  "wholeTree": { "magicLiterals": { "checkNumbers": false, "testScaffoldPattern": "^scaffold-" } }
+  }
 }
 ```
 
@@ -116,17 +272,16 @@ line flag is present. A host flag such as `--no-numbers` also turns them off, an
 
 ## Analysis boundaries
 
-Plugin rules run per file with no type information; imported aliases and cross-file
-signatures are not resolved. Only syntactic shapes in the linted file are seen.
+Plugin rules run per file with no type information; imported aliases and cross-file signatures are not
+resolved. Only syntactic shapes in the linted file are seen.
 
 ## Credits and upstream
 
 Rule ideas come from [anti-slop](https://github.com/dmmulroy/anti-slop) (MIT, commit
 `13909c9e07590f5a85d93c62712259fe14a883f7`) and its fork
-[deslop](https://github.com/maharshi365/deslop). No upstream source code is copied; the
-rules are reimplemented on the Deno ESTree. Ported test cases keep their upstream names and
-carry the MIT notice. A skipped or changed upstream case carries its reason next to the
-case in the test file.
+[deslop](https://github.com/maharshi365/deslop). No upstream source code is copied; the rules are
+reimplemented on the Deno ESTree. Ported test cases keep their upstream names and carry the MIT notice.
+A skipped or changed upstream case carries its reason next to the case in the test file.
 
-MIT notice (anti-slop): Copyright (c) its authors, MIT License. The type environment and
-the type-safety rules are reimplementations; the licence text is not copied here.
+MIT notice (anti-slop): Copyright (c) its authors, MIT License. The type environment and the
+type-safety rules are reimplementations; the licence text is not copied here.
