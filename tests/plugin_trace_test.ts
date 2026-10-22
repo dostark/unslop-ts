@@ -20,6 +20,7 @@ import {
   parseCatalog,
   parseTraceStderr,
   reconcileTraceRecords,
+  resolveTraceRunId,
   type SkipReason,
   TRACE_PREFIX,
   traceEnvName,
@@ -392,4 +393,17 @@ Deno.test("reserved_observer_key_collision_is_refused", () => {
     Error,
     "reserved",
   );
+});
+
+Deno.test("trace_protocol_filters_another_run_before_parsing", () => {
+  const line = "unslop-trace:v1:other:{";
+  const parsed = parseTraceStderr(line, RUN_ID);
+  assertEquals(parsed.records, []);
+  assertEquals(parsed.unrelated, [line]);
+});
+
+Deno.test("trace_protocol_rejects_line_breaks_in_run_ids", () => {
+  const checked: ITraceRecord = { kind: "checked", runId: "bad\n", plugin: "demo", file: "a.ts", rule: "demo/x" };
+  assertThrows(() => formatTraceRecord(checked), TraceProtocolError);
+  assertThrows(() => resolveTraceRunId("demo", "bad\n"), TraceProtocolError);
 });

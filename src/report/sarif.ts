@@ -7,12 +7,12 @@
  * @related-files [src/report/model.ts, src/report/collect.ts]
  */
 
-import { toFileUrl } from "@std/path";
+import { extname, toFileUrl } from "@std/path";
 import type { ICompiledConfig, IResolvedRule } from "../config/descriptor.ts";
 import type { IFinding, IRunReport } from "./model.ts";
+import { TOOL_VERSION } from "./version.ts";
 
 const SARIF_SCHEMA = "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json";
-const TOOL_VERSION = "0.1.1";
 const TOOL_URI = "https://github.com/dostark/unslop-ts";
 const SRCROOT = "%SRCROOT%";
 const MAX_TAGS = 10;
@@ -116,6 +116,10 @@ function ruleIndexMap(descriptors: readonly ISarifDescriptor[]): Map<string, num
   return new Map(descriptors.map((descriptor, index) => [descriptor.id, index]));
 }
 
+function sourceLanguage(file: string): string {
+  return [".js", ".jsx", ".mjs", ".cjs"].includes(extname(file)) ? "javascript" : "typescript";
+}
+
 function artifactsOf(findings: readonly IFinding[]): Record<string, unknown>[] {
   const seen = new Set<string>();
   const artifacts: Record<string, unknown>[] = [];
@@ -124,7 +128,7 @@ function artifactsOf(findings: readonly IFinding[]): Record<string, unknown>[] {
     seen.add(finding.file);
     artifacts.push({
       location: { uri: encodePath(finding.file), uriBaseId: SRCROOT },
-      sourceLanguage: "typescript",
+      sourceLanguage: sourceLanguage(finding.file),
     });
   }
   return artifacts;
@@ -135,7 +139,7 @@ export function sarifReport(report: IRunReport): Record<string, unknown> {
   const descriptors = report.rules.map((summary) => selectedDescriptor(summary.rule));
   const codes = [...new Set(report.foreignDiagnostics.map((diagnostic) => diagnostic.code))].sort();
   for (const code of codes) descriptors.push(foreignDescriptor(code));
-  descriptors.sort((left, right) => left.id.localeCompare(right.id));
+  descriptors.sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
   const indices = ruleIndexMap(descriptors);
   const results = [
     ...report.findings.map((finding) => resultOf(finding, finding.ruleId, indices.get(finding.ruleId) ?? 0, false)),
@@ -152,7 +156,11 @@ export function sarifReport(report: IRunReport): Record<string, unknown> {
         rules: descriptors,
       },
     },
-    originalUriBaseIds: { [SRCROOT]: { uri: toFileUrl(report.projectRoot).href } },
+    originalUriBaseIds: {
+      [SRCROOT]: {
+        uri: toFileUrl(report.projectRoot.endsWith("/") ? report.projectRoot : `${report.projectRoot}/`).href,
+      },
+    },
     columnKind: "unicodeCodePoints",
     artifacts: artifactsOf([...report.findings, ...report.foreignFindings]),
     results,
@@ -171,7 +179,7 @@ export function sarifReport(report: IRunReport): Record<string, unknown> {
 export function sarifRules(compiled: ICompiledConfig): Record<string, unknown> {
   const descriptors = Object.values(compiled.rules)
     .map(selectedDescriptor)
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
   return {
     $schema: SARIF_SCHEMA,
     version: "2.1.0",

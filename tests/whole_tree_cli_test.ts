@@ -378,3 +378,18 @@ Deno.test("whole_tree_unsupported_controls_are_refused", async () => {
     assertStringIncludes(result.stderr, "fixes the level");
   });
 });
+
+Deno.test("whole_tree_accepts_a_file_url_catalog", async () => {
+  await inTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, "src"));
+    await Deno.mkdir(join(dir, "tests"));
+    await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(CATALOG));
+    await Deno.writeTextFile(join(dir, "src/constants.ts"), 'export const HOSTS = ["a.test"];\n');
+    const catalogUrl = new URL(`file://${join(dir, "catalog.json")}`).href;
+    const result = await runDeno(
+      ["run", "-A", CLI, "--rule=constant-restatement", `--catalog=${catalogUrl}`],
+      dir,
+    );
+    assertEquals(result.code, 0, result.stderr);
+  });
+});

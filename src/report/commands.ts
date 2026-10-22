@@ -24,7 +24,7 @@ export function resolveHostCommand(
   if (command === null) return null;
   return command.map((arg) => {
     if (arg.endsWith(WHOLE_TREE_CLI_ARG)) return WHOLE_TREE_CLI;
-    if (arg === CATALOG_PLACEHOLDER) return `--descriptor=${descriptor.pluginUrl.href}`;
+    if (arg === CATALOG_PLACEHOLDER) return `--plugin=${fromFileUrl(descriptor.pluginUrl)}`;
     return arg;
   });
 }

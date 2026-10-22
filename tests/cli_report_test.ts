@@ -9,7 +9,14 @@
 
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { collectRunReport, compileConfig, type IHostDiagnostic, type ILintRunResult, type IRunReport } from "../mod.ts";
+import {
+  collectRunReport,
+  compileConfig,
+  type IHostDiagnostic,
+  type ILintRunResult,
+  type IRunReport,
+  traceEnvName,
+} from "../mod.ts";
 import { runReport } from "../src/cli/commands/report.ts";
 import { configPath, runCli, runReportCli, runReportWriteCli, withCliProject } from "./helpers/cli_project.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
@@ -80,6 +87,13 @@ Deno.test("report_counts_checked_skipped_and_findings_per_rule", async () => {
     assert(report.filesObserved.includes("src/a.ts"));
     assert(report.filesObserved.includes("src/clean.ts"));
     assert(report.findings.some((finding) => finding.ruleId === "demo/no-explicit-unknown"));
+    const table = await runReportCli(dir, ["src/a.ts"]);
+    assertEquals(table.code, 1, table.stderr);
+    assertStringIncludes(table.stdout, "Selected findings:");
+    assertStringIncludes(table.stdout, "Foreign findings:");
+    assertStringIncludes(table.stdout, "Not run:");
+    assertStringIncludes(table.stdout, "HINT");
+    assertStringIncludes(table.stdout, "constant-restatement");
   });
 });
 
@@ -102,7 +116,7 @@ Deno.test("report_lists_parked_off_and_not_selected_rules_without_trace", async 
     const notRun = report.notRun.find((entry) => entry.id === "constant-restatement");
     assert(notRun?.command);
     assert(notRun.command.some((arg) => arg.endsWith("/src/cli/whole_tree.ts")));
-    assert(notRun.command.some((arg) => arg.startsWith("--descriptor=file://")));
+    assert(notRun.command.some((arg) => arg.startsWith("--plugin=/")));
     assert(notRun.command.every((arg) => !arg.includes("--catalog")));
 
     const selected = await runReportCli(dir, [
@@ -151,7 +165,10 @@ Deno.test("report_fails_closed_on_host_or_protocol_error", async () => {
     assertStringIncludes(empty.failure ?? "", "host output");
 
     const malformedTrace = await runReport(dir, reportOptions("src/clean.ts"), {
-      spawn: () => Promise.resolve(hostOf('{"diagnostics":[],"errors":[]}', "unslop-trace:v1:run:{")),
+      spawn: (_args, _cwd, env) =>
+        Promise.resolve(
+          hostOf('{"diagnostics":[],"errors":[]}', `unslop-trace:v1:${env[traceEnvName("demo")]}:{`),
+        ),
     });
     assertEquals(malformedTrace.completion, "failed");
     assertStringIncludes(malformedTrace.failure ?? "", "trace protocol");
@@ -416,6 +433,9 @@ Deno.test("snapshot_walk_handles_internal_symlinks_and_rejects_escapes", async (
     assert(direct);
     assert(alias);
     assertEquals(direct, alias);
+    await Deno.symlink("tree", join(dir, "alias-dir"));
+    const aliased = await captureSources([join(dir, "tree"), join(dir, "alias-dir")], dir);
+    assertEquals(aliased.get("alias-dir/a.ts"), aliased.get("tree/a.ts"));
 
     const outside = await Deno.makeTempFile({ prefix: "snapshot_outside_" });
     try {
@@ -432,7 +452,7 @@ Deno.test("snapshot_walk_handles_internal_symlinks_and_rejects_escapes", async (
   });
 });
 
-Deno.test("snapshot_fingerprints_use_captured_lines_without_serializing_source", () => {
+Deno.test("snapshot_fingerprints_use_captured_lines_without_serializing_source", async () => {
   const descriptor = testDescriptor();
   const compiled = compileConfig({
     version: 2,
@@ -446,6 +466,10 @@ Deno.test("snapshot_fingerprints_use_captured_lines_without_serializing_source",
   const second = { ...first, range: { ...first.range, start: { line: 2, col: 18 }, end: { line: 2, col: 25 } } };
   const report = collectRunReport(resultOf([first, second, first]), { compiled, selection: null, policy: [], sources });
   assert(report.findings[0].fingerprint);
+  const tuple = JSON.stringify(["demo/no-explicit-unknown", encodeURI("src/a.ts"), "// café", 1, 2, "A finding."]);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tuple));
+  const expected = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  assertEquals(report.findings[0].fingerprint, expected);
   assertEquals(report.findings[0].fingerprint, report.findings[2].fingerprint);
   assert(report.findings[0].fingerprint !== report.findings[1].fingerprint);
   assert(!JSON.stringify(report).includes("café"));

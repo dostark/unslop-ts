@@ -7,7 +7,7 @@
  * @related-files [src/report/collect.ts, src/report/model.ts, src/cli/project_loader.ts, src/cli/safe_write.ts]
  */
 
-import { dirname, fromFileUrl, resolve } from "@std/path";
+import { dirname, fromFileUrl, isAbsolute, relative, resolve, toFileUrl } from "@std/path";
 import type { JsonValue } from "../../engine/catalog.ts";
 import { ConfigV2Schema, type IConfigV2 } from "../../config/schema.ts";
 import { compileConfig } from "../../config/compile.ts";
@@ -66,8 +66,8 @@ function usage(message: string): never {
 }
 
 function isWithin(root: string, path: string): boolean {
-  const prefix = root.endsWith("/") ? root : `${root}/`;
-  return path === root || path.startsWith(prefix);
+  const rel = relative(root, path);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
 async function realDirectory(url: URL): Promise<string> {
@@ -131,12 +131,20 @@ function parseDiagnostics(value: unknown): IHostDiagnostic[] {
     const end = range ? asRecord(range.end) : null;
     if (
       !record || !range || !start || !end ||
-      typeof record.filename !== "string" || typeof record.code !== "string" ||
+      typeof record.filename !== "string" || record.filename.length === 0 ||
+      typeof record.code !== "string" || record.code.length === 0 ||
       typeof record.message !== "string" ||
       typeof start.line !== "number" || typeof start.col !== "number" ||
-      typeof end.line !== "number" || typeof end.col !== "number"
+      typeof end.line !== "number" || typeof end.col !== "number" ||
+      !Number.isInteger(start.line) || !Number.isInteger(start.col) ||
+      !Number.isInteger(end.line) || !Number.isInteger(end.col) ||
+      start.line < 1 || start.col < 0 || end.line < start.line ||
+      (end.line === start.line && end.col < start.col)
     ) {
       throw new Error("the host JSON has a malformed diagnostic");
+    }
+    if (record.hint !== undefined && record.hint !== null && typeof record.hint !== "string") {
+      throw new Error("the host JSON has a malformed diagnostic hint");
     }
     return {
       filename: record.filename,
@@ -146,7 +154,7 @@ function parseDiagnostics(value: unknown): IHostDiagnostic[] {
       },
       code: record.code,
       message: record.message,
-      hint: typeof record.hint === "string" ? record.hint : null,
+      hint: record.hint ?? null,
     };
   });
 }
@@ -217,7 +225,7 @@ function failedResult(
   signal: string | null,
 ): ILintRunResult {
   return {
-    input: { descriptor, selectedPluginUrl, paths, selection: runId, runId },
+    input: { descriptor, selectedPluginUrl, paths, selection: null, runId },
     exitCode,
     diagnostics,
     errors,
@@ -243,6 +251,10 @@ export async function runReport(
     usage(`${messageOf(error)}`);
   }
   const root = await realDirectory(descriptor.rootUrl);
+  const reportDescriptor = {
+    ...descriptor,
+    rootUrl: toFileUrl(root.endsWith("/") ? root : `${root}/`),
+  };
   const configPath = await realFile(descriptor.configUrl);
   const lintConfigPath = await realFile(descriptor.lintConfigUrl);
   const pluginPath = await realFile(descriptor.pluginUrl);
@@ -319,7 +331,7 @@ export async function runReport(
   } catch (error) {
     return collectRunReport(
       failedResult(
-        descriptor,
+        reportDescriptor,
         descriptor.pluginUrl,
         paths,
         runId,
@@ -375,7 +387,13 @@ export async function runReport(
     failure = `the lint host exited with code ${host.code} without findings`;
   }
   const completion = failure === null ? "complete" : "failed";
-  const input = { descriptor, selectedPluginUrl: descriptor.pluginUrl, paths, selection: selectionTokens, runId };
+  const input = {
+    descriptor: reportDescriptor,
+    selectedPluginUrl: descriptor.pluginUrl,
+    paths,
+    selection: selectionTokens,
+    runId,
+  };
   const result: ILintRunResult = {
     input,
     exitCode: host.code,
@@ -402,8 +420,8 @@ function diagnosticSourcePath(filename: string, root: string): string {
       path = filename;
     }
   }
-  const prefix = root.endsWith("/") ? root : `${root}/`;
-  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+  const rel = relative(root, path);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)) ? rel : path;
 }
 
 async function diagnosedSourcesStable(
@@ -449,8 +467,8 @@ export function renderReport(report: IRunReport, format: ReportFormat): string {
   if (format === "json") return jsonText(report);
   if (format === "markdown") return markdownReport(report);
   if (format === "sarif") return jsonText(sarifReport(report));
-  const headers = ["ID", "STATUS", "COVERAGE", "CHECKED", "SKIPPED", "FINDINGS"] as const;
-  const rows = report.rules.map((summary) => [
+  const coverageHeaders = ["ID", "STATUS", "COVERAGE", "CHECKED", "SKIPPED", "FINDINGS"] as const;
+  const coverageRows = report.rules.map((summary) => [
     summary.rule.id,
     summary.status,
     summary.coverage,
@@ -458,15 +476,39 @@ export function renderReport(report: IRunReport, format: ReportFormat): string {
     Object.entries(summary.observedSkipped).map(([reason, count]) => `${reason}=${count}`).join(","),
     String(summary.findings),
   ]);
-  const findings = [...report.findings, ...report.foreignFindings].map((finding) =>
-    `${finding.file}:${finding.startLine}:${finding.startColumn} ${finding.ruleId} ${finding.effectiveLevel} ${finding.message}`
-  );
+  const findingHeaders = ["RULE", "ORIGIN", "FILE", "LOCATION", "LEVEL", "MESSAGE", "HINT"] as const;
+  const findingRows = (findings: readonly IFinding[], origin: (finding: IFinding) => string) =>
+    findings.map((finding) => [
+      finding.ruleId,
+      origin(finding),
+      finding.file,
+      `${finding.startLine}:${finding.startColumn}-${finding.endLine}:${finding.endColumn}`,
+      finding.effectiveLevel,
+      finding.message,
+      finding.hint ?? "",
+    ]);
+  const notRunHeaders = ["ID", "MODE", "COMMAND"] as const;
+  const notRunRows = report.notRun.map((check) => [
+    check.id,
+    check.mode,
+    check.command === null ? "" : check.command.join(" "),
+  ]);
   return [
     `completion: ${report.completion}`,
     ...(report.failure === null ? [] : [`failure: ${report.failure}`]),
     `files observed: ${report.filesObserved.length} (host-wide visitation unavailable)`,
-    tableText(headers, rows),
-    ...(findings.length === 0 ? ["No findings."] : ["Findings:", ...findings]),
+    tableText(coverageHeaders, coverageRows),
+    "Selected findings:",
+    ...(report.findings.length === 0
+      ? ["No selected findings."]
+      : [tableText(findingHeaders, findingRows(report.findings, () => "unslop"))]),
+    "Foreign findings:",
+    ...(report.foreignFindings.length === 0 ? ["No foreign findings."] : [tableText(
+      findingHeaders,
+      findingRows(report.foreignFindings, (finding) => finding.ruleId.includes("/") ? "other-plugin" : "deno-built-in"),
+    )]),
+    "Not run:",
+    ...(report.notRun.length === 0 ? ["No deferred checks."] : [tableText(notRunHeaders, notRunRows)]),
     "",
   ].join("\n");
 }
@@ -478,9 +520,4 @@ export function reportExitCode(report: IRunReport): number {
       report.foreignFindings.length > 0
     ? FAILURE_EXIT
     : 0;
-}
-
-/** The findings that make the report exit 1. */
-export function errorFindings(report: IRunReport): readonly IFinding[] {
-  return report.findings.filter((finding) => finding.effectiveLevel === "error");
 }

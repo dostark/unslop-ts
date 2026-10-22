@@ -178,3 +178,14 @@ Deno.test("sarif_fingerprints_are_stable_across_runs", () => {
   assertEquals("results" in run, false);
   assertEquals("invocations" in run, false);
 });
+
+Deno.test("sarif_base_uri_is_a_directory_uri", () => {
+  const report = reportOf([diagnostic("demo/no-explicit-unknown")]);
+  const run = (sarifReport(report).runs as Record<string, unknown>[])[0];
+  const base = run.originalUriBaseIds as Record<string, { uri: string }>;
+  assert(base["%SRCROOT%"].uri.endsWith("/"));
+  const noSlash = sarifReport({ ...report, projectRoot: "/demo" });
+  const noSlashRun = (noSlash.runs as Record<string, unknown>[])[0];
+  const noSlashBase = noSlashRun.originalUriBaseIds as Record<string, { uri: string }>;
+  assert(noSlashBase["%SRCROOT%"].uri.endsWith("/"));
+});

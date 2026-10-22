@@ -15,7 +15,7 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
  */
 
-import { relative } from "@std/path";
+import { fromFileUrl, relative } from "@std/path";
 import { CliError } from "./error.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
 import { CatalogError, type JsonValue } from "../engine/catalog.ts";
@@ -307,7 +307,8 @@ async function loadCatalog(args: readonly string[]): Promise<JsonValue> {
       return exitWithUsage(`'${catalogPath}' is not a filesystem path.`);
     }
     try {
-      return JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue;
+      const local = catalogPath.startsWith("file:") ? fromFileUrl(new URL(catalogPath)) : catalogPath;
+      return JSON.parse(await Deno.readTextFile(local)) as JsonValue;
     } catch (error) {
       return exitWithUsage(
         `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,

@@ -8,6 +8,7 @@
  */
 
 import { assert, assertArrayIncludes, assertEquals, assertStringIncludes } from "@std/assert";
+import { join } from "@std/path";
 import { configPath, runCli, withCliProject } from "./helpers/cli_project.ts";
 
 interface IRuleView {
@@ -190,7 +191,24 @@ Deno.test("generic_whole_tree_commands_resolve_without_catalog_placeholders", as
     const rule = ruleOf((await runCli(dir, ["rules", "show", "constant-restatement", "--format=json"])).stdout);
     const command = rule.command ?? [];
     assert(command.some((arg) => arg.endsWith("/src/cli/whole_tree.ts")), command.join(" "));
-    assert(command.some((arg) => arg.startsWith("--descriptor=file://")), command.join(" "));
+    assert(command.some((arg) => arg.startsWith("--plugin=/")), command.join(" "));
     assert(command.every((arg) => !arg.includes("--catalog")), command.join(" "));
+  });
+});
+
+Deno.test("generic_not_run_commands_are_runnable", async () => {
+  await withCliProject(async (dir) => {
+    const rule = ruleOf((await runCli(dir, ["rules", "show", "constant-restatement", "--format=json"])).stdout);
+    const command = rule.command ?? [];
+    assert(command.length > 0);
+    await Deno.mkdir(join(dir, "src"), { recursive: true });
+    await Deno.writeTextFile(join(dir, "src", "constants.ts"), 'export const HOSTS = ["a.test"];\n');
+    const result = await new Deno.Command(Deno.execPath(), {
+      args: command.slice(1),
+      cwd: dir,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
   });
 });

@@ -37,7 +37,7 @@ const USAGE = [
   "Usage:",
   "  deno task cli <command>         read-only commands and dry runs",
   "  deno task cli:write <command>   real edits and migrate",
-  "  unslop rules list [--category=<category>] [--status=<status>] [--format=table|json] [--select=<tokens>|--profile=<name>]",
+  "  unslop rules list [--category=<category>] [--status=<status>] [--format=table|json|markdown|sarif] [--select=<tokens>|--profile=<name>]",
   "  unslop rules show <id> [--format=table|json] [--select=<tokens>|--profile=<name>]",
   "  unslop rules enable <id> [--level=error|warn] [--dry-run]",
   "  unslop rules disable <id> --reason=<text> [--opt-in] [--dry-run]",
@@ -49,7 +49,7 @@ const USAGE = [
   "  unslop config print [--resolved] [--descriptor=<entry>]",
   "  unslop config schema",
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
-  "  unslop report [--format=table|json] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
+  "  unslop report [--format=table|json|markdown|sarif] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
 ].join("\n");
@@ -245,6 +245,7 @@ async function reportCommand(args: readonly string[]): Promise<number> {
   const afterTerminator = terminator === -1 ? [] : args.slice(terminator + 1);
   const parsed = parseArgs(optionArgs, ["descriptor", "plugin", "select", "profile", "format", "out"], []);
   const paths = [...parsed.positionals, ...afterTerminator];
+  const format = parseReportFormat(option(parsed, "format"));
   const report = await runReport(Deno.cwd(), {
     descriptor: option(parsed, "descriptor") ?? null,
     plugin: option(parsed, "plugin") ?? null,
@@ -252,7 +253,6 @@ async function reportCommand(args: readonly string[]): Promise<number> {
     profile: option(parsed, "profile") ?? null,
     paths,
   }, {});
-  const format = parseReportFormat(option(parsed, "format"));
   const text = renderReport(report, format);
   const out = option(parsed, "out");
   if (out === undefined) {

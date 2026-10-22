@@ -7,7 +7,7 @@
  * @related-files [src/report/context.ts, src/cli/commands/report.ts]
  */
 
-import { extname, join, relative } from "@std/path";
+import { extname, isAbsolute, join, relative } from "@std/path";
 import type { ISourceSnapshot } from "./context.ts";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
@@ -22,8 +22,8 @@ export class SnapshotError extends Error {
 }
 
 function isWithin(root: string, path: string): boolean {
-  const prefix = root.endsWith("/") ? root : `${root}/`;
-  return path === root || path.startsWith(prefix);
+  const rel = relative(root, path);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
 async function readSource(realPath: string): Promise<Uint8Array> {
@@ -67,7 +67,10 @@ export async function captureSources(
       const target = await Deno.stat(realPath);
       if (target.isDirectory) {
         const canonical = await Deno.realPath(realPath);
-        if (visitedDirectories.has(canonical)) return;
+        if (visitedDirectories.has(canonical)) {
+          await addAliasDirectory(realPath, logicalPath, new Set());
+          return;
+        }
         await visitDirectory(realPath, logicalPath, canonical);
       } else {
         await addFile(logicalPath, realPath);
@@ -76,11 +79,42 @@ export async function captureSources(
     }
     if (stat.isDirectory) {
       const canonical = await Deno.realPath(path);
-      if (visitedDirectories.has(canonical)) return;
+      if (visitedDirectories.has(canonical)) {
+        await addAliasDirectory(path, logicalPath, new Set());
+        return;
+      }
       await visitDirectory(path, logicalPath, canonical);
       return;
     }
     await addFile(logicalPath, path);
+  };
+
+  const addAliasDirectory = async (path: string, logicalPath: string, seen: Set<string>): Promise<void> => {
+    const canonical = await Deno.realPath(path);
+    if (seen.has(canonical) || !isWithin(root, canonical)) return;
+    seen.add(canonical);
+    let entries: Deno.DirEntry[];
+    try {
+      entries = [];
+      for await (const entry of Deno.readDir(path)) entries.push(entry);
+    } catch {
+      throw new SnapshotError(`${path}: cannot read the source directory.`);
+    }
+    entries.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
+    for (const entry of entries) {
+      if (SKIPPED_DIRECTORIES.has(entry.name)) continue;
+      const childReal = join(path, entry.name);
+      const childLogical = join(logicalPath, entry.name);
+      const real = await Deno.realPath(childReal);
+      if (!isWithin(root, real)) throw new SnapshotError(`${childLogical}: the symlink escapes the project root.`);
+      const target = await Deno.stat(real);
+      if (target.isDirectory) {
+        await addAliasDirectory(real, childLogical, seen);
+      } else if (SOURCE_EXTENSIONS.has(extname(real))) {
+        const snapshot = byCanonical.get(real);
+        if (snapshot) snapshots.set(relative(root, childLogical), snapshot);
+      }
+    }
   };
 
   const visitDirectory = async (path: string, logicalPath: string, canonical: string): Promise<void> => {
@@ -92,7 +126,7 @@ export async function captureSources(
     } catch {
       throw new SnapshotError(`${path}: cannot read the source directory.`);
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
     for (const entry of entries) {
       if (SKIPPED_DIRECTORIES.has(entry.name)) continue;
       await visit(join(path, entry.name), join(logicalPath, entry.name));

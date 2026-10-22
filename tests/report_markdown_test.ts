@@ -20,4 +20,7 @@ Deno.test("markdown_report_matches_the_golden_file", async () => {
   assert(markdown.includes("src/a%20%5Bx%5D%23100%25.ts"));
   assert(markdown.includes("partial"));
   assert(markdown.includes("Foreign findings"));
+  assert(!markdown.includes("[x](https://evil.test)"));
+  assert(!markdown.includes("<script>"));
+  assert(!markdown.includes("<b>bold</b>"));
 });

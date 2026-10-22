@@ -7,9 +7,10 @@
  * @related-files [src/report/model.ts, src/report/context.ts, src/engine/trace.ts]
  */
 
-import { fromFileUrl } from "@std/path";
+import { fromFileUrl, isAbsolute, relative } from "@std/path";
 import type { IResolvedRule } from "../config/descriptor.ts";
 import type { ISourceSnapshot } from "./context.ts";
+import { TOOL_VERSION } from "./version.ts";
 import { fingerprintOf } from "./fingerprint.ts";
 import type { IResolvedSelection } from "../cli/selection.ts";
 import { type ITraceRecord, SKIP_REASONS, type SkipReason } from "../engine/trace.ts";
@@ -17,8 +18,6 @@ import { notRunCheck } from "./commands.ts";
 import type { IRunContext } from "./context.ts";
 import type { IFinding, IHostDiagnostic, ILintRunResult, INotRunCheck, IRuleRunSummary, IRunReport } from "./model.ts";
 
-const TOOL_VERSION = "0.1.1";
-const PLUGIN_SEPARATOR = "/";
 const WARN = "warn" as const;
 const ERROR = "error" as const;
 
@@ -48,8 +47,8 @@ function repoPath(filename: string, root: string): string {
       path = filename;
     }
   }
-  const prefix = root.endsWith("/") ? root : `${root}/`;
-  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+  const rel = relative(root, path);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)) ? rel : path;
 }
 
 function fingerprintFor(
@@ -222,19 +221,4 @@ export function collectRunReport(result: ILintRunResult, context: IRunContext): 
 /** The findings that affect the report's exit code. */
 export function failingFindings(report: IRunReport): readonly IFinding[] {
   return [...report.findings, ...report.foreignFindings].filter((finding) => finding.effectiveLevel === "error");
-}
-
-/** The file relative to the project root, for renderers. */
-export function displayPath(report: IRunReport, filename: string): string {
-  return repoPath(filename, report.projectRoot);
-}
-
-/** A stable count of the selected plugin rules with findings. */
-export function findingRuleCount(report: IRunReport): number {
-  return new Set(report.findings.map((finding) => finding.ruleId)).size;
-}
-
-/** The plugin prefix of a rule id, or an empty string. */
-export function pluginOf(ruleId: string): string {
-  return ruleId.includes(PLUGIN_SEPARATOR) ? ruleId.slice(0, ruleId.indexOf(PLUGIN_SEPARATOR)) : "";
 }

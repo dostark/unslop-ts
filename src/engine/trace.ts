@@ -95,10 +95,20 @@ function normalizeTraceValue(value: string | undefined): string | null {
  * Resolves the trace run id. An explicit option skips the environment read entirely.
  * A missing, empty, or unreadable trace variable disables tracing.
  */
+const RUN_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+function checkedRunId(value: string | null): string | null {
+  if (value === null || value === MANUAL_TRACE_RUN_ID) return value;
+  if (!RUN_ID_PATTERN.test(value)) {
+    throw new TraceProtocolError(`the run id '${value}' must contain only letters, digits, '.', '_', or '-'`);
+  }
+  return value;
+}
+
 export function resolveTraceRunId(pluginName: string, explicit: string | undefined): string | null {
-  if (explicit !== undefined) return normalizeTraceValue(explicit);
+  if (explicit !== undefined) return checkedRunId(normalizeTraceValue(explicit));
   try {
-    return normalizeTraceValue(Deno.env.get(traceEnvName(pluginName)));
+    return checkedRunId(normalizeTraceValue(Deno.env.get(traceEnvName(pluginName))));
   } catch {
     return null;
   }
@@ -106,8 +116,8 @@ export function resolveTraceRunId(pluginName: string, explicit: string | undefin
 
 /** Encodes one record as the complete stderr line the plugin writes. */
 export function formatTraceRecord(record: ITraceRecord): string {
-  if (record.runId.includes(TRACE_FIELD_SEPARATOR)) {
-    throw new TraceProtocolError(`the run id '${record.runId}' must not contain ':'`);
+  if (!RUN_ID_PATTERN.test(record.runId)) {
+    throw new TraceProtocolError(`the run id '${record.runId}' must contain only letters, digits, '.', '_', or '-'`);
   }
   return `${TRACE_LINE_PREFIX}${record.runId}:${JSON.stringify(record)}`;
 }
@@ -189,6 +199,10 @@ export function parseTraceStderr(stderr: string, runId: string | undefined): ITr
     const separator = rest.indexOf(TRACE_FIELD_SEPARATOR);
     if (separator <= 0) throw new TraceProtocolError("a trace line has no run id or payload");
     const lineRunId = rest.slice(0, separator);
+    if (runId !== undefined && lineRunId !== runId) {
+      unrelated.push(line);
+      continue;
+    }
     const payload = rest.slice(separator + 1);
     let value: unknown;
     try {
@@ -199,10 +213,6 @@ export function parseTraceStderr(stderr: string, runId: string | undefined): ITr
     const record = parseRecord(value);
     if (record.runId !== lineRunId) {
       throw new TraceProtocolError("a trace line run id does not match its record");
-    }
-    if (runId !== undefined && record.runId !== runId) {
-      unrelated.push(line);
-      continue;
     }
     records.push(record);
   }

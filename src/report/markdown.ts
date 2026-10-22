@@ -11,12 +11,12 @@ import type { IFinding, IRunReport } from "./model.ts";
 
 /** Escapes one Markdown table cell. */
 export function escapeMarkdownCell(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
 /** Escapes inline Markdown text outside a table cell. */
 export function escapeMarkdownText(value: string): string {
-  return value.replace(/([\\`*_{}[\]()#+.!<>|])/g, "\\$1");
+  return value.replace(/([\\`*_{}[\]()#+.!<>])/g, "\\$1");
 }
 
 /** A link whose display text is escaped and whose target is percent-encoded. */
@@ -47,8 +47,8 @@ function findingRow(finding: IFinding, origin: string): string[] {
     markdownLink(finding.file),
     `${finding.startLine}:${finding.startColumn}-${finding.endLine}:${finding.endColumn}`,
     finding.effectiveLevel,
-    finding.message,
-    finding.hint ?? "",
+    escapeMarkdownText(finding.message),
+    finding.hint === null ? "" : escapeMarkdownText(finding.hint),
   ];
 }
 

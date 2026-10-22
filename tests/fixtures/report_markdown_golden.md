@@ -15,13 +15,13 @@
 
 | Rule | Origin | File | Location | Level | Message | Hint |
 | --- | --- | --- | --- | --- | --- | --- |
-| `demo/rule` | unslop | [src/a \\\\[x\\\\]\\\\#100%\\\\.ts](src/a%20%5Bx%5D%23100%25.ts) | 1:1-1:2 | error | Selected \| message [x] % | Use \| pipes |
+| `demo/rule` | unslop | [src/a \[x\]\#100%\.ts](src/a%20%5Bx%5D%23100%25.ts) | 1:1-1:2 | error | Selected \| message \[x\]\(https://evil\.test\) % \<script\> | Use \| pipes \<b\>bold\</b\> |
 
 ## Foreign findings
 
 | Rule | Origin | File | Location | Level | Message | Hint |
 | --- | --- | --- | --- | --- | --- | --- |
-| `no-explicit-any` | foreign | [src/a \\\\[x\\\\]\\\\#100%\\\\.ts](src/a%20%5Bx%5D%23100%25.ts) | 1:1-1:2 | error | Foreign \| message [x] % |  |
+| `no-explicit-any` | foreign | [src/a \[x\]\#100%\.ts](src/a%20%5Bx%5D%23100%25.ts) | 1:1-1:2 | error | Foreign \| message \[x\] % |  |
 
 ## Not run
 
