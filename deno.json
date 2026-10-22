@@ -5,7 +5,8 @@
   "exports": {
     ".": "./mod.ts",
     "./cli/rule_ceiling": "./src/cli/rule_ceiling.ts",
-    "./whole-tree": "./src/rules/whole_tree/mod.ts"
+    "./whole-tree": "./src/rules/whole_tree/mod.ts",
+    "./cli": "./src/cli/unslop.ts"
   },
   "imports": {
     "@dostark/unslop-ts": "./mod.ts",
@@ -20,9 +21,10 @@
   },
   "tasks": {
     "test": "deno test --allow-all",
-    "lint": "deno lint",
+    "lint": "deno lint --config=deno.json",
     "check": "deno check mod.ts src/ tests/ examples/",
-    "fmt": "deno fmt"
+    "fmt": "deno fmt",
+    "cli": "deno run --allow-read --allow-env src/cli/unslop.ts"
   },
   "compilerOptions": {
     "lib": [
