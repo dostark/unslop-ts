@@ -18,7 +18,9 @@ import type {
 import type { IRuleMeta, RuleCategory } from "../rules/meta.ts";
 import { RULE_CATEGORIES } from "../rules/meta.ts";
 import { CliError, USAGE_EXIT } from "./error.ts";
-import { jsonText, type OutputFormat, tableText } from "./output.ts";
+import { jsonText, type ReportFormat, tableText } from "./output.ts";
+import { markdownTable } from "../report/markdown.ts";
+import { sarifRules } from "../report/sarif.ts";
 import { resolveHostCommand } from "../report/commands.ts";
 import {
   type IResolvedSelection,
@@ -31,7 +33,7 @@ import {
 
 /** Options shared by both read commands. */
 export interface IRuleQuery {
-  readonly format: OutputFormat;
+  readonly format: ReportFormat;
   readonly category?: string;
   readonly status?: string;
   readonly selection: IResolvedSelection | null;
@@ -117,6 +119,7 @@ function selectedViews(compiled: ICompiledConfig, query: IRuleQuery): IRuleBase[
 export function listRules(compiled: ICompiledConfig, query: IRuleQuery): string {
   const views = selectedViews(compiled, query);
   if (query.format === "json") return jsonText({ rules: views });
+  if (query.format === "sarif") return jsonText(sarifRules(compiled));
   const rows = views.map((view) => [
     view.id,
     view.status,
@@ -125,6 +128,7 @@ export function listRules(compiled: ICompiledConfig, query: IRuleQuery): string 
     view.controls.editable.join(COMPACT_SEPARATOR),
     hostModesText(view.controls),
   ]);
+  if (query.format === "markdown") return markdownTable(TABLE_HEADERS, rows);
   return tableText(TABLE_HEADERS, rows);
 }
 

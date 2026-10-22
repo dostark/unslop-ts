@@ -11,7 +11,7 @@ import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/
 import { join } from "@std/path";
 import { collectRunReport, compileConfig, type IHostDiagnostic, type ILintRunResult, type IRunReport } from "../mod.ts";
 import { runReport } from "../src/cli/commands/report.ts";
-import { configPath, runReportCli, runReportWriteCli, withCliProject } from "./helpers/cli_project.ts";
+import { configPath, runCli, runReportCli, runReportWriteCli, withCliProject } from "./helpers/cli_project.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
 import { captureSources, SnapshotError } from "../src/report/snapshot.ts";
 import type { ISourceSnapshot } from "../src/report/context.ts";
@@ -449,4 +449,72 @@ Deno.test("snapshot_fingerprints_use_captured_lines_without_serializing_source",
   assertEquals(report.findings[0].fingerprint, report.findings[2].fingerprint);
   assert(report.findings[0].fingerprint !== report.findings[1].fingerprint);
   assert(!JSON.stringify(report).includes("café"));
+});
+
+Deno.test("report_and_list_format_dispatch", async () => {
+  await withCliProject(async (dir) => {
+    await writeFiles(dir, { "src/clean.ts": CLEAN_SOURCE, "src/error.ts": UNKNOWN_SOURCE });
+    const markdown = await runReportCli(dir, ["--format=markdown", "src/clean.ts"]);
+    assertEquals(markdown.code, 0, markdown.stderr);
+    assertStringIncludes(markdown.stdout, "# unslop-ts report");
+
+    const sarif = await runReportCli(dir, ["--format=sarif", "src/error.ts"]);
+    assertEquals(sarif.code, 1, sarif.stderr);
+    const sarifJson = JSON.parse(sarif.stdout) as { version: string; $schema: string; runs: unknown[] };
+    assertEquals(sarifJson.version, "2.1.0");
+    assertStringIncludes(sarifJson.$schema, "sarif-schema-2.1.0.json");
+    assertEquals(sarifJson.runs.length, 1);
+
+    const listSarif = await runCli(dir, ["rules", "list", "--format=sarif"]);
+    assertEquals(listSarif.code, 0, listSarif.stderr);
+    const list = JSON.parse(listSarif.stdout) as { runs: Record<string, unknown>[] };
+    assertEquals("results" in list.runs[0], false);
+    assertEquals("invocations" in list.runs[0], false);
+
+    const listMarkdown = await runCli(dir, ["rules", "list", "--format=markdown"]);
+    assertEquals(listMarkdown.code, 0, listMarkdown.stderr);
+    assertStringIncludes(listMarkdown.stdout, "| ID |");
+
+    const showSarif = await runCli(dir, ["rules", "show", "demo/max-params", "--format=sarif"]);
+    assertEquals(showSarif.code, 2);
+    const presetMarkdown = await runCli(dir, ["presets", "show", "unslop:strict", "--format=markdown"]);
+    assertEquals(presetMarkdown.code, 2);
+  });
+});
+
+Deno.test("every_format_preserves_foreign_findings", async () => {
+  await withCliProject(async (dir) => {
+    await writeFiles(dir, {
+      "src/mixed.ts": "export let value: unknown = 1;\nexport const anyValue: any = 1;\n",
+      "src/foreign.ts": "export const anyValue: any = 1;\n",
+    });
+    for (const format of ["table", "json", "markdown", "sarif"]) {
+      const mixed = await runReportCli(dir, [`--format=${format}`, "src/mixed.ts"]);
+      assertEquals(mixed.code, 1, mixed.stderr);
+      if (format === "json") {
+        const report = reportOf(mixed.stdout);
+        assert(report.findings.some((finding) => finding.ruleId === "demo/no-explicit-unknown"));
+        assert(report.foreignFindings.some((finding) => finding.ruleId === "no-explicit-any"));
+      } else if (format === "sarif") {
+        const run = (JSON.parse(mixed.stdout) as { runs: Record<string, unknown>[] }).runs[0];
+        const results = run.results as Record<string, unknown>[];
+        assert(results.some((result) => result.ruleId === "demo/no-explicit-unknown"));
+        assert(results.some((result) => result.ruleId === "deno:no-explicit-any"));
+      } else {
+        assertStringIncludes(mixed.stdout, "demo/no-explicit-unknown");
+        assertStringIncludes(mixed.stdout, "no-explicit-any");
+      }
+    }
+    for (const format of ["table", "json", "markdown", "sarif"]) {
+      const foreign = await runReportCli(dir, [`--format=${format}`, "src/foreign.ts"]);
+      assertEquals(foreign.code, 1, foreign.stderr);
+      if (format === "json") {
+        const report = reportOf(foreign.stdout);
+        assertEquals(report.findings.length, 0);
+        assert(report.foreignFindings.some((finding) => finding.ruleId === "no-explicit-any"));
+      } else {
+        assertStringIncludes(foreign.stdout, "no-explicit-any");
+      }
+    }
+  });
 });

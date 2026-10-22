@@ -21,7 +21,7 @@
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "./error.ts";
 import { listPresets, showPreset } from "./presets.ts";
 import { printConfigText, schemaText, validationText } from "./config_read.ts";
-import { parseFormat, print, printError } from "./output.ts";
+import { parseFormat, parseReportFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
 import { runMigrate } from "./commands/migrate.ts";
 import { renderReport, reportExitCode, runReport } from "./commands/report.ts";
@@ -144,7 +144,7 @@ async function rulesCommand(args: readonly string[]): Promise<number> {
     const { compiled, selection, descriptor } = await loadQuery(parsed);
     print(
       listRules(compiled, {
-        format: parseFormat(option(parsed, "format")),
+        format: parseReportFormat(option(parsed, "format")),
         category: option(parsed, "category"),
         status: option(parsed, "status"),
         selection,
@@ -252,7 +252,7 @@ async function reportCommand(args: readonly string[]): Promise<number> {
     profile: option(parsed, "profile") ?? null,
     paths,
   }, {});
-  const format = parseFormat(option(parsed, "format"));
+  const format = parseReportFormat(option(parsed, "format"));
   const text = renderReport(report, format);
   const out = option(parsed, "out");
   if (out === undefined) {

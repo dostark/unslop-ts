@@ -24,7 +24,7 @@ const SCANNED_FILES = ["mod.ts", "README.md", "deno.json"];
 const SCANNED_EXTENSIONS = [".ts", ".md", ".json"];
 const ALLOWED_PACKAGES = ["@std/", "zod", "typescript", "@dostark/unslop-ts"];
 /** Exact-pinned schema validators that only the test suite needs. */
-const TEST_ONLY_PACKAGES = ["ajv", "ajv-formats"];
+const TEST_ONLY_PACKAGES = ["ajv", "ajv-draft-04", "ajv-formats"];
 // The words are joined here so that this file does not contain them.
 const FORBIDDEN_WORDS = [
   ["ex", "aix"].join(""),
@@ -120,4 +120,12 @@ Deno.test("engine_suite_and_public_exports", async () => {
     "NOT_ENABLED_REASON",
   ];
   for (const name of exported) assert(name in api, name);
+});
+
+Deno.test("draft04_validator_is_test_only", () => {
+  const adapterImport = `import Ajv04 from "ajv-draft-04";\n`;
+  assertEquals(purityViolations([{ path: "src/fixture.ts", text: adapterImport }]), [
+    "src/fixture.ts: imports 'ajv-draft-04'",
+  ]);
+  assertEquals(purityViolations([{ path: "tests/fixture.ts", text: adapterImport }]), []);
 });

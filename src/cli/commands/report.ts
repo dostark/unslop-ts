@@ -22,7 +22,9 @@ import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { loadConfigDescriptor } from "../project_loader.ts";
 import { type IResolvedSelection, resolveSelection, ruleStatus } from "../selection.ts";
 import { selectionEnvName } from "../../engine/plugin.ts";
-import { jsonText, tableText } from "../output.ts";
+import { jsonText, type ReportFormat, tableText } from "../output.ts";
+import { markdownReport } from "../../report/markdown.ts";
+import { sarifReport } from "../../report/sarif.ts";
 
 /** The options of one report run. */
 export interface IReportOptions {
@@ -443,8 +445,10 @@ function contextOf(
 }
 
 /** Renders a report as JSON or the concise table. */
-export function renderReport(report: IRunReport, format: "json" | "table"): string {
+export function renderReport(report: IRunReport, format: ReportFormat): string {
   if (format === "json") return jsonText(report);
+  if (format === "markdown") return markdownReport(report);
+  if (format === "sarif") return jsonText(sarifReport(report));
   const headers = ["ID", "STATUS", "COVERAGE", "CHECKED", "SKIPPED", "FINDINGS"] as const;
   const rows = report.rules.map((summary) => [
     summary.rule.id,

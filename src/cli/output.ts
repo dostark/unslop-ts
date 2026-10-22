@@ -16,10 +16,20 @@ const ENCODER = new TextEncoder();
 /** The two output formats a query command accepts. */
 export type OutputFormat = "table" | "json";
 
+/** The formats a report or rule list accepts. */
+export type ReportFormat = OutputFormat | "markdown" | "sarif";
+
 /** Parses a format option, rejecting every other value as a usage error. */
 export function parseFormat(value: string | undefined): OutputFormat {
   if (value === undefined) return "table";
   if (value === "table" || value === "json") return value;
+  throw new CliError(USAGE_EXIT, `unknown format '${value}'`);
+}
+
+/** Parses a report or rule-list format, rejecting every other value. */
+export function parseReportFormat(value: string | undefined): ReportFormat {
+  if (value === undefined) return "table";
+  if (value === "table" || value === "json" || value === "markdown" || value === "sarif") return value;
   throw new CliError(USAGE_EXIT, `unknown format '${value}'`);
 }
 
