@@ -103,10 +103,14 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
   const rules: Record<string, Deno.lint.Rule> = {};
   for (const id of registry.catalogIds()) {
     const implementation = registry.implementation(id);
-    const entry = catalog.rules[id];
-    if (!implementation || !entry) continue;
-    const settings = ruleSettings(catalog, id, registry);
+    if (!implementation) continue;
     const key = id.slice(registry.pluginName.length + 1);
+    const entry = catalog.rules[id];
+    if (!entry) {
+      rules[key] = { create: () => ({}) };
+      continue;
+    }
+    const settings = ruleSettings(catalog, id, registry);
     const active = isRuleActive(entry, settings.severity, selection, { id, key });
 
     rules[key] = {

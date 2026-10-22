@@ -10,11 +10,12 @@ Deno script headers. A project can add its own packs, so project-specific rules 
 
 ## Use in a Deno project
 
-1. Write a catalog. `examples/catalog.json` is a small one. Each rule id has the form
-   `<plugin name>/<rule key>`, and each rule has an `engine`, a `severity`, a `scope`, and `tags` from the
-   catalog's `tagVocabulary`.
-1. Write the plugin entry. `examples/lint_plugin.ts` builds a registry from the rule packs, parses the
-   catalog against it, and default-exports `createLintPlugin(name, catalog, { rulePacks })`.
+1. Write a version 2 configuration. `examples/unslop.config.json` is a small one. It names the
+   plugin, extends a preset, and sets rule overrides. Rule metadata and guide links come from the engine.
+1. Write the project descriptor. `examples/unslop.project.ts` exports the plugin name, the rule packs,
+   and the file locations. It reads no configuration file.
+1. Write the plugin entry. `examples/lint_plugin.ts` compiles the configuration with
+   `createUnslopProject({ descriptor, config })` and default-exports `project.plugin`.
 1. Register the entry in the project's `deno.json` with `"lint": { "plugins": ["./lint_plugin.ts"] }`,
    and run `deno lint`.
 1. To run a subset locally, export `<NAME>_LINT_RULES`, where `<NAME>` is the plugin name in upper

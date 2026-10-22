@@ -4,7 +4,7 @@
  * @description Cases for the interface naming and rename rules, their prefix option, and their off-by-default state in the example catalog.
  * @architectural-layer Test
  * @dependencies [@std/assert]
- * @related-files [src/rules/interface_convention_rules.ts, examples/catalog.json]
+ * @related-files [src/rules/interface_convention_rules.ts, examples/unslop.config.json]
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
@@ -90,7 +90,7 @@ Deno.test("no-interface-rename-on-import takes the prefix from options", () => {
   assertEquals(linesOf(RENAME, runAt(source, "packages/x/src/a.ts", { prefix: "T" })), [1]);
 });
 
-const EXAMPLE_FILES = ["catalog.json", "lint_plugin.ts"];
+const EXAMPLE_FILES = ["unslop.config.json", "unslop.project.ts", "lint_plugin.ts"];
 const RENAME_VIOLATION = 'import { IFoo as Foo } from "./a.ts";\nexport interface Bar {}\nexport const x = Foo;\n';
 
 async function exampleProject(dir: string): Promise<void> {
@@ -115,7 +115,7 @@ async function codesOf(dir: string, env: Record<string, string>): Promise<(strin
   return (report.diagnostics ?? []).map((diagnostic) => diagnostic.code);
 }
 
-Deno.test("the example catalog keeps both interface rules off until they are selected", async () => {
+Deno.test("the example configuration keeps both interface rules off until they are selected", async () => {
   const dir = await Deno.makeTempDir({ prefix: "interface_example_" });
   try {
     await exampleProject(dir);

@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "plugin": "demo",
+  "extends": ["unslop:recommended"],
+  "docsBase": "docs/style_guide.md",
+  "paths": {
+    "test": ["**/tests/**", "**/*_test.ts"],
+    "fixture": ["**/tests/fixtures/**"]
+  },
+  "rules": {
+    "demo/no-runtime-typeof": {
+      "level": "error",
+      "scope": "prod",
+      "options": { "allowInTypeGuards": true }
+    },
+    "demo/max-params": {
+      "level": "error",
+      "options": { "max": 2 }
+    },
+    "demo/exported-interface-naming": {
+      "level": "off",
+      "optIn": true,
+      "reason": "Opt-in: a naming convention. Select the rule with DEMO_LINT_RULES when the project follows the convention.",
+      "options": { "prefix": "I" }
+    },
+    "demo/no-interface-rename-on-import": {
+      "level": "off",
+      "optIn": true,
+      "reason": "Opt-in: a naming convention. Select the rule with DEMO_LINT_RULES when the project follows the convention.",
+      "options": { "prefix": "I" }
+    },
+    "demo/import-boundaries": {
+      "level": "off",
+      "optIn": true,
+      "reason": "Opt-in: the zones describe one project layout. Replace the example zone with your own, then select the rule with DEMO_LINT_RULES.",
+      "options": {
+        "zones": [
+          {
+            "id": "ui-data",
+            "files": ["src/ui/**"],
+            "deny": [
+              {
+                "specifier": "^(\\.\\./)+data/",
+                "message": "UI files must not import from the data layer."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@
 
 import { assertArrayIncludes, assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";
 import { CatalogError, createLintPlugin, type JsonValue, runPlugin, selectionEnvName } from "../mod.ts";
-import { lintJson, withDemoProject } from "./helpers/demo_project.ts";
+import { lintJson, packRuleKeys, withDemoProject } from "./helpers/demo_project.ts";
 import { createTestPlugin, loadTestCatalog, TEST_PLUGIN_NAME, TEST_RULE_PACKS } from "./helpers/registry.ts";
 
 const PROD_FILE = "packages/x/src/a.ts";
@@ -124,8 +124,12 @@ Deno.test("a selection that matches nothing reports no rule", () => {
 
 Deno.test("every catalog rule stays registered whatever its severity or selection", () => {
   for (const value of [null, "demo/ignore-needs-reason", `demo/${OFF_RULE}`, "demo/does-not-exist"]) {
-    assertEquals(registered(value), ALL_KEYS, `selection ${value}`);
+    assertArrayIncludes(registered(value), ALL_KEYS, `selection ${value}`);
   }
+});
+
+Deno.test("every pack rule is registered even when the catalog does not name it", () => {
+  assertEquals(registered(null), packRuleKeys().sort());
 });
 
 Deno.test("an off rule is registered and reports nothing", () => {
