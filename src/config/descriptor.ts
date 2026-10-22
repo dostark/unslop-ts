@@ -93,6 +93,11 @@ export interface ICompiledConfig {
 /** The host mode a check runs in when no host flag changes it. */
 export const DEFAULT_HOST_MODE = "default";
 
+/** The severity a host reports in its default mode, unless the owner fixes the level. */
+export function hostBaseLevel(controls: IRuleControls): RuleSeverity {
+  return controls.fixedLevel ?? controls.hostModes[DEFAULT_HOST_MODE] ?? "off";
+}
+
 /** The editable controls of every plugin rule. `deno lint` reports a selected plugin finding as an error. */
 export const PLUGIN_RULE_CONTROLS: IRuleControls = {
   editable: ["level", "scope", "include", "exclude", "options"],

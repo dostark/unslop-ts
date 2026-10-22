@@ -59,3 +59,18 @@ export const RULE_CATEGORIES: readonly RuleCategory[] = [
 
 /** Every preset membership a rule may declare. */
 export const PRESET_MEMBERSHIPS: readonly PresetMembership[] = ["recommended", "strict", "opt-in"];
+
+/** The one-line category description that a compiled tag vocabulary uses by default. */
+export const CATEGORY_DESCRIPTIONS: Readonly<Record<RuleCategory, string>> = {
+  "type-safety": "Rules that keep type evidence.",
+  imports: "Rules about where imports sit and which imports are explicit.",
+  boundaries: "Rules about what a file group may import.",
+  interfaces: "Rules about interface names, renames, and placement.",
+  "magic-values": "Rules about repeated literals and duplicated declarations.",
+  "module-structure": "Rules about module layout and exports.",
+  "test-quality": "Rules about test fixtures and assertions.",
+  scripts: "Rules about runnable script headers.",
+  complexity: "Rules about function and class size.",
+  "optional-parameters": "Rules about how optional parameters are declared.",
+  comments: "Rules about comment content and length.",
+};

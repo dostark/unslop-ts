@@ -21,6 +21,8 @@ const SCANNED = ["src", "tests", "docs", "examples"];
 const SCANNED_FILES = ["mod.ts", "README.md", "deno.json"];
 const SCANNED_EXTENSIONS = [".ts", ".md", ".json"];
 const ALLOWED_PACKAGES = ["@std/", "zod", "typescript", "@dostark/unslop-ts"];
+/** Exact-pinned schema validators that only the test suite needs. */
+const TEST_ONLY_PACKAGES = ["ajv", "ajv-formats"];
 // The words are joined here so that this file does not contain them.
 const FORBIDDEN_WORDS = [
   ["ex", "aix"].join(""),
@@ -30,8 +32,10 @@ const FORBIDDEN_WORDS = [
 ];
 const IMPORT_PATTERN = /^(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^import\s*["']([^"']+)["']/gm;
 
-function isAllowedImport(specifier: string): boolean {
+function isAllowedImport(specifier: string, path: string): boolean {
   if (specifier.startsWith(".") || specifier.startsWith("node:")) return true;
+  const testOnly = TEST_ONLY_PACKAGES.some((allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`));
+  if (testOnly) return path.startsWith("tests/");
   return ALLOWED_PACKAGES.some((allowed) => specifier === allowed || specifier.startsWith(allowed));
 }
 
@@ -46,7 +50,7 @@ function purityViolations(files: readonly ISourceFile[]): string[] {
     if (!file.path.endsWith(".ts")) continue;
     for (const match of file.text.matchAll(IMPORT_PATTERN)) {
       const specifier = match[1] ?? match[2];
-      if (!isAllowedImport(specifier)) violations.push(`${file.path}: imports '${specifier}'`);
+      if (!isAllowedImport(specifier, file.path)) violations.push(`${file.path}: imports '${specifier}'`);
     }
   }
   return violations;
@@ -73,6 +77,14 @@ Deno.test("the purity check reports a consumer import and a consumer name in a f
   const violations = purityViolations([{ path: "fixture.ts", text: consumerImport }]);
   assertEquals(violations.length, 2);
   assertEquals(purityViolations([{ path: "ok.ts", text: 'import { join } from "@std/path";\n' }]), []);
+});
+
+Deno.test("the purity check allows a validator only in the test suite", () => {
+  const validatorImport = `import { Ajv2020 } from "ajv/dist/2020.js";\n`;
+  assertEquals(purityViolations([{ path: "src/fixture.ts", text: validatorImport }]), [
+    "src/fixture.ts: imports 'ajv/dist/2020.js'",
+  ]);
+  assertEquals(purityViolations([{ path: "tests/fixture.ts", text: validatorImport }]), []);
 });
 
 Deno.test("the purity check rejects a consumer style-guide name in a seeded engine file", () => {

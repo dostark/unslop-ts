@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "plugin": "demo",
+  "extends": ["unslop:recommended"],
+  "docsBase": "https://example.test/guide/",
+  "paths": {
+    "test": ["**/tests/**"],
+    "fixture": ["**/fixtures/**"],
+    "ignore": [{ "glob": "**/vendor/**", "reason": "Vendored code is not reviewed." }]
+  },
+  "tags": {
+    "project-only": { "description": "A rule choice of this project." }
+  },
+  "rules": {
+    "demo/max-params": ["error", { "max": 5 }],
+    "demo/no-explicit-unknown": {
+      "level": "error",
+      "scope": "prod",
+      "tags": ["project-only"]
+    }
+  }
+}
