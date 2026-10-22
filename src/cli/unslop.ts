@@ -21,14 +21,20 @@ import { printConfigText, schemaText, validationText } from "./config_read.ts";
 import { parseFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
 import { runMigrate } from "./commands/migrate.ts";
+import { type IRuleEditRequest, runRuleEdit } from "./commands/rules_write.ts";
 import { listRules, showRule } from "./rules_read.ts";
 import { type IResolvedSelection, resolveSelection } from "./selection.ts";
+import type { JsonValue } from "../engine/catalog.ts";
 import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.ts";
 
 const USAGE = [
   "Usage:",
   "  unslop rules list [--category=<category>] [--status=<status>] [--format=table|json] [--select=<tokens>|--profile=<name>]",
   "  unslop rules show <id> [--format=table|json] [--select=<tokens>|--profile=<name>]",
+  "  unslop rules enable <id> [--level=error|warn] [--dry-run]",
+  "  unslop rules disable <id> --reason=<text> [--opt-in] [--dry-run]",
+  "  unslop rules set <id> <option>=<json> [--dry-run]",
+  "  unslop rules unset <id> <option> [--dry-run]",
   "  unslop presets list [--format=table|json]",
   "  unslop presets show <name> [--format=table|json]",
   "  unslop config validate [--descriptor=<entry>]",
@@ -100,6 +106,27 @@ async function loadQuery(parsed: IParsedArgs): Promise<{
   return { compiled: project.compiled, descriptor: project.descriptor, selection };
 }
 
+async function finishEdit(parsed: IParsedArgs, request: IRuleEditRequest): Promise<number> {
+  const result = await runRuleEdit(Deno.cwd(), request, {
+    plugin: option(parsed, "plugin"),
+    dryRun: parsed.flags.has("dry-run"),
+  });
+  if (result.diff !== null) {
+    if (result.diff !== "") print(result.diff);
+    return 0;
+  }
+  print(result.changed ? `wrote ${result.path}\n` : `unchanged ${result.path}\n`);
+  return 0;
+}
+
+function parseOptionValue(raw: string): JsonValue {
+  try {
+    return JSON.parse(raw) as JsonValue;
+  } catch {
+    throw new CliError(USAGE_EXIT, `'${raw}' is not valid JSON`);
+  }
+}
+
 async function rulesCommand(args: readonly string[]): Promise<number> {
   const [sub, ...rest] = args;
   if (sub === "list") {
@@ -122,6 +149,38 @@ async function rulesCommand(args: readonly string[]): Promise<number> {
     const { compiled, selection } = await loadQuery(parsed);
     print(showRule(compiled, { format: parseFormat(option(parsed, "format")), selection }, id));
     return 0;
+  }
+  if (sub === "enable") {
+    const parsed = parseArgs(rest, ["level", "plugin"], ["dry-run"]);
+    const [id] = requirePositionals(parsed, 1, "rules enable");
+    return await finishEdit(parsed, { kind: "enable", id, level: option(parsed, "level") });
+  }
+  if (sub === "disable") {
+    const parsed = parseArgs(rest, ["reason", "plugin"], ["opt-in", "dry-run"]);
+    const [id] = requirePositionals(parsed, 1, "rules disable");
+    const reason = option(parsed, "reason");
+    if (reason === undefined || reason.trim() === "") {
+      throw new CliError(USAGE_EXIT, "rules disable needs --reason=<text>");
+    }
+    return await finishEdit(parsed, { kind: "disable", id, reason, optIn: parsed.flags.has("opt-in") });
+  }
+  if (sub === "set") {
+    const parsed = parseArgs(rest, ["plugin"], ["dry-run"]);
+    const [id, assignment] = requirePositionals(parsed, 2, "rules set");
+    const separator = assignment.indexOf("=");
+    if (separator <= 0) throw new CliError(USAGE_EXIT, "rules set needs <option>=<json>");
+    return await finishEdit(parsed, {
+      kind: "set",
+      id,
+      option: assignment.slice(0, separator),
+      value: parseOptionValue(assignment.slice(separator + 1)),
+    });
+  }
+  if (sub === "unset") {
+    const parsed = parseArgs(rest, ["plugin"], ["dry-run"]);
+    const [id, name] = requirePositionals(parsed, 2, "rules unset");
+    if (name.trim() === "") throw new CliError(USAGE_EXIT, "rules unset needs an option name");
+    return await finishEdit(parsed, { kind: "unset", id, option: name });
   }
   throw new CliError(USAGE_EXIT, `unknown rules command '${sub ?? ""}'\n${USAGE}`);
 }

@@ -225,3 +225,45 @@ export async function writeMigrationPair(inputs: IMigrationWriteInputs): Promise
     for (const lock of locks) await removeQuietly(lock);
   }
 }
+
+/** One in-place replacement of an existing file. */
+export interface IReplaceFileInput {
+  readonly path: string;
+  readonly contents: string;
+  /** The exact text the caller read before it planned the change. */
+  readonly expected: string;
+  readonly hooks?: {
+    /** Runs under the lock and before the final byte and identity comparison. */
+    readonly beforeCompare?: () => void | Promise<void>;
+  };
+}
+
+/**
+ * Replaces an existing regular file: it locks, compares the current bytes and identity,
+ * preserves the mode, and renames a private temp over the destination.
+ */
+export async function replaceFile(input: IReplaceFileInput): Promise<string> {
+  const target = await canonicalDestination(input.path);
+  const initial = await lstatOrNull(target);
+  if (!initial) throw new WriteRefusalError(`${target}: the file does not exist.`);
+  if (initial.isSymlink) throw new WriteRefusalError(`${target}: the destination is a symlink.`);
+  if (!initial.isFile) throw new WriteRefusalError(`${target}: the destination is not a regular file.`);
+  const lock = await acquireLock(target);
+  let temp: IStagedFile | null = null;
+  try {
+    if (input.hooks?.beforeCompare) await input.hooks.beforeCompare();
+    const current = await Deno.readTextFile(target);
+    const currentStat = await Deno.lstat(target);
+    const inoChanged = initial.ino !== null && currentStat.ino !== null && initial.ino !== currentStat.ino;
+    if (!currentStat.isFile || inoChanged || current !== input.expected) {
+      throw new WriteRefusalError(`${target}: the file changed while the command ran; re-run the command.`);
+    }
+    temp = await stage(target, input.contents);
+    if (initial.mode !== null) await Deno.chmod(temp.path, initial.mode);
+    await Deno.rename(temp.path, target);
+    return target;
+  } finally {
+    if (temp) await removeQuietly(temp.path);
+    await removeQuietly(lock);
+  }
+}

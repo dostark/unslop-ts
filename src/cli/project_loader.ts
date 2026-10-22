@@ -8,6 +8,7 @@
  */
 
 import { dirname, fromFileUrl, join, resolve, toFileUrl } from "@std/path";
+import type { JsonValue } from "../engine/catalog.ts";
 import { compileConfig } from "../config/compile.ts";
 import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.ts";
 import type { IUnslopProject } from "../config/project.ts";
@@ -218,8 +219,14 @@ function assertJsonConfig(url: URL): void {
   }
 }
 
-/** Reads and structurally parses the version 2 file without compiling it. */
-export async function readConfigObject(descriptor: IProjectDescriptor): Promise<IConfigV2> {
+/** The exact bytes and parsed value of the version 2 file, before schema defaults apply. */
+export interface IConfigSource {
+  readonly text: string;
+  readonly value: JsonValue;
+}
+
+/** Reads and parses the version 2 file as raw JSON, so an edit can preserve the author's fields. */
+export async function readConfigSource(descriptor: IProjectDescriptor): Promise<IConfigSource> {
   assertJsonConfig(descriptor.configUrl);
   const label = configLabel(descriptor);
   let text: string;
@@ -228,15 +235,20 @@ export async function readConfigObject(descriptor: IProjectDescriptor): Promise<
   } catch {
     throw new CliError(FAILURE_EXIT, `${label}: cannot read the configuration.`);
   }
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    return { text, value: JSON.parse(text) as JsonValue };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new CliError(FAILURE_EXIT, `${label}: invalid JSON (${message})`);
   }
-  const result = ConfigV2Schema.safeParse(parsed);
+}
+
+/** Reads and structurally parses the version 2 file without compiling it. */
+export async function readConfigObject(descriptor: IProjectDescriptor): Promise<IConfigV2> {
+  const source = await readConfigSource(descriptor);
+  const result = ConfigV2Schema.safeParse(source.value);
   if (!result.success) {
+    const label = configLabel(descriptor);
     const issue = result.error.issues[0];
     const path = issue && issue.path.length > 0 ? issue.path.map(String).join(".") : "config";
     throw new CliError(FAILURE_EXIT, `${label}: ${path}: ${issue?.message ?? "invalid configuration"}`);
