@@ -118,6 +118,8 @@ Deno.test("level_tuple_and_long_form_compile_to_the_same_entry", () => {
   });
   assertEquals(tupleOptions.rules[id].sources.fields.options, `config:rules.${id}`);
   assertEquals(shortForm.rules[id].sources.fields.options, "default");
+  assertEquals(shortForm.rules[id].reason, null);
+  assertEquals(shortForm.catalog.rules[id].reason, undefined);
 });
 
 Deno.test("presets_expand_by_membership", () => {

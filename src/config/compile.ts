@@ -328,7 +328,7 @@ function resolveRule(
   const include = entry.controls.fixedInclude ?? setting?.include ?? null;
   const exclude = entry.controls.fixedExclude ?? setting?.exclude ?? null;
   const optIn = setting?.optIn ?? true;
-  const reason = setting?.reason ?? NOT_ENABLED_REASON;
+  const reason = setting === undefined ? NOT_ENABLED_REASON : setting.reason;
   const docs = setting?.docs ?? (entry.engineOwned ? `${config.docsBase}${entry.meta.docs}` : entry.meta.docs);
   const tags = validateRuleTags(id, setting?.tags ?? [entry.meta.category], scope, config.tags);
   return {
