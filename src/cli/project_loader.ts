@@ -160,7 +160,9 @@ export async function locateProject(cwd: string, pluginArg: string | null): Prom
 function isDescriptor(value: unknown): value is IProjectDescriptor {
   const record = asRecord(value);
   return record !== null && typeof record.pluginName === "string" && Array.isArray(record.packs) &&
-    record.configUrl instanceof URL;
+    record.rootUrl instanceof URL && record.configUrl instanceof URL &&
+    record.lintConfigUrl instanceof URL && record.pluginUrl instanceof URL &&
+    asRecord(record.scriptRules) !== null && asRecord(record.wholeTreeHosts) !== null;
 }
 
 function isProject(value: unknown): value is IUnslopProject {
@@ -258,9 +260,9 @@ export async function readConfigObject(descriptor: IProjectDescriptor): Promise<
 
 /** Reads the version 2 file from disk and compiles it against the descriptor. */
 export async function readAndCompile(descriptor: IProjectDescriptor): Promise<ICompiledConfig> {
-  const config = await readConfigObject(descriptor);
+  const source = await readConfigSource(descriptor);
   try {
-    return compileConfig(config, descriptor);
+    return compileConfig(source.value, descriptor);
   } catch (error) {
     if (error instanceof ConfigError) throw new CliError(FAILURE_EXIT, `${configLabel(descriptor)}: ${error.message}`);
     throw error;

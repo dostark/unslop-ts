@@ -50,6 +50,7 @@ interface IRuleBase {
   readonly command: readonly string[] | null;
   readonly docs: string;
   readonly tags: readonly string[];
+  readonly exclusionCodes: Readonly<Record<string, string>> | null;
 }
 
 function hostModesText(controls: IRuleControls): string {
@@ -86,6 +87,7 @@ function baseView(rule: IResolvedRule, selection: IResolvedSelection | null): IR
     command: rule.command,
     docs: rule.docs,
     tags: rule.tags,
+    exclusionCodes: rule.exclusionCodes,
   };
 }
 
@@ -143,6 +145,7 @@ function showTable(rule: IResolvedRule, view: IRuleBase): string {
     `configured options: ${optionsText(rule.configuredOptions)}`,
     `default options: ${optionsText(rule.defaultOptions)}`,
     `effective options: ${optionsText(rule.effectiveOptions)}`,
+    `exclusion codes: ${view.exclusionCodes === null ? NO_VALUE : JSON.stringify(view.exclusionCodes)}`,
     `sources: ${sourcesText(rule.sources)}`,
   ];
   return `${lines.join("\n")}\n`;

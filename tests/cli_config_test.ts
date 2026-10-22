@@ -174,3 +174,26 @@ Deno.test("config_validate_rejects_an_ambiguous_profile_key", async () => {
     assertStringIncludes(result.stderr, "ambiguous");
   });
 });
+
+Deno.test("config_validate_rejects_a_prototype_option", async () => {
+  await withCliProject(async (dir) => {
+    const config = JSON.parse(await Deno.readTextFile(configPath(dir))) as { rules: Record<string, unknown> };
+    config.rules["demo/max-params"] = ["error", JSON.parse('{"__proto__":{"max":3}}')];
+    await Deno.writeTextFile(configPath(dir), JSON.stringify(config, null, 2));
+    const result = await runCli(dir, ["config", "validate"]);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stderr, "rules.demo/max-params.options.__proto__");
+  });
+});
+
+Deno.test("config_validate_refuses_a_malformed_descriptor", async () => {
+  await withCliProject(async (dir) => {
+    await Deno.writeTextFile(
+      join(dir, "examples", "bad.project.ts"),
+      'export const descriptor = { pluginName: "demo", packs: [], configUrl: new URL("./unslop.config.json", import.meta.url) };\n',
+    );
+    const result = await runCli(dir, ["config", "validate", "--descriptor=examples/bad.project.ts"]);
+    assertEquals(result.code, 2);
+    assertStringIncludes(result.stderr, "must export 'descriptor'");
+  });
+});

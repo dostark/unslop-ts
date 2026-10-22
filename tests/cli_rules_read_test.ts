@@ -8,7 +8,7 @@
  */
 
 import { assertArrayIncludes, assertEquals, assertStringIncludes } from "@std/assert";
-import { runCli, withCliProject } from "./helpers/cli_project.ts";
+import { configPath, runCli, withCliProject } from "./helpers/cli_project.ts";
 
 interface IRuleView {
   readonly id: string;
@@ -23,6 +23,7 @@ interface IRuleView {
   readonly configuredOptions: Record<string, unknown>;
   readonly defaultOptions: Record<string, unknown> | null;
   readonly effectiveOptions: Record<string, unknown> | null;
+  readonly exclusionCodes: Record<string, string> | null;
   readonly sources: { readonly fields: Record<string, string> };
 }
 
@@ -171,5 +172,15 @@ Deno.test("rules_show_prints_the_corrected_origins", async () => {
     assertEquals(rule.sources.fields.scope, "default");
     assertEquals(rule.sources.fields.docs, "default");
     assertEquals(rule.sources.fields.tags, "default");
+  });
+});
+
+Deno.test("rules_show_prints_exclusion_codes", async () => {
+  await withCliProject(async (dir) => {
+    const config = JSON.parse(await Deno.readTextFile(configPath(dir))) as { rules: Record<string, unknown> };
+    config.rules["project-check"] = { level: "warn", exclusionCodes: { "a-code": "Because." } };
+    await Deno.writeTextFile(configPath(dir), JSON.stringify(config, null, 2));
+    const rule = ruleOf((await runCli(dir, ["rules", "show", "project-check", "--format=json"])).stdout);
+    assertEquals(rule.exclusionCodes, { "a-code": "Because." });
   });
 });
