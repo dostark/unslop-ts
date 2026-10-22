@@ -7,7 +7,9 @@
  * @related-files [mod.ts, src/engine/plugin.ts]
  */
 
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
+import * as api from "../mod.ts";
+import { main } from "../src/cli/unslop.ts";
 import { walk } from "@std/fs";
 import { fromFileUrl, relative } from "@std/path";
 
@@ -91,4 +93,31 @@ Deno.test("the purity check rejects a consumer style-guide name in a seeded engi
   const guideName = ["CODE", "STYLE"].join("_");
   const violations = purityViolations([{ path: "src/fixture.ts", text: `const guide = "${guideName}.md";` }]);
   assertEquals(violations, [`src/fixture.ts: names '${guideName.toLowerCase()}'`]);
+});
+
+Deno.test("engine_suite_and_public_exports", async () => {
+  const config = JSON.parse(await Deno.readTextFile(new URL("../deno.json", import.meta.url))) as {
+    exports: Record<string, string>;
+    tasks: Record<string, string>;
+  };
+  assertEquals(config.exports["./cli"], "./src/cli/unslop.ts");
+  assert(typeof config.tasks.cli === "string" && config.tasks.cli.length > 0);
+  assertEquals(typeof main, "function");
+  const exported = [
+    "compileConfig",
+    "configJsonSchema",
+    "createUnslopProject",
+    "migrateCatalog",
+    "semanticCatalogProjection",
+    "semanticCompiledProjection",
+    "enableRule",
+    "disableRule",
+    "setOption",
+    "unsetOption",
+    "WHOLE_TREE_CHECKS",
+    "PRESETS",
+    "RULE_CATEGORIES",
+    "NOT_ENABLED_REASON",
+  ];
+  for (const name of exported) assert(name in api, name);
 });
