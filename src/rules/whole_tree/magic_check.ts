@@ -38,6 +38,6 @@ export async function checkMagicLiterals(
     if (pathClass === "fixture" || (pathClass === "test" && !includeTests)) continue;
     files.push({ path, text: await Deno.readTextFile(entry.path), isTest: pathClass === "test" });
   }
-  files.sort((a, b) => a.path.localeCompare(b.path));
+  files.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
   return detectMagicLiterals(files, options);
 }

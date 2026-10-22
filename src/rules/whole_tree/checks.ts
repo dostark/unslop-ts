@@ -38,7 +38,8 @@ export interface IWholeTreeCheck {
   readonly command: readonly string[];
 }
 
-const CLI_PATH = "src/cli/whole_tree.ts";
+const CLI_SEGMENTS = ["src", "cli", "whole_tree.ts"] as const;
+const CLI_PATH = CLI_SEGMENTS.join("/");
 const CATALOG_ARGUMENT = "--catalog=<catalog>";
 const UNUSED_EXPORTS_STRICT = "--strict";
 const OPTIONAL_PARAMS_FAIL = "--fail";

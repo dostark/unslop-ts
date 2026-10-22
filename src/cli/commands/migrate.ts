@@ -35,7 +35,7 @@ function messageOf(error: unknown): string {
 
 /** Migrates a version 1 catalog to a version 2 configuration plus its separate layout. */
 export async function runMigrate(cwd: string, options: IMigrateOptions): Promise<IMigrationWriteResult> {
-  const descriptor = await loadConfigDescriptor(cwd, options.descriptor);
+  const descriptor = await loadConfigDescriptor(cwd, options.descriptor, null);
   const fromUrl = await resolveLocalEntry(options.from, cwd);
   let text: string;
   try {

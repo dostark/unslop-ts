@@ -56,18 +56,18 @@ export function resolveSelection(
   compiled: ICompiledConfig,
   config: IConfigV2,
   pluginName: string,
-  select?: string,
-  profile?: string,
+  select: string | null,
+  profile: string | null,
 ): IResolvedSelection | null {
-  if (select !== undefined && profile !== undefined) {
+  if (select !== null && profile !== null) {
     throw new CliError(USAGE_EXIT, "--select and --profile cannot be combined.");
   }
   let tokens: string;
-  if (profile !== undefined) {
+  if (profile !== null) {
     const selectors = config.profiles[profile];
     if (!selectors) throw new CliError(USAGE_EXIT, `unknown profile '${profile}'`);
     tokens = selectors.join(",");
-  } else if (select !== undefined) {
+  } else if (select !== null) {
     tokens = select;
   } else {
     tokens = readSelectionVariable(pluginName);

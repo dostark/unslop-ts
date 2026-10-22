@@ -134,10 +134,10 @@ async function siblingDescriptor(pluginPath: string, root: string): Promise<stri
 }
 
 /** Finds the project and its single configured local plugin. Several plugins require `--plugin`. */
-export async function locateProject(cwd: string, pluginArg?: string): Promise<IProjectLocation> {
+export async function locateProject(cwd: string, pluginArg: string | null): Promise<IProjectLocation> {
   const lint = await findLintConfig(cwd);
   let pluginPath: string;
-  if (pluginArg !== undefined) {
+  if (pluginArg !== null) {
     pluginPath = resolve(cwd, pluginArg);
   } else {
     const plugins = configuredPlugins(await readLintConfig(lint.configPath));
@@ -178,9 +178,9 @@ async function loadProjectEntry(value: string, cwd: string): Promise<IUnslopProj
 }
 
 /** Loads the configured project, whose entry exports a compiled `project`. */
-export async function loadProject(cwd: string, pluginArg?: string): Promise<IUnslopProject> {
-  if (pluginArg !== undefined) return await loadProjectEntry(pluginArg, cwd);
-  const location = await locateProject(cwd);
+export async function loadProject(cwd: string, pluginArg: string | null): Promise<IUnslopProject> {
+  if (pluginArg !== null) return await loadProjectEntry(pluginArg, cwd);
+  const location = await locateProject(cwd, null);
   return await loadProjectEntry(location.pluginPath, cwd);
 }
 
@@ -195,10 +195,10 @@ async function loadDescriptorEntry(value: string, cwd: string): Promise<IProject
 /** Loads the descriptor that a configuration command needs, without importing the plugin. */
 export async function loadConfigDescriptor(
   cwd: string,
-  descriptorArg?: string,
-  pluginArg?: string,
+  descriptorArg: string | null,
+  pluginArg: string | null,
 ): Promise<IProjectDescriptor> {
-  if (descriptorArg !== undefined) return await loadDescriptorEntry(descriptorArg, cwd);
+  if (descriptorArg !== null) return await loadDescriptorEntry(descriptorArg, cwd);
   const location = await locateProject(cwd, pluginArg);
   if (location.descriptorPath === null) {
     throw new CliError(

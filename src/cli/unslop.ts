@@ -99,14 +99,14 @@ async function loadQuery(parsed: IParsedArgs): Promise<{
   descriptor: IProjectDescriptor;
   selection: IResolvedSelection | null;
 }> {
-  const project = await loadProject(Deno.cwd(), option(parsed, "plugin"));
+  const project = await loadProject(Deno.cwd(), option(parsed, "plugin") ?? null);
   const config = await readConfigObject(project.descriptor);
   const selection = resolveSelection(
     project.compiled,
     config,
     project.descriptor.pluginName,
-    option(parsed, "select"),
-    option(parsed, "profile"),
+    option(parsed, "select") ?? null,
+    option(parsed, "profile") ?? null,
   );
   return { compiled: project.compiled, descriptor: project.descriptor, selection };
 }
@@ -241,7 +241,11 @@ async function configCommand(args: readonly string[]): Promise<number> {
   if (sub === "validate") {
     const parsed = parseArgs(rest, ["descriptor", "plugin"], []);
     requirePositionals(parsed, 0, "config validate");
-    const descriptor = await loadConfigDescriptor(Deno.cwd(), option(parsed, "descriptor"), option(parsed, "plugin"));
+    const descriptor = await loadConfigDescriptor(
+      Deno.cwd(),
+      option(parsed, "descriptor") ?? null,
+      option(parsed, "plugin") ?? null,
+    );
     const compiled = await readAndCompile(descriptor);
     print(validationText(descriptor, compiled));
     return 0;
@@ -249,7 +253,11 @@ async function configCommand(args: readonly string[]): Promise<number> {
   if (sub === "print") {
     const parsed = parseArgs(rest, ["descriptor", "plugin"], ["resolved"]);
     requirePositionals(parsed, 0, "config print");
-    const descriptor = await loadConfigDescriptor(Deno.cwd(), option(parsed, "descriptor"), option(parsed, "plugin"));
+    const descriptor = await loadConfigDescriptor(
+      Deno.cwd(),
+      option(parsed, "descriptor") ?? null,
+      option(parsed, "plugin") ?? null,
+    );
     print(printConfigText(await readAndCompile(descriptor), parsed.flags.has("resolved")));
     return 0;
   }

@@ -295,18 +295,44 @@ there is no `report` command yet.
 
 ## Option validation
 
-A regular expression option is checked when the configuration is compiled. A pattern that does not
-compile, a repeated or unknown flag, and a pattern that fails with its own flags are `ConfigError`s that
-name the field. The whole-tree command reports the same error and exits with code 2. The fields are the
-`specifiers` of `allowDynamicImports`, the `pattern` and `flags` of each `ephemeral-comment` phrase,
-the `pattern` of `ephemeral-filename`, and `testScaffoldPattern` of `wholeTree.magicLiterals`.
+A regular expression option is checked when the catalog is parsed (version 1) or the configuration is
+compiled (version 2). A pattern that does not compile, a repeated or unknown flag, and a pattern that
+fails with its own flags are `CatalogError`/`ConfigError`s that name the field. The whole-tree command
+reports the same error and exits with code 2. The fields are the `specifiers` of
+`allowDynamicImports`, the `pattern` and `flags` of each `ephemeral-comment` phrase, the `pattern` of
+`ephemeral-filename`, and `testScaffoldPattern` of the magic-literals options.
+
+The version 1 catalog form:
 
 ```json
 {
   "rules": {
     "demo/ephemeral-comment": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": ["demo"],
+      "options": { "phrases": [{ "pattern": "\\btried\\b", "flags": "gi", "hint": "State the fact." }] }
+    }
+  },
+  "wholeTree": { "magicLiterals": { "checkNumbers": false, "testScaffoldPattern": "^scaffold-" } }
+}
+```
+
+The version 2 configuration form puts the same options in rule entries:
+
+```json
+{
+  "version": 2,
+  "plugin": "demo",
+  "rules": {
+    "demo/ephemeral-comment": {
       "level": "error",
       "options": { "phrases": [{ "pattern": "\\btried\\b", "flags": "gi", "hint": "State the fact." }] }
+    },
+    "magic-literals": {
+      "level": "error",
+      "options": { "checkNumbers": false, "testScaffoldPattern": "^scaffold-" }
     }
   }
 }

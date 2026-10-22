@@ -298,7 +298,7 @@ function violationsOf(
   if (accumulator.occurrences.length > globalThreshold) {
     const files = [...accumulator.perFile]
       .map(([file, count]) => ({ file, count, firstLine: firstLineIn(accumulator, file) }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file, undefined, { numeric: true }));
     found.push(violationFrom(accumulator, "global", files, candidate));
   }
   for (const [file, count] of accumulator.perFile) {

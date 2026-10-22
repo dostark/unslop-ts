@@ -87,7 +87,7 @@ export async function runRuleEdit(
   request: IRuleEditRequest,
   options: IRuleEditOptions,
 ): Promise<IRuleEditResult> {
-  const project = await loadProject(cwd, options.plugin);
+  const project = await loadProject(cwd, options.plugin ?? null);
   const source = await readConfigSource(project.descriptor);
   const context: IEditContext = { descriptor: project.descriptor, compiled: project.compiled };
   let next: JsonValue;
