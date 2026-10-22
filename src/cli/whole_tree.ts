@@ -16,6 +16,8 @@
  */
 
 import { relative } from "@std/path";
+import { CliError } from "./error.ts";
+import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
 import { CatalogError, type JsonValue } from "../engine/catalog.ts";
 import { selectionEnvNameForRule } from "../engine/plugin.ts";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
@@ -229,15 +231,7 @@ async function runOptionalParams(
   }
 }
 
-async function runMagicLiterals(catalogPath: string, includeTests: boolean): Promise<void> {
-  let catalog: JsonValue;
-  try {
-    catalog = JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue;
-  } catch (error) {
-    return exitWithUsage(
-      `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+async function runMagicLiterals(catalog: JsonValue, includeTests: boolean): Promise<void> {
   let violations;
   try {
     violations = await checkMagicLiterals(Deno.cwd(), catalog, includeTests);
@@ -266,15 +260,7 @@ const DUPLICATE_SUBJECT: Readonly<Record<DuplicateRuleKey, string>> = {
   "duplicate-constant": "constants",
 };
 
-async function runDuplicates(rule: DuplicateRuleKey, catalogPath: string): Promise<void> {
-  let catalog: JsonValue;
-  try {
-    catalog = JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue;
-  } catch (error) {
-    return exitWithUsage(
-      `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+async function runDuplicates(rule: DuplicateRuleKey, catalog: JsonValue): Promise<void> {
   let report;
   try {
     report = await checkDuplicates(Deno.cwd(), catalog, rule);
@@ -297,22 +283,60 @@ async function runDuplicates(rule: DuplicateRuleKey, catalogPath: string): Promi
 function exitWithUsage(message: string): never {
   console.error(message);
   console.error(
-    `Usage: whole_tree.ts --catalog=<path> --rule=<${
+    `Usage: whole_tree.ts (--catalog=<path> | --descriptor=<path> | --plugin=<path>) --rule=<${
       RULES.join("|")
     }> [--strict] [--staged] [--include-tests] [--fail]`,
   );
   Deno.exit(USAGE_EXIT);
 }
 
-/** Reads the whole-tree settings from the `--catalog` file, or exits with a usage error. */
-async function loadSettings(catalogPath: string): Promise<IWholeTreeSettings> {
+const NON_FILE = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+
+function inputCount(args: readonly string[]): number {
+  return ["catalog", "descriptor", "plugin"].filter((name) => flagValue(args, name) !== undefined).length;
+}
+
+/** Loads either the legacy catalog or a compiled descriptor, with exactly one explicit input. */
+async function loadCatalog(args: readonly string[]): Promise<JsonValue> {
+  if (inputCount(args) !== 1) {
+    return exitWithUsage("Pass exactly one of --catalog, --descriptor, or --plugin.");
+  }
+  const catalogPath = flagValue(args, "catalog");
+  if (catalogPath !== undefined) {
+    if (NON_FILE.test(catalogPath) && !catalogPath.startsWith("file:")) {
+      return exitWithUsage(`'${catalogPath}' is not a filesystem path.`);
+    }
+    try {
+      return JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue;
+    } catch (error) {
+      return exitWithUsage(
+        `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  const descriptorArg = flagValue(args, "descriptor") ?? null;
+  const pluginArg = flagValue(args, "plugin") ?? null;
+  for (const value of [descriptorArg, pluginArg]) {
+    if (value !== null && NON_FILE.test(value) && !value.startsWith("file:")) {
+      return exitWithUsage(`'${value}' is not a filesystem path.`);
+    }
+  }
   try {
-    return parseWholeTreeSettings(JSON.parse(await Deno.readTextFile(catalogPath)) as JsonValue);
+    const descriptor = await loadConfigDescriptor(Deno.cwd(), descriptorArg, pluginArg);
+    const compiled = await readAndCompile(descriptor);
+    return structuredClone(compiled.catalog) as JsonValue;
+  } catch (error) {
+    if (error instanceof CliError) return exitWithUsage(error.message);
+    throw error;
+  }
+}
+
+/** Reads the whole-tree settings from the catalog, or exits with a usage error. */
+function loadSettings(catalog: JsonValue): IWholeTreeSettings {
+  try {
+    return parseWholeTreeSettings(catalog);
   } catch (error) {
     if (error instanceof CatalogError) return exitWithUsage(error.message);
-    if (error instanceof Deno.errors.NotFound || error instanceof SyntaxError) {
-      return exitWithUsage(`Cannot read the catalog '${catalogPath}': ${error.message}`);
-    }
     throw error;
   }
 }
@@ -320,11 +344,10 @@ async function loadSettings(catalogPath: string): Promise<IWholeTreeSettings> {
 async function main(): Promise<void> {
   const rule = flagValue(Deno.args, "rule");
   if (rule === undefined || !RULES.includes(rule)) exitWithUsage("Missing or unknown --rule.");
-  const catalogPath = flagValue(Deno.args, "catalog");
-  if (catalogPath === undefined) exitWithUsage("Missing --catalog=<path>.");
-  if (isDuplicateRule(rule)) return await runDuplicates(rule, catalogPath);
-  if (rule === MAGIC_RULE) return await runMagicLiterals(catalogPath, Deno.args.includes("--include-tests"));
-  const settings = await loadSettings(catalogPath);
+  const catalog = await loadCatalog(Deno.args);
+  if (isDuplicateRule(rule)) return await runDuplicates(rule, catalog);
+  if (rule === MAGIC_RULE) return await runMagicLiterals(catalog, Deno.args.includes("--include-tests"));
+  const settings = loadSettings(catalog);
   const args = Deno.args;
   if (rule === "constant-restatement") {
     if (!settings.constantRestatement) exitWithUsage("The catalog has no wholeTree.constantRestatement section.");

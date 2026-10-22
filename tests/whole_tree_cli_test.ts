@@ -11,6 +11,7 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { CLI_PATH, withCliProject } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
+import { loadConfigDescriptor, readAndCompile } from "../src/cli/project_loader.ts";
 
 const CLI = new URL("../src/cli/whole_tree.ts", import.meta.url).href;
 const USAGE_EXIT = 2;
@@ -216,5 +217,164 @@ Deno.test("config_print_output_is_a_working_whole_tree_catalog", async () => {
     );
     assertEquals(result.code, 0, result.stderr);
     assertStringIncludes(result.stdout, "No constant restatements found");
+  });
+});
+
+const ALL_RULES = [
+  "constant-restatement",
+  "unused-exports",
+  "optional-params",
+  "magic-literals",
+  "duplicate-type",
+  "duplicate-constant",
+] as const;
+
+async function writeWholeTreeConfig(dir: string): Promise<void> {
+  await Deno.mkdir(join(dir, "src"), { recursive: true });
+  await Deno.writeTextFile(join(dir, "src", "constants.ts"), 'export const HOSTS = ["a.test"];\n');
+  const path = join(dir, "examples", "unslop.config.json");
+  const config = JSON.parse(await Deno.readTextFile(path)) as { rules: Record<string, unknown> };
+  config.rules["magic-literals"] = ["error", {}];
+  config.rules["duplicate-type"] = ["error", {}];
+  config.rules["duplicate-constant"] = ["error", {}];
+  config.rules["unused-exports"] = ["warn", {
+    productionRoots: ["src"],
+    testSegments: ["tests"],
+    testSuffixes: ["_test.ts"],
+    entrypointSuffixes: ["_test.ts"],
+    mainEntrypointSuffixes: ["main.ts"],
+    scriptRoot: "scripts",
+    walkSkipPatterns: ["node_modules"],
+    strictSkipPrefixes: [],
+    strictSkipSegments: [],
+  }];
+  config.rules["optional-params"] = ["warn", {
+    wrapperType: "Opt",
+    wrapperImport: "@demo/types",
+    reasonExamples: ["OptionalInput"],
+    testSegments: ["tests"],
+    testSuffixes: ["_test.ts"],
+    skipSegments: ["vendor"],
+    walkSkipSegments: ["node_modules"],
+    pluginRuleId: "demo/no-optional-params",
+  }];
+  await Deno.writeTextFile(path, JSON.stringify(config, null, 2));
+}
+
+async function compiledCatalog(dir: string): Promise<void> {
+  const descriptor = await loadConfigDescriptor(dir, "examples/unslop.project.ts", null);
+  const compiled = await readAndCompile(descriptor);
+  await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(compiled.catalog, null, 2));
+}
+
+Deno.test("v2_whole_tree_adapter_covers_six_checks", async () => {
+  await withCliProject(async (dir) => {
+    await writeWholeTreeConfig(dir);
+    await compiledCatalog(dir);
+    await Deno.mkdir(join(dir, "src"), { recursive: true });
+    await Deno.writeTextFile(join(dir, "src", "clean.ts"), "export const value = 1;\n");
+    for (const rule of ALL_RULES) {
+      const v1 = await runDeno(["run", "-A", CLI, `--rule=${rule}`, "--catalog=catalog.json"], dir);
+      const v2 = await runDeno(["run", "-A", CLI, `--rule=${rule}`, "--descriptor=examples/unslop.project.ts"], dir);
+      assertEquals(v2.code, v1.code, rule);
+      assertEquals(v2.stdout, v1.stdout, rule);
+    }
+  });
+});
+
+Deno.test("whole_tree_modes_preserve_existing_enforcement", async () => {
+  await withCliProject(async (dir) => {
+    await writeWholeTreeConfig(dir);
+    await compiledCatalog(dir);
+    await Deno.mkdir(join(dir, "src"), { recursive: true });
+    await Deno.writeTextFile(join(dir, "src", "optional.ts"), "export function f(x?: number) { return x; }\n");
+    for (const flags of [["--fail"], ["--include-tests"], ["--verbose"]]) {
+      const v1 = await runDeno(["run", "-A", CLI, "--rule=optional-params", "--catalog=catalog.json", ...flags], dir);
+      const v2 = await runDeno(
+        ["run", "-A", CLI, "--rule=optional-params", "--descriptor=examples/unslop.project.ts", ...flags],
+        dir,
+      );
+      assertEquals(v2.code, v1.code, flags.join(" "));
+      assertEquals(v2.stdout, v1.stdout, flags.join(" "));
+    }
+    const strict = ["--rule=unused-exports", "--strict"];
+    const v1 = await runDeno(["run", "-A", CLI, ...strict, "--catalog=catalog.json"], dir);
+    const v2 = await runDeno(["run", "-A", CLI, ...strict, "--descriptor=examples/unslop.project.ts"], dir);
+    assertEquals(v2.code, v1.code);
+    assertEquals(v2.stdout, v1.stdout);
+  });
+});
+
+Deno.test("whole_tree_uses_safe_shared_loader", async () => {
+  await withCliProject(async (dir) => {
+    await writeWholeTreeConfig(dir);
+    await compiledCatalog(dir);
+    const restricted = await runDeno(
+      [
+        "run",
+        "--allow-read",
+        "--allow-env",
+        CLI,
+        "--descriptor=examples/unslop.project.ts",
+        "--rule=constant-restatement",
+      ],
+      dir,
+    );
+    assertEquals(restricted.code, 0, restricted.stderr);
+    const nonFile = await runDeno(
+      [
+        "run",
+        "-A",
+        CLI,
+        "--descriptor=data:text/typescript,export const descriptor = {};",
+        "--rule=constant-restatement",
+      ],
+      dir,
+    );
+    assertEquals(nonFile.code, USAGE_EXIT);
+    const ambiguous = await runDeno(
+      [
+        "run",
+        "-A",
+        CLI,
+        "--catalog=catalog.json",
+        "--descriptor=examples/unslop.project.ts",
+        "--rule=constant-restatement",
+      ],
+      dir,
+    );
+    assertEquals(ambiguous.code, USAGE_EXIT);
+    await Deno.writeTextFile(join(dir, "examples", "unslop.config.json"), "{ not json");
+    const bad = await runDeno(
+      ["run", "-A", CLI, "--descriptor=examples/unslop.project.ts", "--rule=constant-restatement"],
+      dir,
+    );
+    assertEquals(bad.code, USAGE_EXIT);
+  });
+});
+
+Deno.test("whole_tree_unsupported_controls_are_refused", async () => {
+  await withCliProject(async (dir) => {
+    await writeWholeTreeConfig(dir);
+    const path = join(dir, "examples", "unslop.config.json");
+    const config = JSON.parse(await Deno.readTextFile(path)) as { rules: Record<string, unknown> };
+    config.rules["unused-exports"] = ["error", {
+      productionRoots: ["src"],
+      testSegments: ["tests"],
+      testSuffixes: ["_test.ts"],
+      entrypointSuffixes: ["_test.ts"],
+      mainEntrypointSuffixes: ["main.ts"],
+      scriptRoot: "scripts",
+      walkSkipPatterns: ["node_modules"],
+      strictSkipPrefixes: [],
+      strictSkipSegments: [],
+    }];
+    await Deno.writeTextFile(path, JSON.stringify(config, null, 2));
+    const result = await runDeno(
+      ["run", "-A", CLI, "--descriptor=examples/unslop.project.ts", "--rule=unused-exports"],
+      dir,
+    );
+    assertEquals(result.code, USAGE_EXIT);
+    assertStringIncludes(result.stderr, "fixes the level");
   });
 });
