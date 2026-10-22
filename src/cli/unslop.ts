@@ -20,6 +20,7 @@ import { listPresets, showPreset } from "./presets.ts";
 import { printConfigText, schemaText, validationText } from "./config_read.ts";
 import { parseFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
+import { runMigrate } from "./commands/migrate.ts";
 import { listRules, showRule } from "./rules_read.ts";
 import { type IResolvedSelection, resolveSelection } from "./selection.ts";
 import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.ts";
@@ -33,6 +34,7 @@ const USAGE = [
   "  unslop config validate [--descriptor=<entry>]",
   "  unslop config print [--resolved] [--descriptor=<entry>]",
   "  unslop config schema",
+  "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
 ].join("\n");
@@ -143,6 +145,26 @@ async function presetsCommand(args: readonly string[]): Promise<number> {
   throw new CliError(USAGE_EXIT, `unknown presets command '${sub ?? ""}'\n${USAGE}`);
 }
 
+async function migrateCommand(args: readonly string[]): Promise<number> {
+  const parsed = parseArgs(args, ["descriptor", "from", "out", "layout-out"], []);
+  requirePositionals(parsed, 0, "migrate");
+  const descriptor = option(parsed, "descriptor");
+  const from = option(parsed, "from");
+  const out = option(parsed, "out");
+  if (descriptor === undefined || from === undefined || out === undefined) {
+    throw new CliError(USAGE_EXIT, `migrate needs --descriptor, --from, and --out\n${USAGE}`);
+  }
+  const result = await runMigrate(Deno.cwd(), {
+    descriptor,
+    from,
+    out,
+    layoutOut: option(parsed, "layout-out"),
+  });
+  print(`wrote ${result.configPath}\n`);
+  if (result.layoutPath !== null) print(`wrote ${result.layoutPath}\n`);
+  return 0;
+}
+
 async function configCommand(args: readonly string[]): Promise<number> {
   const [sub, ...rest] = args;
   if (sub === "schema") {
@@ -176,6 +198,7 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "rules") return await rulesCommand(rest);
     if (command === "presets") return await presetsCommand(rest);
     if (command === "config") return await configCommand(rest);
+    if (command === "migrate") return await migrateCommand(rest);
     throw new CliError(USAGE_EXIT, `${command === undefined ? "" : `unknown command '${command}'\n`}${USAGE}`);
   } catch (error) {
     if (error instanceof CliError) {

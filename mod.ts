@@ -12,6 +12,7 @@ export { createLintPlugin, selectionEnvName } from "./src/engine/plugin.ts";
 export { createRuleRegistry, RuleRegistryError } from "./src/engine/registry.ts";
 export { runPlugin } from "./src/engine/run_plugin.ts";
 export { compileConfig, NOT_ENABLED_REASON } from "./src/config/compile.ts";
+export { migrateCatalog, semanticCatalogProjection, semanticCompiledProjection } from "./src/config/migrate.ts";
 export { DEFAULT_HOST_MODE, hostBaseLevel, PLUGIN_RULE_CONTROLS } from "./src/config/descriptor.ts";
 export { configJsonSchema } from "./src/config/json_schema.ts";
 export { PRESET_IDS, PRESETS } from "./src/config/presets.ts";
@@ -33,6 +34,7 @@ export type {
   RuleOrigin,
 } from "./src/config/descriptor.ts";
 export type { IPreset, PresetId } from "./src/config/presets.ts";
+export type { ICatalogProjection, IMigrationResult, IRuleProjection } from "./src/config/migrate.ts";
 export type { IUnslopProject, IUnslopProjectInput } from "./src/config/project.ts";
 export type { IRegistryEntry } from "./src/config/registry.ts";
 export type { IConfigV2 } from "./src/config/schema.ts";

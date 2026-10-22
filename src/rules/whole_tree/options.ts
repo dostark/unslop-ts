@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { CatalogError, type JsonValue } from "../../engine/catalog.ts";
+import { CatalogError } from "../../engine/catalog.ts";
 import { RegexSourceSchema } from "../../engine/regex_option.ts";
 
 const WHOLE_TREE_KEY = "wholeTree";
@@ -154,7 +154,7 @@ export type IOptionalParamsSettings = NonNullable<IWholeTreeSettings["optionalPa
 const CatalogSettingsSchema = z.object({ [WHOLE_TREE_KEY]: WholeTreeSettingsSchema.optional() }).loose();
 
 /** Reads and validates the `wholeTree` section of a catalog. A catalog without the section gives `{}`. */
-export function parseWholeTreeSettings(catalog: JsonValue): IWholeTreeSettings {
+export function parseWholeTreeSettings(catalog: unknown): IWholeTreeSettings {
   const parsed = CatalogSettingsSchema.safeParse(catalog);
   if (parsed.success) return parsed.data[WHOLE_TREE_KEY] ?? {};
   const issue = parsed.error.issues[0];

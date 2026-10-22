@@ -1,0 +1,120 @@
+{
+  "version": "1",
+  "scopes": {
+    "test": ["**/*_test.ts"],
+    "fixture": ["**/tests/fixtures/**"]
+  },
+  "layout": {
+    "sourceRoots": ["src"],
+    "entrypoints": ["src/main.ts"],
+    "docs": [{ "path": "README.md", "reason": "Project entry point." }]
+  },
+  "wholeTree": {
+    "optionalParams": {
+      "wrapperType": "Opt",
+      "wrapperImport": "@demo/types",
+      "reasonExamples": ["OptionalContext"],
+      "testSegments": ["/tests/"],
+      "testSuffixes": ["_test.ts"],
+      "skipSegments": ["/fixtures/"],
+      "walkSkipSegments": ["/vendor/"],
+      "pluginRuleId": "demo/require-optional-wrapper"
+    },
+    "unusedExports": {
+      "productionRoots": ["src"],
+      "testSegments": ["/tests/"],
+      "testSuffixes": ["_test.ts"],
+      "entrypointSuffixes": ["/mod.ts"],
+      "mainEntrypointSuffixes": ["/main.ts"],
+      "scriptRoot": "scripts",
+      "walkSkipPatterns": ["node_modules"],
+      "strictSkipPrefixes": ["src/vendor/"],
+      "strictSkipSegments": ["/generated/"]
+    },
+    "constantRestatement": {
+      "constantModules": ["src/constants.ts"],
+      "testRoots": ["tests"],
+      "minRestatedElements": 2
+    },
+    "magicLiterals": {
+      "checkNumbers": false,
+      "minNumber": 42,
+      "additionalStrings": ["legacy"]
+    }
+  },
+  "tagVocabulary": {
+    "type-safety": {
+      "description": "Rules that keep type evidence."
+    },
+    "module-structure": {
+      "description": "Rules about module layout and exports."
+    },
+    "magic-values": {
+      "description": "Rules about repeated literals and duplicated declarations."
+    },
+    "project-tag": {
+      "description": "A tag this project chose.",
+      "requiresScope": ["prod", "all"]
+    }
+  },
+  "ignore": [{ "glob": "**/vendor/**", "reason": "Vendored code is not reviewed." }],
+  "rules": {
+    "demo/no-chained-type-assertions": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "codeStyle": "unslop-ts/docs/style_guide.md#strict-type-safety",
+      "tags": ["type-safety"]
+    },
+    "demo/max-params": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "prod",
+      "include": ["src/**"],
+      "exclude": ["src/generated/**"],
+      "codeStyle": "docs/custom-guide.md#limits",
+      "tags": ["project-tag"],
+      "options": { "max": 3 },
+      "limits": "Only function, method, and constructor declarations are counted."
+    },
+    "demo/no-explicit-unknown": {
+      "engine": "plugin",
+      "severity": "off",
+      "optIn": true,
+      "reason": "Opt-in until the project burns down its weak dictionaries.",
+      "scope": "all",
+      "tags": ["type-safety"]
+    },
+    "demo/require-module-header": {
+      "engine": "plugin",
+      "severity": "off",
+      "reason": "This project records module purpose in its own guide.",
+      "scope": "all",
+      "tags": ["module-structure"]
+    },
+    "project-check": {
+      "engine": "script",
+      "severity": "warn",
+      "scope": "all",
+      "tags": ["project-tag"],
+      "options": { "threshold": 2 },
+      "limits": "A consumer limit."
+    },
+    "duplicate-type": {
+      "engine": "script",
+      "severity": "error",
+      "scope": "prod",
+      "include": ["src/**"],
+      "tags": ["magic-values"],
+      "options": { "minProperties": 3 },
+      "limits": "Interface and object type alias members are compared after whitespace normalization. Imported aliases are not resolved."
+    },
+    "duplicate-constant": {
+      "engine": "script",
+      "severity": "error",
+      "scope": "all",
+      "tags": ["magic-values"],
+      "limits": "Top-level named constants with a static value are compared; a value from a call, identifier, or interpolation is out of scope."
+    }
+  }
+}

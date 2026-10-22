@@ -1,0 +1,492 @@
+{
+  "version": "1",
+  "scopes": {
+    "test": [
+      "**/*_test.ts"
+    ],
+    "fixture": [
+      "**/tests/fixtures/**"
+    ]
+  },
+  "layout": {
+    "root1": [
+      "src/area1/**",
+      "tests/area1/**"
+    ],
+    "root2": [
+      "src/area2/**",
+      "tests/area2/**"
+    ],
+    "root3": [
+      "src/area3/**",
+      "tests/area3/**"
+    ],
+    "root4": [
+      "src/area4/**",
+      "tests/area4/**"
+    ],
+    "root5": [
+      "src/area5/**",
+      "tests/area5/**"
+    ],
+    "root6": [
+      "src/area6/**",
+      "tests/area6/**"
+    ],
+    "root7": [
+      "src/area7/**",
+      "tests/area7/**"
+    ],
+    "root8": [
+      "src/area8/**",
+      "tests/area8/**"
+    ],
+    "root9": [
+      "src/area9/**",
+      "tests/area9/**"
+    ],
+    "root10": [
+      "src/area10/**",
+      "tests/area10/**"
+    ],
+    "root11": [
+      "src/area11/**",
+      "tests/area11/**"
+    ],
+    "root12": [
+      "src/area12/**",
+      "tests/area12/**"
+    ]
+  },
+  "wholeTree": {
+    "optionalParams": {
+      "wrapperType": "Opt",
+      "wrapperImport": "@demo/types",
+      "reasonExamples": [
+        "OptionalContext"
+      ],
+      "testSegments": [
+        "/tests/"
+      ],
+      "testSuffixes": [
+        "_test.ts"
+      ],
+      "skipSegments": [
+        "/fixtures/"
+      ],
+      "walkSkipSegments": [
+        "/vendor/"
+      ],
+      "pluginRuleId": "demo/require-optional-wrapper"
+    },
+    "unusedExports": {
+      "productionRoots": [
+        "src"
+      ],
+      "testSegments": [
+        "/tests/"
+      ],
+      "testSuffixes": [
+        "_test.ts"
+      ],
+      "entrypointSuffixes": [
+        "/mod.ts"
+      ],
+      "mainEntrypointSuffixes": [
+        "/main.ts"
+      ],
+      "scriptRoot": "scripts",
+      "walkSkipPatterns": [
+        "node_modules"
+      ],
+      "strictSkipPrefixes": [
+        "src/vendor/"
+      ],
+      "strictSkipSegments": [
+        "/generated/"
+      ]
+    },
+    "constantRestatement": {
+      "constantModules": [
+        "src/constants.ts"
+      ],
+      "testRoots": [
+        "tests"
+      ],
+      "minRestatedElements": 2
+    },
+    "magicLiterals": {
+      "checkNumbers": false,
+      "minNumber": 42,
+      "additionalStrings": [
+        "legacy"
+      ]
+    }
+  },
+  "tagVocabulary": {
+    "type-safety": {
+      "description": "Rules that keep type evidence."
+    },
+    "imports": {
+      "description": "Rules about where imports sit and which imports are explicit."
+    },
+    "boundaries": {
+      "description": "Rules about what a file group may import."
+    },
+    "interfaces": {
+      "description": "Rules about interface names, renames, and placement."
+    },
+    "magic-values": {
+      "description": "Rules about repeated literals and duplicated declarations."
+    },
+    "module-structure": {
+      "description": "Rules about module layout and exports."
+    },
+    "test-quality": {
+      "description": "Rules about test fixtures and assertions."
+    },
+    "scripts": {
+      "description": "Rules about runnable script headers."
+    },
+    "complexity": {
+      "description": "Rules about function and class size."
+    },
+    "optional-parameters": {
+      "description": "Rules about how optional parameters are declared."
+    },
+    "comments": {
+      "description": "Rules about comment content and length."
+    }
+  },
+  "ignore": [
+    {
+      "glob": "**/vendor1/**",
+      "reason": "Vendored area 1."
+    },
+    {
+      "glob": "**/vendor2/**",
+      "reason": "Vendored area 2."
+    },
+    {
+      "glob": "**/vendor3/**",
+      "reason": "Vendored area 3."
+    },
+    {
+      "glob": "**/vendor4/**",
+      "reason": "Vendored area 4."
+    }
+  ],
+  "rules": {
+    "demo/no-chained-type-assertions": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-explicit-unknown": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-unsafe-dictionary": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-typeof-escape": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-pass-through-type-alias": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-object-parameters": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/require-safety-comment": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-runtime-typeof": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-conditional-empty-object-spread": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/no-boolean-assert": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "test-quality"
+      ]
+    },
+    "demo/no-repeated-assert-call": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "test-quality"
+      ]
+    },
+    "demo/no-constant-substring-assert": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "test-quality"
+      ]
+    },
+    "demo/max-cyclomatic-complexity": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "complexity"
+      ]
+    },
+    "demo/max-class-size": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "complexity"
+      ]
+    },
+    "demo/require-optional-wrapper": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "optional-parameters"
+      ]
+    },
+    "demo/import-inside-statement": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "imports"
+      ]
+    },
+    "demo/dynamic-import": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "imports"
+      ]
+    },
+    "demo/inline-type-import": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "imports"
+      ]
+    },
+    "demo/re-export-imported": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "imports"
+      ]
+    },
+    "demo/import-placement": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "imports"
+      ]
+    },
+    "demo/exported-interface-placement": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "interfaces"
+      ]
+    },
+    "demo/promise-response-alias": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/promise-response-return": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/ts-suppression-pragmas": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "type-safety"
+      ]
+    },
+    "demo/magic-union-type": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "magic-values"
+      ]
+    },
+    "demo/long-comment": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "comments"
+      ]
+    },
+    "demo/ephemeral-comment": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "comments"
+      ]
+    },
+    "demo/decorative-comment": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "comments"
+      ]
+    },
+    "demo/max-params": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "complexity"
+      ]
+    },
+    "demo/test-inline-multiline-fixture": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "test-quality"
+      ]
+    },
+    "demo/require-module-header": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "module-structure"
+      ]
+    },
+    "demo/ephemeral-filename": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "comments"
+      ]
+    },
+    "demo/exported-interface-naming": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "interfaces"
+      ]
+    },
+    "demo/no-interface-rename-on-import": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "interfaces"
+      ]
+    },
+    "demo/import-boundaries": {
+      "engine": "plugin",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "boundaries"
+      ]
+    },
+    "duplicate-type": {
+      "engine": "script",
+      "severity": "error",
+      "scope": "prod",
+      "tags": [
+        "magic-values"
+      ],
+      "include": [
+        "src/**"
+      ]
+    },
+    "duplicate-constant": {
+      "engine": "script",
+      "severity": "error",
+      "scope": "all",
+      "tags": [
+        "magic-values"
+      ]
+    },
+    "project-check": {
+      "engine": "script",
+      "severity": "warn",
+      "scope": "all",
+      "tags": [
+        "scripts"
+      ],
+      "options": {
+        "threshold": 2
+      },
+      "limits": "A consumer limit."
+    }
+  }
+}
