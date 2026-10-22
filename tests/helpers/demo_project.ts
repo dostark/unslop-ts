@@ -7,7 +7,7 @@
  * @related-files [tests/deno_builtin_overlap_test.ts, tests/plugin_selection_test.ts]
  */
 
-import { join } from "@std/path";
+import { dirname, join } from "@std/path";
 import { DENO_RULE_PACK, type JsonValue, TYPESCRIPT_RULE_PACK } from "../../mod.ts";
 
 export interface ILintReport {
@@ -19,6 +19,10 @@ export interface IDemoProjectOptions {
   readonly files: Readonly<Record<string, string>>;
   /** Built-in rule settings under `lint.rules`. The recommended set is the default. */
   readonly lintRules?: { readonly include?: readonly string[]; readonly exclude?: readonly string[] };
+  /** A catalog that replaces the all-rules demo catalog. */
+  readonly catalog?: Record<string, JsonValue>;
+  /** A plugin source that replaces the generated source. */
+  readonly pluginSource?: string;
 }
 
 export interface IDeno {
@@ -69,12 +73,14 @@ export function demoCatalog(): Record<string, JsonValue> {
   };
 }
 
-function pluginSource(): string {
+function pluginSource(options: IDemoProjectOptions): string {
   return [
     `import { createLintPlugin, createRuleRegistry, DENO_RULE_PACK, parseCatalog, TYPESCRIPT_RULE_PACK } from "${ENGINE_ALIAS}";`,
     "const packs = [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK];",
     `const registry = createRuleRegistry(${JSON.stringify(DEMO_PLUGIN_NAME)}, packs);`,
-    `const catalog = parseCatalog(${JSON.stringify(demoCatalog())}, { scriptRuleSchemas: null, registry });`,
+    `const catalog = parseCatalog(${
+      JSON.stringify(options.catalog ?? demoCatalog())
+    }, { scriptRuleSchemas: null, registry });`,
     `export default createLintPlugin(${JSON.stringify(DEMO_PLUGIN_NAME)}, catalog, { rulePacks: packs });`,
     "",
   ].join("\n");
@@ -109,8 +115,12 @@ export async function withDemoProject<T>(
   const dir = await Deno.makeTempDir({ prefix: "demo_project_" });
   try {
     await Deno.writeTextFile(join(dir, CONFIG_FILE), await configSource(options));
-    await Deno.writeTextFile(join(dir, PLUGIN_FILE), pluginSource());
-    for (const [name, source] of Object.entries(options.files)) await Deno.writeTextFile(join(dir, name), source);
+    await Deno.writeTextFile(join(dir, PLUGIN_FILE), options.pluginSource ?? pluginSource(options));
+    for (const [name, source] of Object.entries(options.files)) {
+      const target = join(dir, name);
+      await Deno.mkdir(dirname(target), { recursive: true });
+      await Deno.writeTextFile(target, source);
+    }
     return await body(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });

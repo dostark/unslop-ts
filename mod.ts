@@ -9,6 +9,20 @@
 
 export { CatalogError, classifyPath, parseCatalog, PATH_CLASS, ruleSettings } from "./src/engine/catalog.ts";
 export { createLintPlugin, selectionEnvName } from "./src/engine/plugin.ts";
+export {
+  formatTraceRecord,
+  INTERNAL_COVERAGE_RULE,
+  MANUAL_TRACE_RUN_ID,
+  parseTraceStderr,
+  reconcileTraceRecords,
+  resolveTraceRunId,
+  SKIP_REASONS,
+  TRACE_LINE_PREFIX,
+  TRACE_PREFIX,
+  TRACE_PROTOCOL_VERSION,
+  traceEnvName,
+  TraceProtocolError,
+} from "./src/engine/trace.ts";
 export { createRuleRegistry, RuleRegistryError } from "./src/engine/registry.ts";
 export { runPlugin } from "./src/engine/run_plugin.ts";
 export { compileConfig, NOT_ENABLED_REASON } from "./src/config/compile.ts";
@@ -44,6 +58,16 @@ export type { ICatalog, IResolvedRuleSettings, JsonValue, PathClass } from "./sr
 export type { ICatalogLoadOptions, ScriptRuleSchemas } from "./src/engine/catalog.ts";
 export type { RuleScope, RuleSeverity } from "./src/engine/catalog.ts";
 export type { ILintPluginOptions } from "./src/engine/plugin.ts";
+export type {
+  ITraceCheckedRecord,
+  ITraceExpectation,
+  ITraceObservedRecord,
+  ITraceParseResult,
+  ITraceRecord,
+  ITraceSkippedRecord,
+  SkipReason,
+  TraceRecordKind,
+} from "./src/engine/trace.ts";
 export type { IRulePack, IRuleRegistry } from "./src/engine/registry.ts";
 export type { IRuleMeta, PresetMembership, RuleCategory, RuleEngine } from "./src/rules/meta.ts";
 export type { IWholeTreeCheck, WholeTreeCheckKey } from "./src/rules/whole_tree/checks.ts";

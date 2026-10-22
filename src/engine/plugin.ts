@@ -9,22 +9,31 @@
 
 import { matchesAnyGlob } from "./glob.ts";
 import {
+  CatalogError,
   classifyPath,
   type ICatalog,
   PATH_CLASS,
   type PathClass,
   requireRegisteredPluginRules,
-  type RuleScope,
   ruleSettings,
   type RuleSeverity,
 } from "./catalog.ts";
 import { createRuleRegistry, type IRulePack } from "./registry.ts";
+import {
+  formatTraceRecord,
+  INTERNAL_COVERAGE_RULE,
+  type ITraceRecord,
+  resolveTraceRunId,
+  type SkipReason,
+} from "./trace.ts";
 
 /** Rule packs the plugin factory registers. */
 export interface ILintPluginOptions {
   readonly rulePacks: readonly IRulePack[];
   /** A selection list that replaces the selection variable, so a caller need not change the process environment. */
   readonly selection?: string;
+  /** A trace run id that replaces the trace variable, so a caller need not change the process environment. */
+  readonly trace?: string;
 }
 
 type CatalogRule = ICatalog["rules"][string];
@@ -56,11 +65,6 @@ function isSelected(selection: Set<string>, id: string, key: string, tags: strin
   return false;
 }
 
-function scopeAllows(scope: RuleScope, pathClass: PathClass): boolean {
-  if (pathClass === PATH_CLASS.fixture) return false;
-  return scope === "all" || scope === pathClass;
-}
-
 /** The repository-relative path for a filename Deno lint reports as absolute. */
 function repoRelative(filename: string): string {
   const cwd = Deno.cwd();
@@ -68,12 +72,17 @@ function repoRelative(filename: string): string {
   return filename.startsWith(prefix) ? filename.slice(prefix.length) : filename;
 }
 
-/** True when scope, include, and exclude all allow the rule on this path. */
-function allows(repoPath: string, pathClass: PathClass, settings: ReturnType<typeof ruleSettings>): boolean {
-  if (!scopeAllows(settings.scope, pathClass)) return false;
-  if (settings.include && !matchesAnyGlob(repoPath, settings.include)) return false;
-  if (settings.exclude && matchesAnyGlob(repoPath, settings.exclude)) return false;
-  return true;
+/** The first condition that stops a rule on this path, or null when the rule may run. */
+function skipReasonOf(
+  repoPath: string,
+  pathClass: PathClass,
+  settings: ReturnType<typeof ruleSettings>,
+): SkipReason | null {
+  if (pathClass === PATH_CLASS.fixture) return "fixture";
+  if (settings.scope !== "all" && settings.scope !== pathClass) return "scope";
+  if (settings.include && !matchesAnyGlob(repoPath, settings.include)) return "include";
+  if (settings.exclude && matchesAnyGlob(repoPath, settings.exclude)) return "exclude";
+  return null;
 }
 
 /** True when the rule should report: severity, opt-in, and the local selection all allow it. */
@@ -100,7 +109,27 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
   }
 
   const ignored = (catalog.ignore ?? []).map((entry) => entry.glob);
+  const reservedId = `${name}/${INTERNAL_COVERAGE_RULE}`;
+  if (registry.catalogIds().includes(reservedId)) {
+    throw new CatalogError(`rules.${reservedId}`, "the rule key 'internal-coverage' is reserved for trace observation");
+  }
+  const traceRunId = resolveTraceRunId(name, options.trace);
+  const emit = traceRunId === null ? null : (record: ITraceRecord) => console.error(formatTraceRecord(record));
   const rules: Record<string, Deno.lint.Rule> = {};
+  if (traceRunId !== null) {
+    rules[INTERNAL_COVERAGE_RULE] = {
+      create(context) {
+        emit?.({
+          kind: "observed",
+          runId: traceRunId,
+          plugin: name,
+          file: repoRelative(context.filename),
+          rule: INTERNAL_COVERAGE_RULE,
+        });
+        return {};
+      },
+    };
+  }
   for (const id of registry.catalogIds()) {
     const implementation = registry.implementation(id);
     if (!implementation) continue;
@@ -117,16 +146,40 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
       create(context) {
         if (!active) return {};
         const repoPath = repoRelative(context.filename);
-        if (matchesAnyGlob(repoPath, ignored)) return {};
+        const terminal = (kind: "checked" | "skipped", reason?: SkipReason): void => {
+          if (traceRunId === null) return;
+          if (kind === "checked") {
+            emit?.({ kind: "checked", runId: traceRunId, plugin: name, file: repoPath, rule: id });
+            return;
+          }
+          emit?.({
+            kind: "skipped",
+            runId: traceRunId,
+            plugin: name,
+            file: repoPath,
+            rule: id,
+            reason: reason ?? "scope",
+          });
+        };
+        if (matchesAnyGlob(repoPath, ignored)) {
+          terminal("skipped", "ignored");
+          return {};
+        }
         const pathClass = classifyPath(repoPath, catalog.scopes);
-        if (!allows(repoPath, pathClass, settings)) return {};
-        return implementation.create(context, {
+        const reason = skipReasonOf(repoPath, pathClass, settings);
+        if (reason !== null) {
+          terminal("skipped", reason);
+          return {};
+        }
+        const visitors = implementation.create(context, {
           options: settings.options,
           repoPath,
           isTestFile: pathClass === PATH_CLASS.test,
           codeStyle: settings.codeStyle,
           pluginName: name,
         });
+        terminal("checked");
+        return visitors;
       },
     };
   }
