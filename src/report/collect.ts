@@ -9,6 +9,8 @@
 
 import { fromFileUrl } from "@std/path";
 import type { IResolvedRule } from "../config/descriptor.ts";
+import type { ISourceSnapshot } from "./context.ts";
+import { fingerprintOf } from "./fingerprint.ts";
 import type { IResolvedSelection } from "../cli/selection.ts";
 import { type ITraceRecord, SKIP_REASONS, type SkipReason } from "../engine/trace.ts";
 import { notRunCheck } from "./commands.ts";
@@ -50,15 +52,32 @@ function repoPath(filename: string, root: string): string {
   return path.startsWith(prefix) ? path.slice(prefix.length) : path;
 }
 
+function fingerprintFor(
+  source: ISourceSnapshot | undefined,
+  ruleId: string,
+  file: string,
+  startLine: number,
+  startColumn: number,
+  endColumn: number,
+  message: string,
+): string | null {
+  if (!source) return null;
+  const lines = new TextDecoder().decode(source.bytes).split("\n");
+  const line = lines[startLine - 1];
+  return line === undefined ? null : fingerprintOf(ruleId, file, line, startColumn, endColumn, message);
+}
+
 function findingOf(
   diagnostic: IHostDiagnostic,
   rule: IResolvedRule,
   status: RuleStatus,
   root: string,
+  source: ISourceSnapshot | undefined,
 ): IFinding {
+  const file = repoPath(diagnostic.filename, root);
   return {
     ruleId: rule.id,
-    file: repoPath(diagnostic.filename, root),
+    file,
     startLine: diagnostic.range.start.line,
     startColumn: diagnostic.range.start.col,
     endLine: diagnostic.range.end.line,
@@ -66,14 +85,27 @@ function findingOf(
     effectiveLevel: effectiveLevel(rule, status),
     message: diagnostic.message,
     hint: diagnostic.hint,
-    fingerprint: null,
+    fingerprint: fingerprintFor(
+      source,
+      rule.id,
+      file,
+      diagnostic.range.start.line,
+      diagnostic.range.start.col,
+      diagnostic.range.end.col,
+      diagnostic.message,
+    ),
   };
 }
 
-function foreignFindingOf(diagnostic: IHostDiagnostic, root: string): IFinding {
+function foreignFindingOf(
+  diagnostic: IHostDiagnostic,
+  root: string,
+  source: ISourceSnapshot | undefined,
+): IFinding {
+  const file = repoPath(diagnostic.filename, root);
   return {
     ruleId: diagnostic.code,
-    file: repoPath(diagnostic.filename, root),
+    file,
     startLine: diagnostic.range.start.line,
     startColumn: diagnostic.range.start.col,
     endLine: diagnostic.range.end.line,
@@ -81,7 +113,15 @@ function foreignFindingOf(diagnostic: IHostDiagnostic, root: string): IFinding {
     effectiveLevel: ERROR,
     message: diagnostic.message,
     hint: diagnostic.hint,
-    fingerprint: null,
+    fingerprint: fingerprintFor(
+      source,
+      diagnostic.code,
+      file,
+      diagnostic.range.start.line,
+      diagnostic.range.start.col,
+      diagnostic.range.end.col,
+      diagnostic.message,
+    ),
   };
 }
 
@@ -139,13 +179,17 @@ export function collectRunReport(result: ILintRunResult, context: IRunContext): 
     const rule = context.compiled.rules[diagnostic.code];
     if (rule && rule.engine === "plugin") {
       const status = statusOf(rule, context.selection);
-      selectedFindings.push(findingOf(diagnostic, rule, status, root));
+      selectedFindings.push(
+        findingOf(diagnostic, rule, status, root, context.sources?.get(repoPath(diagnostic.filename, root))),
+      );
       findingsByRule.set(rule.id, (findingsByRule.get(rule.id) ?? 0) + 1);
     } else {
       foreignDiagnostics.push(diagnostic);
     }
   }
-  const foreignFindings = foreignDiagnostics.map((diagnostic) => foreignFindingOf(diagnostic, root));
+  const foreignFindings = foreignDiagnostics.map((diagnostic) =>
+    foreignFindingOf(diagnostic, root, context.sources?.get(repoPath(diagnostic.filename, root)))
+  );
   const summaries = rules.map((rule) =>
     summaryOf(
       rule,

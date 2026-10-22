@@ -7,12 +7,14 @@
  * @related-files [src/cli/commands/report.ts, src/report/collect.ts, tests/helpers/cli_project.ts]
  */
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { collectRunReport, compileConfig, type IHostDiagnostic, type ILintRunResult, type IRunReport } from "../mod.ts";
 import { runReport } from "../src/cli/commands/report.ts";
 import { configPath, runReportCli, runReportWriteCli, withCliProject } from "./helpers/cli_project.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
+import { captureSources, SnapshotError } from "../src/report/snapshot.ts";
+import type { ISourceSnapshot } from "../src/report/context.ts";
 
 const UNKNOWN_SOURCE = "export let value: unknown = 1;\n";
 const CLEAN_SOURCE = "export const value = 1;\n";
@@ -174,6 +176,14 @@ function reportOptions(path: string) {
   return { descriptor: null, plugin: null, select: null, profile: null, paths: [path] };
 }
 
+function hostJson(diagnostics: readonly IHostDiagnostic[]): string {
+  return JSON.stringify({ diagnostics, errors: [] });
+}
+
+function fileUrl(dir: string, path: string): string {
+  return new URL(`file://${join(dir, path)}`).href;
+}
+
 function hostOf(stdout: string, stderr: string, code = 0) {
   const encoder = new TextEncoder();
   return { code, signal: null, stdout: encoder.encode(stdout), stderr: encoder.encode(stderr) };
@@ -318,7 +328,11 @@ Deno.test("report_classifies_every_host_termination", async () => {
     const findings = await runReport(dir, reportOptions("src/clean.ts"), {
       spawn: () =>
         Promise.resolve(
-          hostOf(JSON.stringify({ diagnostics: [diagnosticOf("demo/no-explicit-unknown")], errors: [] }), "", 1),
+          hostOf(
+            JSON.stringify({ diagnostics: [diagnosticOf("demo/no-explicit-unknown", "src/clean.ts")], errors: [] }),
+            "",
+            1,
+          ),
         ),
     });
     assertEquals(findings.completion, "complete");
@@ -341,4 +355,98 @@ Deno.test("report_classifies_every_host_termination", async () => {
     assertEquals(signal.completion, "failed");
     assertStringIncludes(signal.failure ?? "", "signal");
   });
+});
+
+Deno.test("report_snapshot_changes_mark_run_incomplete", async () => {
+  await withCliProject(async (dir) => {
+    await writeFiles(dir, { "src/a.ts": UNKNOWN_SOURCE, "src/clean.ts": CLEAN_SOURCE });
+    const diagnostic = diagnosticOf("demo/no-explicit-unknown", fileUrl(dir, "src/a.ts"));
+    const changed = await runReport(dir, reportOptions("src/a.ts"), {
+      afterSpawn: async () => {
+        await Deno.writeTextFile(join(dir, "src/a.ts"), `${UNKNOWN_SOURCE}// changed\n`);
+      },
+      spawn: () => Promise.resolve(hostOf(hostJson([diagnostic]), "", 1)),
+    });
+    assertEquals(changed.completion, "failed");
+    assertStringIncludes(changed.failure ?? "", "source changed");
+
+    const missing = await runReport(dir, reportOptions("src/a.ts"), {
+      afterSpawn: async () => {
+        await Deno.remove(join(dir, "src/a.ts"));
+      },
+      spawn: () => Promise.resolve(hostOf(hostJson([diagnostic]), "", 1)),
+    });
+    assertEquals(missing.completion, "failed");
+    assertStringIncludes(missing.failure ?? "", "source changed");
+
+    const fresh = diagnosticOf("demo/no-explicit-unknown", fileUrl(dir, "src/new.ts"));
+    const added = await runReport(dir, reportOptions("src/clean.ts"), {
+      afterSpawn: async () => {
+        await Deno.writeTextFile(join(dir, "src/new.ts"), UNKNOWN_SOURCE);
+      },
+      spawn: () => Promise.resolve(hostOf(hostJson([fresh]), "", 1)),
+    });
+    assertEquals(added.completion, "failed");
+    assertStringIncludes(added.failure ?? "", "source changed");
+  });
+});
+
+Deno.test("snapshot_scope_matches_the_host_operands", async () => {
+  await withCliProject(async (dir) => {
+    await writeFiles(dir, { "src/target.ts": UNKNOWN_SOURCE, "src/unrelated.ts": UNKNOWN_SOURCE });
+    const sources = await captureSources([join(dir, "src/target.ts")], dir);
+    assertEquals([...sources.keys()].sort(), ["src/target.ts"]);
+    const result = await runReportCli(dir, ["--format=json", "src/target.ts"]);
+    assertEquals(result.code, 1, result.stderr);
+    const report = reportOf(result.stdout);
+    assert(report.findings.every((finding) => finding.file === "src/target.ts"));
+    assertEquals(report.filesObserved.includes("src/unrelated.ts"), false);
+  });
+});
+
+Deno.test("snapshot_walk_handles_internal_symlinks_and_rejects_escapes", async () => {
+  await withCliProject(async (dir) => {
+    await Deno.mkdir(join(dir, "tree"), { recursive: true });
+    await Deno.writeTextFile(join(dir, "tree/a.ts"), UNKNOWN_SOURCE);
+    await Deno.symlink("a.ts", join(dir, "tree/alias.ts"));
+    await Deno.symlink(".", join(dir, "tree/loop"));
+    const sources = await captureSources([join(dir, "tree")], dir);
+    const direct = sources.get("tree/a.ts");
+    const alias = sources.get("tree/alias.ts");
+    assert(direct);
+    assert(alias);
+    assertEquals(direct, alias);
+
+    const outside = await Deno.makeTempFile({ prefix: "snapshot_outside_" });
+    try {
+      await Deno.writeTextFile(outside, UNKNOWN_SOURCE);
+      await Deno.symlink(outside, join(dir, "tree/escape.ts"));
+      await assertRejects(
+        () => captureSources([join(dir, "tree")], dir),
+        SnapshotError,
+        "escapes",
+      );
+    } finally {
+      await Deno.remove(outside);
+    }
+  });
+});
+
+Deno.test("snapshot_fingerprints_use_captured_lines_without_serializing_source", () => {
+  const descriptor = testDescriptor();
+  const compiled = compileConfig({
+    version: 2,
+    plugin: "demo",
+    rules: { "demo/no-explicit-unknown": "error" },
+  }, descriptor);
+  const bytes = new TextEncoder().encode("// café\r\nexport let value: unknown = 1;\r\n");
+  const source: ISourceSnapshot = { canonicalPath: "/demo/src/a.ts", bytes };
+  const sources = new Map([["src/a.ts", source]]);
+  const first = diagnosticOf("demo/no-explicit-unknown");
+  const second = { ...first, range: { ...first.range, start: { line: 2, col: 18 }, end: { line: 2, col: 25 } } };
+  const report = collectRunReport(resultOf([first, second, first]), { compiled, selection: null, policy: [], sources });
+  assert(report.findings[0].fingerprint);
+  assertEquals(report.findings[0].fingerprint, report.findings[2].fingerprint);
+  assert(report.findings[0].fingerprint !== report.findings[1].fingerprint);
+  assert(!JSON.stringify(report).includes("café"));
 });

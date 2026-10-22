@@ -15,7 +15,8 @@ import { ConfigError } from "../../config/schema.ts";
 import type { IProjectDescriptor } from "../../config/descriptor.ts";
 import { parseTraceStderr, reconcileTraceRecords, traceEnvName, TraceProtocolError } from "../../engine/trace.ts";
 import { collectRunReport } from "../../report/collect.ts";
-import type { IRunContext } from "../../report/context.ts";
+import type { IRunContext, ISourceSnapshot } from "../../report/context.ts";
+import { captureSources, SnapshotError } from "../../report/snapshot.ts";
 import type { IFinding, IHostDiagnostic, IHostError, ILintRunResult, IRunReport } from "../../report/model.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { loadConfigDescriptor } from "../project_loader.ts";
@@ -290,6 +291,13 @@ export async function runReport(
     if (!isWithin(root, path)) usage(`${path}: the operand is outside the project root.`);
     paths.push(path);
   }
+  let sources: ReadonlyMap<string, ISourceSnapshot>;
+  try {
+    sources = await captureSources(paths, root);
+  } catch (error) {
+    if (error instanceof SnapshotError) usage(error.message);
+    usage(`${messageOf(error)}`);
+  }
   let selection: IResolvedSelection | null;
   try {
     selection = resolveSelection(compiled, config, descriptor.pluginName, options.select, options.profile);
@@ -321,7 +329,7 @@ export async function runReport(
         null,
         null,
       ),
-      contextOf(compiled, selection, descriptor, configBytes, lintConfigBytes),
+      contextOf(compiled, selection, descriptor, configBytes, lintConfigBytes, sources),
     );
   }
   await hooks.afterSpawn?.();
@@ -355,6 +363,8 @@ export async function runReport(
       ? `trace protocol failure: ${error.message}`
       : `host output failure: ${messageOf(error)}`;
   }
+  const sourceStable = await diagnosedSourcesStable(diagnostics, sources, root);
+  if (!sourceStable) failure = "the diagnosed source changed during the run";
   if (host.signal !== null) failure = `the lint host terminated with signal ${host.signal}`;
   if (host.code === null) failure ??= "the lint host exited without a code";
   if (errors.length > 0) failure ??= `the lint host reported ${errors.length} error(s)`;
@@ -375,7 +385,42 @@ export async function runReport(
     completion,
     failure,
   };
-  return collectRunReport(result, contextOf(compiled, selection, descriptor, configBytes, lintConfigBytes));
+  return collectRunReport(
+    result,
+    contextOf(compiled, selection, descriptor, configBytes, lintConfigBytes, sources),
+  );
+}
+
+function diagnosticSourcePath(filename: string, root: string): string {
+  let path = filename;
+  if (filename.startsWith("file:")) {
+    try {
+      path = fromFileUrl(filename);
+    } catch {
+      path = filename;
+    }
+  }
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
+
+async function diagnosedSourcesStable(
+  diagnostics: readonly IHostDiagnostic[],
+  sources: ReadonlyMap<string, ISourceSnapshot>,
+  root: string,
+): Promise<boolean> {
+  for (const diagnostic of diagnostics) {
+    const source = sources.get(diagnosticSourcePath(diagnostic.filename, root));
+    if (!source) return false;
+    let bytes: Uint8Array;
+    try {
+      bytes = await Deno.readFile(source.canonicalPath);
+    } catch {
+      return false;
+    }
+    if (!bytesEqual(source.bytes, bytes)) return false;
+  }
+  return true;
 }
 
 function contextOf(
@@ -384,6 +429,7 @@ function contextOf(
   descriptor: IProjectDescriptor,
   configBytes: Uint8Array,
   lintConfigBytes: Uint8Array,
+  sources: ReadonlyMap<string, ISourceSnapshot> | null,
 ): IRunContext {
   return {
     compiled,
@@ -392,7 +438,7 @@ function contextOf(
       { url: descriptor.configUrl, bytes: configBytes },
       { url: descriptor.lintConfigUrl, bytes: lintConfigBytes },
     ],
-    sources: null,
+    sources,
   };
 }
 
