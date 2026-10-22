@@ -106,7 +106,7 @@ async function copyProject(base: string): Promise<{ dir: string; cleanup: string
   return { dir, cleanup };
 }
 
-Deno.test("the_readme_lists_every_implemented_cli_command", async () => {
+Deno.test("the_readme_lists_every_cli_command", async () => {
   const readme = await readReadme();
   for (const command of COMMANDS) assertStringIncludes(readme, command);
   for (const concept of ["--dry-run", "--descriptor", "--plugin", "Exit codes", "JSONC", "no-clobber"]) {
@@ -123,7 +123,7 @@ Deno.test("the_readme_lists_every_implemented_cli_command", async () => {
 
 Deno.test("every_readme_example_runs_with_its_documented_task", async () => {
   const examples = examplesOf(await readReadme());
-  assertEquals(examples.length, 15);
+  assertEquals(examples.length, 17);
   await withCliProject(async (base) => {
     await Deno.writeTextFile(join(base, "catalog.json"), JSON.stringify(V1_CATALOG, null, 2));
     await Deno.mkdir(join(base, "src"), { recursive: true });

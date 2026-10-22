@@ -145,3 +145,8 @@ Deno.test("the magic-literal defaults and the forbidden-ignore default in the gu
   assertStringIncludes(GUIDE, "absolute value below 100");
   assertEquals(defaultOptions(DENO_RULE_PACK, "no-forbidden-lint-ignore").forbiddenRules, ["no-explicit-any"]);
 });
+
+Deno.test("engine_guide_claims_still_pass", () => {
+  assert(GUIDE.includes("reports"));
+  assert(GUIDE.includes("unslop"));
+});

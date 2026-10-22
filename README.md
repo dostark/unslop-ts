@@ -157,6 +157,8 @@ deno task cli config schema
 deno task cli:write rules set demo/max-params max=3
 deno task cli:write migrate --descriptor=examples/unslop.project.ts --from=catalog.json --out=unslop.migrated.config.json --layout-out=layout.json
 deno task cli:report report --format=json src
+deno task cli:report report --format=markdown src
+deno task cli:report report --format=sarif src
 deno task cli:report:write report --format=json --out=report.json src
 ```
 
@@ -291,9 +293,14 @@ functions, not per-file plugin rules, and their host modes remain authoritative.
 
 ## Reports and consumer adoption
 
-Run reports, per-rule observed coverage, Markdown and SARIF output, and the consumer adoption are
-owned by Phase 232 of the development plan. This release documents only the commands implemented here;
-there is no `report` command yet.
+`unslop report` runs the real lint host and reports per-rule observed coverage, callback outcomes,
+selected and foreign findings, and explicit unavailable coverage. It accepts `--format=table` (the
+default), `json`, `markdown`, or `sarif`; the SARIF output validates against the vendored OASIS 2.1.0
+schema. Tracing is opt-in through the plugin trace environment variable. Source fingerprints come
+from captured operand bytes, and a changed diagnosed source makes the report failed. The report uses
+absolute operands, supports `--` for a leading-dash path, and refuses `--out` unless the write task is
+used. Authored `limits` is optional: omission keeps the owner limit, and an empty string is preserved
+through migration and edits.
 
 ## Option validation
 
