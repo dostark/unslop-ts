@@ -7,7 +7,7 @@
  * @related-files [src/cli/rules_read.ts, src/cli/selection.ts, tests/helpers/cli_project.ts]
  */
 
-import { assertArrayIncludes, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertArrayIncludes, assertEquals, assertStringIncludes } from "@std/assert";
 import { configPath, runCli, withCliProject } from "./helpers/cli_project.ts";
 
 interface IRuleView {
@@ -182,5 +182,15 @@ Deno.test("rules_show_prints_exclusion_codes", async () => {
     await Deno.writeTextFile(configPath(dir), JSON.stringify(config, null, 2));
     const rule = ruleOf((await runCli(dir, ["rules", "show", "project-check", "--format=json"])).stdout);
     assertEquals(rule.exclusionCodes, { "a-code": "Because." });
+  });
+});
+
+Deno.test("generic_whole_tree_commands_resolve_without_catalog_placeholders", async () => {
+  await withCliProject(async (dir) => {
+    const rule = ruleOf((await runCli(dir, ["rules", "show", "constant-restatement", "--format=json"])).stdout);
+    const command = rule.command ?? [];
+    assert(command.some((arg) => arg.endsWith("/src/cli/whole_tree.ts")), command.join(" "));
+    assert(command.some((arg) => arg.startsWith("--descriptor=file://")), command.join(" "));
+    assert(command.every((arg) => !arg.includes("--catalog")), command.join(" "));
   });
 });

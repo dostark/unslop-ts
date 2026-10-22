@@ -174,7 +174,7 @@ function parseRecord(value: unknown): ITraceRecord {
  * Parses stderr into trace records and unrelated host lines. When `runId` is given,
  * lines addressed to another run are unrelated. A matching prefix with a bad shape fails.
  */
-export function parseTraceStderr(stderr: string, runId?: string): ITraceParseResult {
+export function parseTraceStderr(stderr: string, runId: string | undefined): ITraceParseResult {
   const records: ITraceRecord[] = [];
   const unrelated: string[] = [];
   for (const line of stderr.split("\n")) {

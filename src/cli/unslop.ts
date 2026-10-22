@@ -24,8 +24,11 @@ import { printConfigText, schemaText, validationText } from "./config_read.ts";
 import { parseFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
 import { runMigrate } from "./commands/migrate.ts";
+import { renderReport, reportExitCode, runReport } from "./commands/report.ts";
 import { type IRuleEditRequest, runRuleEdit } from "./commands/rules_write.ts";
 import { listRules, showRule } from "./rules_read.ts";
+import { resolve } from "@std/path";
+import { PartialWriteError, writeMigrationPair, WriteRefusalError } from "./safe_write.ts";
 import { type IResolvedSelection, resolveSelection } from "./selection.ts";
 import type { JsonValue } from "../engine/catalog.ts";
 import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.ts";
@@ -46,6 +49,7 @@ const USAGE = [
   "  unslop config print [--resolved] [--descriptor=<entry>]",
   "  unslop config schema",
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
+  "  unslop report [--format=table|json] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
 ].join("\n");
@@ -137,13 +141,14 @@ async function rulesCommand(args: readonly string[]): Promise<number> {
   if (sub === "list") {
     const parsed = parseArgs(rest, [...QUERY_OPTIONS, "category", "status"], []);
     requirePositionals(parsed, 0, "rules list");
-    const { compiled, selection } = await loadQuery(parsed);
+    const { compiled, selection, descriptor } = await loadQuery(parsed);
     print(
       listRules(compiled, {
         format: parseFormat(option(parsed, "format")),
         category: option(parsed, "category"),
         status: option(parsed, "status"),
         selection,
+        descriptor,
       }),
     );
     return 0;
@@ -151,8 +156,12 @@ async function rulesCommand(args: readonly string[]): Promise<number> {
   if (sub === "show") {
     const parsed = parseArgs(rest, QUERY_OPTIONS, []);
     const [id] = requirePositionals(parsed, 1, "rules show");
-    const { compiled, selection } = await loadQuery(parsed);
-    print(showRule(compiled, { format: parseFormat(option(parsed, "format")), selection }, id));
+    const { compiled, selection, descriptor } = await loadQuery(parsed);
+    print(showRule(compiled, {
+      format: parseFormat(option(parsed, "format")),
+      selection,
+      descriptor,
+    }, id));
     return 0;
   }
   if (sub === "enable") {
@@ -230,6 +239,43 @@ async function migrateCommand(args: readonly string[]): Promise<number> {
   return 0;
 }
 
+async function reportCommand(args: readonly string[]): Promise<number> {
+  const terminator = args.indexOf("--");
+  const optionArgs = terminator === -1 ? args : args.slice(0, terminator);
+  const afterTerminator = terminator === -1 ? [] : args.slice(terminator + 1);
+  const parsed = parseArgs(optionArgs, ["descriptor", "plugin", "select", "profile", "format", "out"], []);
+  const paths = [...parsed.positionals, ...afterTerminator];
+  const report = await runReport(Deno.cwd(), {
+    descriptor: option(parsed, "descriptor") ?? null,
+    plugin: option(parsed, "plugin") ?? null,
+    select: option(parsed, "select") ?? null,
+    profile: option(parsed, "profile") ?? null,
+    paths,
+  }, {});
+  const format = parseFormat(option(parsed, "format"));
+  const text = renderReport(report, format);
+  const out = option(parsed, "out");
+  if (out === undefined) {
+    print(text);
+  } else {
+    const target = resolve(Deno.cwd(), out);
+    try {
+      const written = await writeMigrationPair({
+        config: { path: target, contents: text },
+        layout: null,
+        sources: [],
+      });
+      print(`wrote ${written.configPath}\n`);
+    } catch (error) {
+      if (error instanceof WriteRefusalError || error instanceof PartialWriteError) {
+        throw new CliError(error.exitCode, error.message);
+      }
+      throw new CliError(FAILURE_EXIT, error instanceof Error ? error.message : String(error));
+    }
+  }
+  return reportExitCode(report);
+}
+
 async function configCommand(args: readonly string[]): Promise<number> {
   const [sub, ...rest] = args;
   if (sub === "schema") {
@@ -272,6 +318,7 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "presets") return await presetsCommand(rest);
     if (command === "config") return await configCommand(rest);
     if (command === "migrate") return await migrateCommand(rest);
+    if (command === "report") return await reportCommand(rest);
     throw new CliError(USAGE_EXIT, `${command === undefined ? "" : `unknown command '${command}'\n`}${USAGE}`);
   } catch (error) {
     if (error instanceof CliError) {

@@ -8,11 +8,18 @@
  */
 
 import type { JsonValue, RuleScope, RuleSeverity } from "../engine/catalog.ts";
-import type { ICompiledConfig, IResolvedRule, IRuleControls, IRuleSources } from "../config/descriptor.ts";
+import type {
+  ICompiledConfig,
+  IProjectDescriptor,
+  IResolvedRule,
+  IRuleControls,
+  IRuleSources,
+} from "../config/descriptor.ts";
 import type { IRuleMeta, RuleCategory } from "../rules/meta.ts";
 import { RULE_CATEGORIES } from "../rules/meta.ts";
 import { CliError, USAGE_EXIT } from "./error.ts";
 import { jsonText, type OutputFormat, tableText } from "./output.ts";
+import { resolveHostCommand } from "../report/commands.ts";
 import {
   type IResolvedSelection,
   resolveRuleId,
@@ -28,6 +35,7 @@ export interface IRuleQuery {
   readonly category?: string;
   readonly status?: string;
   readonly selection: IResolvedSelection | null;
+  readonly descriptor: IProjectDescriptor;
 }
 
 const TABLE_HEADERS = ["ID", "STATUS", "LEVEL", "CATEGORY", "CONTROLS", "HOST"] as const;
@@ -69,7 +77,11 @@ function validateStatus(status: string | undefined): void {
   }
 }
 
-function baseView(rule: IResolvedRule, selection: IResolvedSelection | null): IRuleBase {
+function baseView(
+  rule: IResolvedRule,
+  selection: IResolvedSelection | null,
+  descriptor: IProjectDescriptor,
+): IRuleBase {
   const status = ruleStatus(rule, selection);
   return {
     id: rule.id,
@@ -84,7 +96,7 @@ function baseView(rule: IResolvedRule, selection: IResolvedSelection | null): IR
     include: rule.include,
     exclude: rule.exclude,
     controls: rule.controls,
-    command: rule.command,
+    command: resolveHostCommand(rule.command, descriptor),
     docs: rule.docs,
     tags: rule.tags,
     exclusionCodes: rule.exclusionCodes,
@@ -95,7 +107,7 @@ function selectedViews(compiled: ICompiledConfig, query: IRuleQuery): IRuleBase[
   validateCategory(query.category);
   validateStatus(query.status);
   return Object.values(compiled.rules)
-    .map((rule) => baseView(rule, query.selection))
+    .map((rule) => baseView(rule, query.selection, query.descriptor))
     .filter((view) => query.category === undefined || view.category === query.category)
     .filter((view) => query.status === undefined || view.status === query.status)
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -155,7 +167,7 @@ function showTable(rule: IResolvedRule, view: IRuleBase): string {
 export function showRule(compiled: ICompiledConfig, query: IRuleQuery, token: string): string {
   const id = resolveRuleId(compiled, token);
   const rule = compiled.rules[id];
-  const view = baseView(rule, query.selection);
+  const view = baseView(rule, query.selection, query.descriptor);
   if (query.format === "table") return showTable(rule, view);
   return jsonText({
     rule: {

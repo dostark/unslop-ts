@@ -123,9 +123,11 @@ Deno.test("the_readme_lists_every_implemented_cli_command", async () => {
 
 Deno.test("every_readme_example_runs_with_its_documented_task", async () => {
   const examples = examplesOf(await readReadme());
-  assertEquals(examples.length, 13);
+  assertEquals(examples.length, 15);
   await withCliProject(async (base) => {
     await Deno.writeTextFile(join(base, "catalog.json"), JSON.stringify(V1_CATALOG, null, 2));
+    await Deno.mkdir(join(base, "src"), { recursive: true });
+    await Deno.writeTextFile(join(base, "src", "clean.ts"), "export const value = 1;\n");
     for (const example of examples) {
       const flags = await taskFlags(example.task);
       const { dir, cleanup } = await copyProject(base);
@@ -197,3 +199,35 @@ Deno.test("the_readme_names_the_bridge_and_the_two_tasks", async () => {
 async function readReadFile(): Promise<string> {
   return await Deno.readTextFile(README_URL);
 }
+
+Deno.test("report_runs_with_documented_task_permissions", async () => {
+  const flags = await taskFlags("cli:report");
+  await withCliProject(async (base) => {
+    await Deno.mkdir(join(base, "src"), { recursive: true });
+    await Deno.writeTextFile(join(base, "src", "clean.ts"), "export const value = 1;\n");
+    const result = await runDeno(["run", ...flags, CLI_PATH, "report", "--format=json", "src"], base);
+    assertEquals(result.code, 0, result.stderr);
+    assertEquals((JSON.parse(result.stdout) as { completion: string }).completion, "complete");
+  });
+});
+
+Deno.test("report_out_requires_the_documented_write_invocation", async () => {
+  const readFlags = await taskFlags("cli:report");
+  const writeFlags = await taskFlags("cli:report:write");
+  await withCliProject(async (base) => {
+    await Deno.mkdir(join(base, "src"), { recursive: true });
+    await Deno.writeTextFile(join(base, "src", "clean.ts"), "export const value = 1;\n");
+    const refused = await runDeno(
+      ["run", ...readFlags, CLI_PATH, "report", "--format=json", "--out=report.json", "src"],
+      base,
+    );
+    assertEquals(refused.code, 2, refused.stderr);
+    assertEquals(await exists(new URL(`file://${join(base, "report.json")}`)), false);
+    const written = await runDeno(
+      ["run", ...writeFlags, CLI_PATH, "report", "--format=json", "--out=report.json", "src"],
+      base,
+    );
+    assertEquals(written.code, 0, written.stderr);
+    assert(await exists(new URL(`file://${join(base, "report.json")}`)));
+  });
+});

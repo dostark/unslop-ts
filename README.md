@@ -156,6 +156,8 @@ deno task cli config print
 deno task cli config schema
 deno task cli:write rules set demo/max-params max=3
 deno task cli:write migrate --descriptor=examples/unslop.project.ts --from=catalog.json --out=unslop.migrated.config.json --layout-out=layout.json
+deno task cli:report report --format=json src
+deno task cli:report:write report --format=json --out=report.json src
 ```
 
 Query and edit routes accept `--plugin=<entry>` to select a local plugin entry. Without it, discovery

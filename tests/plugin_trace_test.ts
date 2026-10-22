@@ -331,8 +331,8 @@ Deno.test("trace_protocol_reconciliation_rejects_contradictions", () => {
     () => reconcileTraceRecords([{ ...observed, rule: "demo/no-runtime-typeof" } as ITraceRecord], expected),
     TraceProtocolError,
   );
-  assertThrows(() => parseTraceStderr("unslop-trace:v2:run:{}"), TraceProtocolError);
-  assertThrows(() => parseTraceStderr("unslop-trace:v1:run:{"), TraceProtocolError);
+  assertThrows(() => parseTraceStderr("unslop-trace:v2:run:{}", undefined), TraceProtocolError);
+  assertThrows(() => parseTraceStderr("unslop-trace:v1:run:{", undefined), TraceProtocolError);
 });
 
 Deno.test("trace_protocol_preserves_unrelated_stderr", () => {
@@ -343,7 +343,7 @@ Deno.test("trace_protocol_preserves_unrelated_stderr", () => {
   const parsed = parseTraceStderr(stderr, RUN_ID);
   assertEquals(parsed.records, [checked]);
   assertEquals(parsed.unrelated, ["host line", formatTraceRecord(other), "tail line"]);
-  assertEquals(parseTraceStderr("plain host output").unrelated, ["plain host output"]);
+  assertEquals(parseTraceStderr("plain host output", undefined).unrelated, ["plain host output"]);
 });
 
 Deno.test("throwing_rule_never_emits_checked", async () => {

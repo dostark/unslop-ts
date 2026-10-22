@@ -26,6 +26,7 @@ export {
 export { createRuleRegistry, RuleRegistryError } from "./src/engine/registry.ts";
 export { runPlugin } from "./src/engine/run_plugin.ts";
 export { compileConfig, NOT_ENABLED_REASON } from "./src/config/compile.ts";
+export { collectRunReport, failingFindings } from "./src/report/collect.ts";
 export { migrateCatalog, semanticCatalogProjection, semanticCompiledProjection } from "./src/config/migrate.ts";
 export { DEFAULT_HOST_MODE, hostBaseLevel, PLUGIN_RULE_CONTROLS } from "./src/config/descriptor.ts";
 export { configJsonSchema } from "./src/config/json_schema.ts";
@@ -58,6 +59,16 @@ export type { ICatalog, IResolvedRuleSettings, JsonValue, PathClass } from "./sr
 export type { ICatalogLoadOptions, ScriptRuleSchemas } from "./src/engine/catalog.ts";
 export type { RuleScope, RuleSeverity } from "./src/engine/catalog.ts";
 export type { ILintPluginOptions } from "./src/engine/plugin.ts";
+export type {
+  IFinding,
+  IHostDiagnostic,
+  IHostError,
+  ILintRunInput,
+  ILintRunResult,
+  INotRunCheck,
+  IRuleRunSummary,
+  IRunReport,
+} from "./src/report/model.ts";
 export type {
   ITraceCheckedRecord,
   ITraceExpectation,

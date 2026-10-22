@@ -133,6 +133,41 @@ export async function runCliAt(
   return await runDeno(["run", "--allow-read", "--allow-env", CLI_PATH, ...args], cwd, env);
 }
 
+/** Runs the report CLI with read, env, and scoped Deno run permissions. */
+export async function runReportCliAt(
+  cwd: string,
+  args: readonly string[],
+  env: Record<string, string> = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return await runDeno(
+    ["run", "--allow-read", "--allow-env", "--allow-run=deno", CLI_PATH, "report", ...args],
+    cwd,
+    env,
+  );
+}
+
+/** Runs the report CLI in the project root. */
+export async function runReportCli(
+  dir: string,
+  args: readonly string[],
+  env: Record<string, string> = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return await runReportCliAt(dir, args, env);
+}
+
+/** Runs the report CLI with write permission for `--out`. */
+export async function runReportWriteCli(
+  dir: string,
+  args: readonly string[],
+  env: Record<string, string> = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return await runDeno(
+    ["run", "--allow-read", "--allow-write", "--allow-env", "--allow-run=deno", CLI_PATH, "report", ...args],
+    dir,
+    env,
+  );
+}
+
 /** Runs the CLI in the project root. */
 export async function runCli(
   dir: string,
