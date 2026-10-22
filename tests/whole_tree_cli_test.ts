@@ -9,6 +9,7 @@
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
+import { CLI_PATH, withCliProject } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
 
 const CLI = new URL("../src/cli/whole_tree.ts", import.meta.url).href;
@@ -194,5 +195,26 @@ Deno.test("whole_tree passes a tree whose repeated literal is a listed status wo
     const result = await runDeno(["run", "-A", CLI, "--rule=magic-literals", "--catalog=catalog.json"], dir);
     assertEquals(result.code, 0);
     assertStringIncludes(result.stdout, "No magic value violations detected");
+  });
+});
+
+Deno.test("config_print_output_is_a_working_whole_tree_catalog", async () => {
+  await withCliProject(async (dir) => {
+    await Deno.mkdir(join(dir, "src"), { recursive: true });
+    await Deno.mkdir(join(dir, "tests"), { recursive: true });
+    await Deno.writeTextFile(join(dir, "src", "constants.ts"), 'export const ITEMS = ["alpha", "beta"];\n');
+    await Deno.writeTextFile(
+      join(dir, "tests", "example_test.ts"),
+      'import { ITEMS } from "../src/constants.ts";\nexport const count = ITEMS.length;\n',
+    );
+    const printed = await runDeno(["run", "--allow-read", "--allow-env", CLI_PATH, "config", "print"], dir);
+    assertEquals(printed.code, 0, printed.stderr);
+    await Deno.writeTextFile(join(dir, "printed_catalog.json"), printed.stdout);
+    const result = await runDeno(
+      ["run", "-A", CLI, "--rule=constant-restatement", "--catalog=printed_catalog.json"],
+      dir,
+    );
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "No constant restatements found");
   });
 });

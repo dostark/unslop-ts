@@ -20,6 +20,7 @@ import {
 } from "./descriptor.ts";
 import { PRESETS } from "./presets.ts";
 import { buildRegistryIndex, type IRegistryEntry } from "./registry.ts";
+import { resolveSelectorTokens, SelectorError, selectorSource } from "./selectors.ts";
 import { ConfigError, ConfigV2Schema, type IConfigV2, type RuleSettingSchema } from "./schema.ts";
 
 /** The reason a rule carries when the configuration never names it. */
@@ -237,6 +238,9 @@ function defaultOptionsFor(schema: z.ZodTypeAny): Record<string, JsonValue> | nu
 }
 
 function configuredOptions(entry: IRegistryEntry, id: string, setting: ISetting): IOptionState {
+  if (Object.hasOwn(setting.options, "__proto__")) {
+    throw new ConfigError(`rules.${id}.options.__proto__`, "the option name '__proto__' is not allowed");
+  }
   if (!entry.optionSchema) {
     if (Object.keys(setting.options).length > 0) {
       throw new ConfigError(`rules.${id}.options`, "this rule accepts no options");
@@ -304,12 +308,22 @@ function sourcesFor(setting: ISetting | undefined): IRuleSources {
   };
   if (!setting) return { fields };
   const origin = setting.origin;
-  const preset = origin.startsWith("preset:");
+  if (origin.startsWith("preset:")) {
+    return {
+      fields: {
+        level: origin,
+        options: "default",
+        scope: "default",
+        docs: "default",
+        tags: "default",
+      },
+    };
+  }
   fields.level = origin;
-  fields.options = preset || setting.optionsSupplied ? origin : "default";
-  fields.scope = preset || setting.scope !== null ? origin : "default";
-  fields.docs = preset || setting.docs !== null ? origin : "default";
-  fields.tags = preset || setting.tags !== null ? origin : "default";
+  fields.options = setting.optionsSupplied ? origin : "default";
+  fields.scope = setting.scope !== null ? origin : "default";
+  fields.docs = setting.docs !== null ? origin : "default";
+  fields.tags = setting.tags !== null ? origin : "default";
   if (setting.include) fields.include = origin;
   if (setting.exclude) fields.exclude = origin;
   return { fields };
@@ -345,6 +359,7 @@ function resolveRule(
     exclude,
     optIn,
     reason,
+    exclusionCodes: setting?.exclusionCodes ?? null,
     docs,
     tags,
     controls: entry.controls,
@@ -353,9 +368,9 @@ function resolveRule(
   };
 }
 
-function catalogRule(entry: IRegistryEntry, resolved: IResolvedRule, setting: ISetting | undefined): ICatalogRule {
+function catalogRule(entry: IRegistryEntry, resolved: IResolvedRule): ICatalogRule {
   const options = resolved.effectiveOptions ?? resolved.defaultOptions;
-  const exclusionCodes = setting?.exclusionCodes;
+  const exclusionCodes = resolved.exclusionCodes;
   return {
     engine: entry.engine === PLUGIN_ENGINE ? "plugin" : "script",
     severity: resolved.configuredLevel,
@@ -392,8 +407,28 @@ function buildVocabulary(
   return vocabulary;
 }
 
+function rawObject(value: JsonValue | undefined): Record<string, JsonValue> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, JsonValue>
+    : null;
+}
+
+/** Rejects `__proto__` in raw rule options before Zod rebuilds the object and hides the own key. */
+function rejectPrototypeOptions(input: JsonValue): void {
+  const rules = rawObject(rawObject(input)?.rules);
+  if (!rules) return;
+  for (const [id, setting] of Object.entries(rules)) {
+    const options = Array.isArray(setting) ? setting[1] : rawObject(setting)?.options;
+    const optionRecord = rawObject(options);
+    if (optionRecord && Object.hasOwn(optionRecord, "__proto__")) {
+      throw new ConfigError(`rules.${id}.options.__proto__`, "the option name '__proto__' is not allowed");
+    }
+  }
+}
+
 /** Compiles a version 2 configuration against a descriptor. It is pure: no filesystem and no plugin instantiation. */
 export function compileConfig(input: JsonValue, descriptor: IProjectDescriptor): ICompiledConfig {
+  rejectPrototypeOptions(input);
   const config = parseConfig(input);
   if (config.plugin !== descriptor.pluginName) {
     throw new ConfigError("plugin", `the project plugin name is '${descriptor.pluginName}'`);
@@ -408,19 +443,32 @@ export function compileConfig(input: JsonValue, descriptor: IProjectDescriptor):
     const resolved = resolveRule(id, entry, setting, config);
     rules[id] = resolved;
     if (entry.engine === PLUGIN_ENGINE) {
-      catalogRules[id] = catalogRule(entry, resolved, setting);
+      catalogRules[id] = catalogRule(entry, resolved);
       continue;
     }
     if (!setting) continue;
     if (entry.engine === SCRIPT_ENGINE) {
-      catalogRules[id] = catalogRule(entry, resolved, setting);
+      catalogRules[id] = catalogRule(entry, resolved);
       continue;
     }
     const section = WHOLE_TREE_SECTIONS[id];
     if (section) {
       wholeTree[section] = resolved.effectiveOptions ?? resolved.defaultOptions ?? {};
     } else {
-      catalogRules[id] = catalogRule(entry, resolved, setting);
+      catalogRules[id] = catalogRule(entry, resolved);
+    }
+  }
+  const selectorRules = selectorSource(rules);
+  for (const [name, tokens] of Object.entries(config.profiles)) {
+    for (const [index, token] of tokens.entries()) {
+      try {
+        resolveSelectorTokens(selectorRules, token);
+      } catch (error) {
+        if (error instanceof SelectorError) {
+          throw new ConfigError(`profiles.${name}.${index}`, error.message);
+        }
+        throw error;
+      }
     }
   }
   const catalog: ICatalog = {

@@ -157,6 +157,15 @@ Deno.test("invalid_configs_report_the_field", () => {
       path: `rules.${PLUGIN_PREFIX}max-params.options.nope`,
     },
     {
+      run: () =>
+        compile(
+          minimal({
+            rules: { [`${PLUGIN_PREFIX}max-params`]: ["error", JSON.parse('{"__proto__":{"x":1}}')] },
+          }),
+        ),
+      path: `rules.${PLUGIN_PREFIX}max-params.options.__proto__`,
+    },
+    {
       run: () => compile(minimal({ rules: { [`${PLUGIN_PREFIX}no-explicit-unknown`]: "warn" } })),
       path: `rules.${PLUGIN_PREFIX}no-explicit-unknown.level`,
     },
@@ -338,4 +347,28 @@ Deno.test("script_rules_keep_consumer_docs_and_reject_unknown_options", () => {
     errorPath(() => compile(minimal({ rules: { "project-check": ["warn", { extra: true }] } }), descriptor)),
     "rules.project-check.options",
   );
+});
+
+Deno.test("a_preset_only_rule_reports_the_preset_for_level_only", () => {
+  const compiled = compile(minimal({ extends: ["unslop:recommended"] }));
+  const fields = compiled.rules["demo/no-chained-type-assertions"].sources.fields;
+  assertEquals(fields.level, "preset:unslop:recommended");
+  assertEquals(fields.options, "default");
+  assertEquals(fields.scope, "default");
+  assertEquals(fields.docs, "default");
+  assertEquals(fields.tags, "default");
+});
+
+Deno.test("a_configured_field_overrides_the_preset_origin", () => {
+  const id = `${PLUGIN_PREFIX}no-chained-type-assertions`;
+  const compiled = compile(minimal({
+    extends: ["unslop:recommended"],
+    rules: { [id]: { level: "error", scope: "prod" } },
+  }));
+  const fields = compiled.rules[id].sources.fields;
+  assertEquals(fields.level, `config:rules.${id}`);
+  assertEquals(fields.scope, `config:rules.${id}`);
+  assertEquals(fields.options, "default");
+  assertEquals(fields.docs, "default");
+  assertEquals(fields.tags, "default");
 });

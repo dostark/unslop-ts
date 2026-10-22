@@ -37,6 +37,7 @@ interface IMaterialized {
   readonly options: Readonly<Record<string, JsonValue>>;
   readonly optIn: boolean;
   readonly reason: string | null;
+  readonly exclusionCodes: Readonly<Record<string, string>> | null;
 }
 
 function asObject(value: JsonValue | undefined): Record<string, JsonValue> | null {
@@ -101,16 +102,18 @@ function materialize(rule: IResolvedRule, state: IMaterialized): Record<string, 
   if (rule.controls.editable.includes("scope") && rule.scope !== DEFAULT_SCOPE) setting.scope = rule.scope;
   if (rule.controls.editable.includes("include") && rule.include) setting.include = [...rule.include];
   if (rule.controls.editable.includes("exclude") && rule.exclude) setting.exclude = [...rule.exclude];
-  if (state.level === OFF) {
-    if (state.optIn) setting.optIn = true;
-    if (state.reason !== null) setting.reason = state.reason;
+  if (state.optIn) setting.optIn = true;
+  if (state.reason !== null) setting.reason = state.reason;
+  if (state.exclusionCodes !== null && Object.keys(state.exclusionCodes).length > 0) {
+    setting.exclusionCodes = { ...state.exclusionCodes };
   }
   if (rule.docs !== defaultDocs(rule)) setting.docs = rule.docs;
   if (!sameList(rule.tags, defaultTags(rule))) setting.tags = [...rule.tags];
   return setting;
 }
 
-function effectiveEquals(left: IResolvedRule, right: IResolvedRule): boolean {
+/** True when two resolved rules carry the same effective and authored fields. */
+export function effectiveEquals(left: IResolvedRule, right: IResolvedRule): boolean {
   return left.configuredLevel === right.configuredLevel &&
     left.effectiveLevel === right.effectiveLevel &&
     left.scope === right.scope &&
@@ -118,6 +121,7 @@ function effectiveEquals(left: IResolvedRule, right: IResolvedRule): boolean {
     sameNullableList(left.exclude, right.exclude) &&
     left.optIn === right.optIn &&
     left.reason === right.reason &&
+    JSON.stringify(left.exclusionCodes) === JSON.stringify(right.exclusionCodes) &&
     left.docs === right.docs &&
     sameList(left.tags, right.tags) &&
     JSON.stringify(left.effectiveOptions) === JSON.stringify(right.effectiveOptions) &&
@@ -178,6 +182,7 @@ function baseState(rule: IResolvedRule): IMaterialized {
     options: rule.effectiveOptions ?? rule.defaultOptions ?? {},
     optIn: rule.optIn,
     reason: rule.reason,
+    exclusionCodes: rule.exclusionCodes,
   };
 }
 
@@ -197,7 +202,18 @@ export function enableRule(
     throw new EditRefusalError(`rules.${rule.id}.level`, "plugin rules support only 'error'");
   }
   const state = baseState(rule);
-  return finalize(config, rule.id, materialize(rule, { ...state, level, optIn: false, reason: null }), context);
+  const wasOff = rule.configuredLevel === OFF;
+  return finalize(
+    config,
+    rule.id,
+    materialize(rule, {
+      ...state,
+      level,
+      optIn: wasOff ? false : state.optIn,
+      reason: wasOff ? null : state.reason,
+    }),
+    context,
+  );
 }
 
 /** Disables a rule with a reason, optionally parking it for explicit selection. */

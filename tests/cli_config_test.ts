@@ -142,3 +142,35 @@ Deno.test("unknown_command_option_or_format_exits_2", async () => {
     }
   });
 });
+
+async function setProfiles(dir: string, profiles: Record<string, string[]>): Promise<void> {
+  const config = JSON.parse(await Deno.readTextFile(configPath(dir))) as Record<string, unknown>;
+  config.profiles = profiles;
+  await Deno.writeTextFile(configPath(dir), JSON.stringify(config, null, 2));
+}
+
+Deno.test("config_validate_rejects_a_profile_with_an_unknown_rule_or_tag", async () => {
+  await withCliProject(async (dir) => {
+    await setProfiles(dir, { badRule: ["demo/not-a-rule"] });
+    const rule = await runCli(dir, ["config", "validate"]);
+    assertEquals(rule.code, 1);
+    assertStringIncludes(rule.stderr, "profiles.badRule.0");
+    assertStringIncludes(rule.stderr, "unknown rule id");
+
+    await setProfiles(dir, { badTag: ["tag:nosuchtag"] });
+    const tag = await runCli(dir, ["config", "validate"]);
+    assertEquals(tag.code, 1);
+    assertStringIncludes(tag.stderr, "profiles.badTag.0");
+    assertStringIncludes(tag.stderr, "unknown tag");
+  });
+});
+
+Deno.test("config_validate_rejects_an_ambiguous_profile_key", async () => {
+  await withCliProject(async (dir) => {
+    await setProfiles(dir, { ambiguous: ["no-explicit-unknown"] });
+    const result = await runCli(dir, ["config", "validate"]);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stderr, "profiles.ambiguous.0");
+    assertStringIncludes(result.stderr, "ambiguous");
+  });
+});

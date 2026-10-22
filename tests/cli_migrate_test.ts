@@ -271,3 +271,33 @@ Deno.test("migration_second_output_failure_is_recoverable", async () => {
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("migrate_refuses_output_that_does_not_compile", async () => {
+  await withV1Project(async (paths) => {
+    const catalog = JSON.parse(await Deno.readTextFile(paths.catalog)) as Record<string, unknown>;
+    catalog.ignore = [{ glob: "**/vendor/**", reason: "" }];
+    await Deno.writeTextFile(paths.catalog, JSON.stringify(catalog, null, 2));
+    const result = await runMigrateCli(paths.dir, MIGRATE_ARGS);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stderr, "does not compile");
+    assertStringIncludes(result.stderr, "paths.ignore.0.reason");
+    assertEquals(await exists(paths.config), false);
+    assertEquals(await exists(paths.layout), false);
+    const leftovers: string[] = [];
+    for await (const entry of Deno.readDir(paths.dir)) {
+      if (entry.name.includes(".unslop")) leftovers.push(entry.name);
+    }
+    assertEquals(leftovers, []);
+  });
+});
+
+Deno.test("migrate_of_a_valid_catalog_is_unchanged", async () => {
+  await withV1Project(async (paths) => {
+    const result = await runMigrateCli(paths.dir, MIGRATE_ARGS);
+    assertEquals(result.code, 0, result.stderr);
+    assert(await exists(paths.config));
+    assert(await exists(paths.layout));
+    const validated = await runMigrateCli(paths.dir, ["config", "validate"]);
+    assertEquals(validated.code, 0, validated.stderr);
+  });
+});

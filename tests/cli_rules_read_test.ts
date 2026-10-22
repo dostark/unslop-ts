@@ -99,6 +99,14 @@ Deno.test("rules_show_reports_configured_effective_and_default_options_with_sour
   });
 });
 
+Deno.test("a_valid_profile_still_selects_a_parked_rule", async () => {
+  await withCliProject(async (dir) => {
+    const rules = parseRules((await runCli(dir, ["rules", "list", "--format=json", "--profile=parked"])).stdout);
+    assertEquals(findRule(rules, "demo/exported-interface-naming").status, "active");
+    assertEquals(findRule(rules, "demo/no-chained-type-assertions").status, "not-selected");
+  });
+});
+
 Deno.test("status_follows_the_selection_variable", async () => {
   await withCliProject(async (dir) => {
     const selected = parseRules(
@@ -150,5 +158,18 @@ Deno.test("status_follows_the_selection_variable", async () => {
     assertEquals((await runCli(dir, ["rules", "list", "--select=demo/missing"])).code, 2);
     assertEquals((await runCli(dir, ["rules", "list", "--profile=missing"])).code, 2);
     assertEquals((await runCli(dir, ["rules", "list", "--select=tag:missing"])).code, 2);
+  });
+});
+
+Deno.test("rules_show_prints_the_corrected_origins", async () => {
+  await withCliProject(async (dir) => {
+    const rule = ruleOf(
+      (await runCli(dir, ["rules", "show", "demo/no-chained-type-assertions", "--format=json"])).stdout,
+    );
+    assertEquals(rule.sources.fields.level, "preset:unslop:recommended");
+    assertEquals(rule.sources.fields.options, "default");
+    assertEquals(rule.sources.fields.scope, "default");
+    assertEquals(rule.sources.fields.docs, "default");
+    assertEquals(rule.sources.fields.tags, "default");
   });
 });

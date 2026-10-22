@@ -72,7 +72,9 @@ rule packs and script checks, so project-specific rules stay in the project.
   needs a reason.
 - `tags` overrides a category description and may restrict its scope. Only tags used by an emitted rule
   enter the compiled vocabulary.
-- `profiles` maps a name to a non-empty selector list for `--profile`.
+- `profiles` maps a name to a non-empty selector list for `--profile`. Every profile token is validated
+  when the configuration is compiled, so a typo fails `config validate` rather than the later user who
+  selects that profile.
 - `rules` accepts a level, `[level, options]`, or the long form. The long form adds `scope` (default
   `all`), `include`, `exclude`, `options`, `optIn`, `reason`, `docs`, `tags`, and consumer-only
   `exclusionCodes`.
@@ -130,6 +132,32 @@ Run the CLI from a checkout with `deno task cli`, or as the package subpath `@do
 | `unslop config schema`                                                         | The generated structural JSON Schema.                                             |
 | `unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=]` | Migrate a version 1 catalog without overwriting an input or existing destination. |
 
+Use `deno task cli` for read commands and dry runs. Use `deno task cli:write` for a real edit, a
+migration, or any command that locks, stages, and writes files. The read task grants no write access,
+because the CLI imports trusted project code with its own permissions.
+
+### Command examples
+
+These examples run in a checkout of this repository. Each line uses the task whose permissions it
+needs. The `migrate` example assumes a version 1 project and writes a separate output name so it cannot
+clobber a live version 2 file.
+
+```sh
+deno task cli rules list --format=json
+deno task cli rules show demo/max-params --format=json
+deno task cli rules enable demo/no-boolean-assert --dry-run
+deno task cli rules disable demo/no-chained-type-assertions --reason=unused --dry-run
+deno task cli rules set demo/max-params max=4 --dry-run
+deno task cli rules unset demo/max-params max --dry-run
+deno task cli presets list --format=json
+deno task cli presets show unslop:strict --format=json
+deno task cli config validate
+deno task cli config print
+deno task cli config schema
+deno task cli:write rules set demo/max-params max=3
+deno task cli:write migrate --descriptor=examples/unslop.project.ts --from=catalog.json --out=unslop.migrated.config.json --layout-out=layout.json
+```
+
 Query and edit routes accept `--plugin=<entry>` to select a local plugin entry. Without it, discovery
 walks to the nearest JSON `deno.json` and uses its single configured plugin; several plugins require
 `--plugin`. `--select=<tokens>` and `--profile=<name>` replace the selection variable for that call and
@@ -158,7 +186,9 @@ effective rule.
 An edit refuses a control that the named host does not read, a plugin `warn` level, a missing reason,
 and an `unset` whose option has no engine default. A refused or stale edit leaves the bytes unchanged.
 A real edit locks the file, compares the current bytes and inode with the read copy, preserves the mode,
-and replaces it atomically. `--dry-run` prints a unified diff before any lock or temporary file exists.
+and replaces it atomically. An edit keeps an authored `reason`, `optIn`, and consumer `exclusionCodes`
+at every level; `enable` clears the first two only when the rule was off. `--dry-run` prints a unified
+diff before any lock or temporary file exists.
 
 ## Migration
 
@@ -171,7 +201,23 @@ that differs from the rule metadata is refused instead of discarded.
 The pair is written without overwriting: canonical parent paths, sibling locks, staged temporary files,
 and no-clobber hard links. Layout commits first and the configuration last. If the second commit fails,
 only the layout inode created by that invocation is removed. If cleanup cannot complete, the command
-exits `1` and reports the exact surviving paths; it never reports a successful partial pair.
+exits `1` and reports the exact surviving paths; it never reports a successful partial pair. The output
+is compiled before it is written, so a value that is legal in version 1 but illegal in version 2 is
+refused with no file created.
+
+### Whole-tree hosts today
+
+Until Phase 232 Step 5 adds the version 2 adapter, a whole-tree host still reads a legacy catalog.
+`unslop config print` emits one with the `wholeTree` section, so a migrated project can keep its checks
+running:
+
+```sh
+deno task cli config print > catalog.json
+deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-exports
+```
+
+The same hint prints after a migration. Phase 232 Step 5 replaces this bridge with a compiled-settings
+adapter, so the separate catalog is temporary.
 
 ## Working with deno lint
 

@@ -7,6 +7,9 @@
  * @related-files [src/cli/project_loader.ts, src/cli/rules_read.ts, src/cli/presets.ts, src/cli/config_read.ts]
  *
  * Usage:
+ *   deno task cli <read command>          # read-only: list, show, presets, config, dry runs
+ *   deno task cli:write <write command>   # writes: real edits and migrate
+ *
  *   deno run --allow-read --allow-env src/cli/unslop.ts rules list [--category=] [--status=] [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts rules show <id> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts presets list|show <name> [--format=]
@@ -29,6 +32,8 @@ import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.t
 
 const USAGE = [
   "Usage:",
+  "  deno task cli <command>         read-only commands and dry runs",
+  "  deno task cli:write <command>   real edits and migrate",
   "  unslop rules list [--category=<category>] [--status=<status>] [--format=table|json] [--select=<tokens>|--profile=<name>]",
   "  unslop rules show <id> [--format=table|json] [--select=<tokens>|--profile=<name>]",
   "  unslop rules enable <id> [--level=error|warn] [--dry-run]",
@@ -221,6 +226,7 @@ async function migrateCommand(args: readonly string[]): Promise<number> {
   });
   print(`wrote ${result.configPath}\n`);
   if (result.layoutPath !== null) print(`wrote ${result.layoutPath}\n`);
+  print("whole-tree hosts: deno task cli config print > catalog.json\n");
   return 0;
 }
 

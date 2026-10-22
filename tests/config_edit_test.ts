@@ -19,7 +19,9 @@ import {
   setOption,
   unsetOption,
 } from "../mod.ts";
+import { effectiveEquals } from "../src/config/edit.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
+import { migrationDescriptor } from "./helpers/migration_descriptor.ts";
 
 function context(config: JsonValue): IEditContext {
   const descriptor = testDescriptor();
@@ -138,4 +140,88 @@ Deno.test("inherited_scope_exclusions_and_options_survive_targeted_edits", () =>
     EditRefusalError,
   );
   assertEquals(refused.path, "rules.optional-params.level");
+});
+
+Deno.test("edit_preserves_reason_on_an_enabled_rule", () => {
+  const config = {
+    version: 2,
+    plugin: "demo",
+    rules: {
+      "demo/max-params": { level: "error", reason: "Team agreed on 2.", options: { max: 2 } },
+    },
+  } as JsonValue;
+  const edited = setOption(config, context(config), "demo/max-params", "max", 3);
+  assertEquals(record(record(record(edited).rules)["demo/max-params"]).reason, "Team agreed on 2.");
+  assertEquals(compiledOf(edited).rules["demo/max-params"].reason, "Team agreed on 2.");
+  assertEquals(compiledOf(edited).catalog.rules["demo/max-params"].reason, "Team agreed on 2.");
+});
+
+Deno.test("edit_preserves_opt_in_on_an_enabled_rule", () => {
+  const config = {
+    version: 2,
+    plugin: "demo",
+    rules: {
+      "demo/max-params": { level: "error", optIn: true, reason: "Selected by tag.", options: { max: 2 } },
+    },
+  } as JsonValue;
+  const set = setOption(config, context(config), "demo/max-params", "max", 4);
+  assertEquals(record(record(record(set).rules)["demo/max-params"]).optIn, true);
+  assertEquals(record(record(record(set).rules)["demo/max-params"]).reason, "Selected by tag.");
+  const unset = unsetOption(set, context(set), "demo/max-params", "max");
+  assertEquals(record(record(record(unset).rules)["demo/max-params"]).optIn, true);
+  assertEquals(record(record(record(unset).rules)["demo/max-params"]).reason, "Selected by tag.");
+});
+
+Deno.test("edit_preserves_exclusion_codes_on_a_script_rule", () => {
+  const descriptor = migrationDescriptor();
+  const contextFor = (config: JsonValue): IEditContext => ({ descriptor, compiled: compileConfig(config, descriptor) });
+  const config = {
+    version: 2,
+    plugin: "demo",
+    rules: {
+      "project-check": { level: "warn", exclusionCodes: { "a-code": "because" } },
+    },
+  } as JsonValue;
+  const enabled = enableRule(config, contextFor(config), "project-check", "error");
+  assertEquals(record(record(record(enabled).rules)["project-check"]).exclusionCodes, { "a-code": "because" });
+  assertEquals(compileConfig(enabled, descriptor).rules["project-check"].exclusionCodes, { "a-code": "because" });
+  const warn = enableRule(enabled, contextFor(enabled), "project-check", "warn");
+  assertEquals(record(record(record(warn).rules)["project-check"]).exclusionCodes, { "a-code": "because" });
+  assertEquals(compileConfig(warn, descriptor).catalog.rules["project-check"].exclusionCodes, {
+    "a-code": "because",
+  });
+});
+
+Deno.test("enable_of_an_off_rule_still_clears_reason_and_opt_in", () => {
+  const config = {
+    version: 2,
+    plugin: "demo",
+    rules: {
+      "demo/max-params": { level: "off", optIn: true, reason: "Selected later.", options: { max: 2 } },
+    },
+  } as JsonValue;
+  const enabled = enableRule(config, context(config), "demo/max-params");
+  const compiled = compiledOf(enabled).rules["demo/max-params"];
+  assertEquals(compiled.reason, null);
+  assertEquals(compiled.optIn, false);
+  assertEquals(JSON.stringify(record(enabled)).includes('"reason"'), false);
+  assertEquals(JSON.stringify(record(enabled)).includes('"optIn"'), false);
+});
+
+Deno.test("effective_equality_fails_when_a_field_is_dropped", () => {
+  const descriptor = migrationDescriptor();
+  const withCodes = {
+    version: 2,
+    plugin: "demo",
+    rules: { "project-check": { level: "warn", exclusionCodes: { "a-code": "because" } } },
+  } as JsonValue;
+  const without = {
+    version: 2,
+    plugin: "demo",
+    rules: { "project-check": "warn" },
+  } as JsonValue;
+  const left = compileConfig(withCodes, descriptor).rules["project-check"];
+  const right = compileConfig(without, descriptor).rules["project-check"];
+  assertEquals(effectiveEquals(left, right), false);
+  assertEquals(effectiveEquals(left, left), true);
 });

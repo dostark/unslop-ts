@@ -165,3 +165,13 @@ Deno.test("disable_without_reason_is_a_usage_error", async () => {
     assertEquals(await leftovers(dir), []);
   });
 });
+
+Deno.test("a_prototype_option_name_is_refused", async () => {
+  await withCliProject(async (dir) => {
+    const before = await Deno.readTextFile(configFile(dir));
+    const result = await runWriteCli(dir, ["rules", "set", "demo/max-params", '__proto__={"x":1}']);
+    assertEquals(result.code, 1);
+    assertStringIncludes(result.stderr, "__proto__");
+    assertEquals(await Deno.readTextFile(configFile(dir)), before);
+  });
+});

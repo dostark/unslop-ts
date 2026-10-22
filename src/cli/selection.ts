@@ -11,6 +11,12 @@ import type { RuleSeverity } from "../engine/catalog.ts";
 import { selectionEnvName } from "../engine/plugin.ts";
 import type { ICompiledConfig, IResolvedRule } from "../config/descriptor.ts";
 import type { IConfigV2 } from "../config/schema.ts";
+import {
+  resolveRuleId as resolveId,
+  resolveSelectorTokens,
+  SelectorError,
+  selectorSource,
+} from "../config/selectors.ts";
 import { CliError, USAGE_EXIT } from "./error.ts";
 
 /** The status of a resolved rule for the current selection. */
@@ -25,24 +31,16 @@ export interface IResolvedSelection {
   readonly tags: ReadonlySet<string>;
 }
 
-const TAG_PREFIX = "tag:";
 const EFFECTIVE_ERROR: RuleSeverity = "error";
 
-function ruleKey(id: string): string {
-  const separator = id.lastIndexOf("/");
-  return separator === -1 ? id : id.slice(separator + 1);
-}
-
-/** Resolves a full id or an unambiguous bare key to a rule id. */
+/** Resolves a full id or an unambiguous bare key to a rule id, as a usage error on failure. */
 export function resolveRuleId(compiled: ICompiledConfig, token: string): string {
-  if (compiled.rules[token]) return token;
-  if (token.includes("/")) throw new CliError(USAGE_EXIT, `unknown rule id '${token}'`);
-  const matches = Object.keys(compiled.rules).filter((id) => ruleKey(id) === token);
-  if (matches.length === 0) throw new CliError(USAGE_EXIT, `unknown rule '${token}'`);
-  if (matches.length > 1) {
-    throw new CliError(USAGE_EXIT, `ambiguous rule key '${token}': ${matches.sort().join(", ")}`);
+  try {
+    return resolveId(Object.keys(compiled.rules), token);
+  } catch (error) {
+    if (error instanceof SelectorError) throw new CliError(USAGE_EXIT, error.message);
+    throw error;
   }
-  return matches[0];
 }
 
 function readSelectionVariable(pluginName: string): string {
@@ -75,22 +73,12 @@ export function resolveSelection(
     tokens = readSelectionVariable(pluginName);
   }
   if (tokens.trim() === "") return null;
-  const ids = new Set<string>();
-  const tags = new Set<string>();
-  for (const raw of tokens.split(",")) {
-    const token = raw.trim();
-    if (token === "") continue;
-    if (token.startsWith(TAG_PREFIX)) {
-      const tag = token.slice(TAG_PREFIX.length);
-      if (!Object.values(compiled.rules).some((rule) => rule.tags.includes(tag))) {
-        throw new CliError(USAGE_EXIT, `unknown tag '${tag}'`);
-      }
-      tags.add(tag);
-      continue;
-    }
-    ids.add(resolveRuleId(compiled, token));
+  try {
+    return resolveSelectorTokens(selectorSource(compiled.rules), tokens);
+  } catch (error) {
+    if (error instanceof SelectorError) throw new CliError(USAGE_EXIT, error.message);
+    throw error;
   }
-  return { ids, tags };
 }
 
 /** True when the selection includes the rule by id or tag. */

@@ -9,6 +9,7 @@
 
 import { fromFileUrl, resolve } from "@std/path";
 import type { JsonValue } from "../../engine/catalog.ts";
+import { compileConfig } from "../../config/compile.ts";
 import { migrateCatalog } from "../../config/migrate.ts";
 import { ConfigError } from "../../config/schema.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
@@ -56,6 +57,20 @@ export async function runMigrate(cwd: string, options: IMigrateOptions): Promise
       throw new CliError(FAILURE_EXIT, `${options.from}: ${error.message}`);
     }
     throw new CliError(FAILURE_EXIT, `${options.from}: ${messageOf(error)}`);
+  }
+  try {
+    compileConfig(migrated.config, descriptor);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      throw new CliError(
+        FAILURE_EXIT,
+        `${options.from}: the migrated configuration does not compile: ${error.message}`,
+      );
+    }
+    throw new CliError(
+      FAILURE_EXIT,
+      `${options.from}: the migrated configuration does not compile: ${messageOf(error)}`,
+    );
   }
   if (migrated.layout !== null && options.layoutOut === undefined) {
     throw new CliError(USAGE_EXIT, "--layout-out is required because the input catalog has a layout.");

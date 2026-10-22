@@ -52,9 +52,12 @@ export interface IWholeTreeHostSpec {
 /** The configuration-independent project input. It never imports a plugin instance or the config file. */
 export interface IProjectDescriptor {
   readonly pluginName: string;
+  /** The project root. Reserved for the Phase 232 Step 2 run binding; no Phase 231 reader. */
   readonly rootUrl: URL;
   readonly configUrl: URL;
+  /** The lint config. Reserved for the Phase 232 Step 2 run binding; no Phase 231 reader. */
   readonly lintConfigUrl: URL;
+  /** The plugin entry. Reserved for the Phase 232 Step 2 run binding; no Phase 231 reader. */
   readonly pluginUrl: URL;
   readonly packs: readonly IRulePack[];
   readonly scriptRules: Readonly<Record<string, IScriptRuleSpec>>;
@@ -67,6 +70,7 @@ export interface IResolvedRule {
   readonly engine: RuleEngine;
   readonly meta: IRuleMeta;
   readonly configuredLevel: RuleSeverity;
+  /** Equal to `configuredLevel` here; selection-aware commands compute their own view. */
   readonly effectiveLevel: RuleSeverity;
   readonly configuredOptions: Readonly<Record<string, JsonValue>>;
   /** Engine defaults, or null when parsing them needs project input. */
@@ -77,6 +81,8 @@ export interface IResolvedRule {
   readonly exclude: readonly string[] | null;
   readonly optIn: boolean;
   readonly reason: string | null;
+  /** Consumer script exclusion codes; null for an engine-owned rule. */
+  readonly exclusionCodes: Readonly<Record<string, string>> | null;
   readonly docs: string;
   readonly tags: readonly string[];
   readonly controls: IRuleControls;

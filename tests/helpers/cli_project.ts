@@ -83,6 +83,10 @@ const CONFIG = {
       options: { max: 2 },
       tags: ["project-choice"],
     },
+    "constant-restatement": [
+      "error",
+      { constantModules: ["src/constants.ts"], testRoots: ["tests"], minRestatedElements: 2 },
+    ],
     "project-check": ["warn", {}],
   },
 };
