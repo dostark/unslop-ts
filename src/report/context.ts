@@ -7,7 +7,7 @@
  * @related-files [src/report/collect.ts, src/cli/commands/report.ts]
  */
 
-import type { IResolvedSelection } from "../cli/selection.ts";
+import type { IResolvedSelection } from "../config/selectors.ts";
 import type { ICompiledConfig } from "../config/descriptor.ts";
 
 /** One captured policy file. */

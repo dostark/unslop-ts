@@ -1,31 +1,36 @@
 /**
- * @module LintPluginFactory
- * @path src/engine/plugin.ts
- * @description Builds a Deno lint plugin from a validated catalog and rule packs, honouring severity, scope, and local selection.
+ * @module DenoHost
+ * @path deno.ts
+ * @description Deno host entry point: the Deno lint plugin factory, the project builder, and the in-process runner.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [src/engine/catalog.ts, src/engine/registry.ts]
+ * @related-files [mod.ts, src/engine/rule_gate.ts, src/engine/run_plugin.ts]
  */
 
-import { matchesAnyGlob } from "./glob.ts";
+import { compileConfig } from "./src/config/compile.ts";
+import type { ICompiledConfig, IProjectDescriptor } from "./src/config/descriptor.ts";
 import {
   CatalogError,
   classifyPath,
   type ICatalog,
+  type JsonValue,
   PATH_CLASS,
-  type PathClass,
   requireRegisteredPluginRules,
   ruleSettings,
-  type RuleSeverity,
-} from "./catalog.ts";
-import { createRuleRegistry, type IRulePack } from "./registry.ts";
+} from "./src/engine/catalog.ts";
+import { matchesAnyGlob } from "./src/engine/glob.ts";
+import { createRuleRegistry, type IRulePack } from "./src/engine/registry.ts";
+import { isRuleActive, parseSelection, repoRelative, selectionEnvName, skipReasonOf } from "./src/engine/rule_gate.ts";
 import {
   formatTraceRecord,
   INTERNAL_COVERAGE_RULE,
   type ITraceRecord,
   resolveTraceRunId,
   type SkipReason,
-} from "./trace.ts";
+  traceEnvName,
+} from "./src/engine/trace.ts";
+
+export { runPlugin } from "./src/engine/run_plugin.ts";
 
 /** Rule packs the plugin factory registers. */
 export interface ILintPluginOptions {
@@ -36,74 +41,21 @@ export interface ILintPluginOptions {
   readonly trace?: string;
 }
 
-type CatalogRule = ICatalog["rules"][string];
-
-const RULE_ID_SEPARATOR = "/";
-const NON_NAME_CHARS = /[^A-Z0-9]+/g;
-const SELECTION_ENV_SUFFIX = "_LINT_RULES";
-
-/** The variable that selects a plugin's rules locally: "demo" gives "DEMO_LINT_RULES". */
-export function selectionEnvName(pluginName: string): string {
-  return `${pluginName.toUpperCase().replace(NON_NAME_CHARS, "_")}${SELECTION_ENV_SUFFIX}`;
-}
-
-/** The selection variable of the plugin that owns a catalog id of the form `<plugin>/<key>`. */
-export function selectionEnvNameForRule(ruleId: string): string {
-  return selectionEnvName(ruleId.split(RULE_ID_SEPARATOR)[0]);
-}
-
-function parseSelection(value: string): Set<string> | null {
-  if (value.trim() === "") return null;
-  return new Set(value.split(",").map((token) => token.trim()).filter((token) => token.length > 0));
-}
-
-function isSelected(selection: Set<string>, id: string, key: string, tags: string[]): boolean {
-  if (selection.has(id) || selection.has(key)) return true;
-  for (const token of selection) {
-    if (token.startsWith("tag:") && tags.includes(token.slice("tag:".length))) return true;
+/** Reads a variable the host may forbid, so a sandboxed run disables the feature instead of failing. */
+function readEnv(name: string): string | undefined {
+  try {
+    return Deno.env.get(name);
+  } catch {
+    return undefined;
   }
-  return false;
 }
 
-/** The repository-relative path for a filename Deno lint reports as absolute. */
-function repoRelative(filename: string): string {
-  const cwd = Deno.cwd();
-  const prefix = cwd.endsWith("/") ? cwd : `${cwd}/`;
-  return filename.startsWith(prefix) ? filename.slice(prefix.length) : filename;
-}
-
-/** The first condition that stops a rule on this path, or null when the rule may run. */
-function skipReasonOf(
-  repoPath: string,
-  pathClass: PathClass,
-  settings: ReturnType<typeof ruleSettings>,
-): SkipReason | null {
-  if (pathClass === PATH_CLASS.fixture) return "fixture";
-  if (settings.scope !== "all" && settings.scope !== pathClass) return "scope";
-  if (settings.include && !matchesAnyGlob(repoPath, settings.include)) return "include";
-  if (settings.exclude && matchesAnyGlob(repoPath, settings.exclude)) return "exclude";
-  return null;
-}
-
-/** True when the rule should report: severity, opt-in, and the local selection all allow it. */
-function isRuleActive(
-  entry: CatalogRule,
-  severity: RuleSeverity,
-  selection: Set<string> | null,
-  names: { readonly id: string; readonly key: string },
-): boolean {
-  const selected = selection !== null && isSelected(selection, names.id, names.key, entry.tags);
-  // An `off` rule runs only when it is opt-in and explicitly selected.
-  if (severity === "off") return entry.optIn === true && selected;
-  return selection === null || selected;
-}
-
-/** Builds the plugin. An inactive rule stays registered and returns no visitors, so Deno treats its ignores as known. */
-export function createLintPlugin(name: string, catalog: ICatalog, options: ILintPluginOptions): Deno.lint.Plugin {
+/** Builds the Deno lint plugin. An inactive rule stays registered and returns no visitors, so Deno treats its ignores as known. */
+export function createDenoPlugin(name: string, catalog: ICatalog, options: ILintPluginOptions): Deno.lint.Plugin {
   const registry = createRuleRegistry(name, options.rulePacks);
   requireRegisteredPluginRules(catalog, registry);
   const envName = selectionEnvName(name);
-  const selection = parseSelection(options.selection ?? Deno.env.get(envName) ?? "");
+  const selection = parseSelection(options.selection ?? readEnv(envName) ?? "");
   if (selection) {
     console.error(`[${name}-lint] ${envName} active: ${[...selection].join(", ")}`);
   }
@@ -113,7 +65,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
   if (registry.catalogIds().includes(reservedId)) {
     throw new CatalogError(`rules.${reservedId}`, "the rule key 'internal-coverage' is reserved for trace observation");
   }
-  const traceRunId = resolveTraceRunId(name, options.trace);
+  const traceRunId = resolveTraceRunId(options.trace, readEnv(traceEnvName(name)));
   const emit = traceRunId === null ? null : (record: ITraceRecord) => console.error(formatTraceRecord(record));
   const rules: Record<string, Deno.lint.Rule> = {};
   if (traceRunId !== null) {
@@ -123,7 +75,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
           kind: "observed",
           runId: traceRunId,
           plugin: name,
-          file: repoRelative(context.filename),
+          file: repoRelative(context.filename, Deno.cwd()),
           rule: INTERNAL_COVERAGE_RULE,
         });
         return {};
@@ -145,7 +97,7 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
     rules[key] = {
       create(context) {
         if (!active) return {};
-        const repoPath = repoRelative(context.filename);
+        const repoPath = repoRelative(context.filename, Deno.cwd());
         const terminal = (kind: "checked" | "skipped", reason?: SkipReason): void => {
           if (traceRunId === null) return;
           if (kind === "checked") {
@@ -185,4 +137,26 @@ export function createLintPlugin(name: string, catalog: ICatalog, options: ILint
   }
 
   return { name, rules };
+}
+
+/** The input of {@link createUnslopProject}. */
+export interface IUnslopProjectInput {
+  readonly descriptor: IProjectDescriptor;
+  readonly config: JsonValue;
+}
+
+/** A configured project: the descriptor, its compiled model, and the plugin Deno lint loads. */
+export interface IUnslopProject {
+  readonly descriptor: IProjectDescriptor;
+  readonly compiled: ICompiledConfig;
+  readonly plugin: Deno.lint.Plugin;
+}
+
+/** Compiles a configuration and builds its lint plugin. The entry file exports the result of this call. */
+export function createUnslopProject(input: IUnslopProjectInput): IUnslopProject {
+  const compiled = compileConfig(input.config, input.descriptor);
+  const plugin = createDenoPlugin(input.descriptor.pluginName, compiled.catalog, {
+    rulePacks: input.descriptor.packs,
+  });
+  return { descriptor: input.descriptor, compiled, plugin };
 }

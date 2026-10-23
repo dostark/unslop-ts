@@ -11,7 +11,7 @@ import { dirname, fromFileUrl, join, resolve, toFileUrl } from "@std/path";
 import type { JsonValue } from "../engine/catalog.ts";
 import { compileConfig } from "../config/compile.ts";
 import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.ts";
-import type { IUnslopProject } from "../config/project.ts";
+import type { IUnslopProject } from "../../deno.ts";
 import { ConfigError, ConfigV2Schema, type IConfigV2 } from "../config/schema.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "./error.ts";
 

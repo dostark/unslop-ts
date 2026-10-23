@@ -7,7 +7,8 @@
  * @related-files [tests/helpers/registry.ts]
  */
 
-import { type JsonValue, runPlugin } from "../../mod.ts";
+import type { JsonValue } from "../../mod.ts";
+import { runPlugin } from "../../deno.ts";
 import { createTestPlugin, loadTestCatalog, TEST_PLUGIN_NAME } from "./registry.ts";
 
 export interface IRuleFinding {

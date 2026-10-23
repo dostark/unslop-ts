@@ -8,7 +8,6 @@
  */
 
 import {
-  createLintPlugin,
   createRuleRegistry,
   DENO_RULE_PACK,
   type ICatalog,
@@ -18,6 +17,7 @@ import {
   parseCatalog,
   TYPESCRIPT_RULE_PACK,
 } from "../../mod.ts";
+import { createDenoPlugin } from "../../deno.ts";
 
 export const TEST_PLUGIN_NAME = "demo";
 
@@ -32,5 +32,5 @@ export function loadTestCatalog(input: JsonValue): ICatalog {
 
 /** Builds the lint plugin for a parsed catalog with the engine rule packs. */
 export function createTestPlugin(catalog: ICatalog): Deno.lint.Plugin {
-  return createLintPlugin(TEST_PLUGIN_NAME, catalog, { rulePacks: TEST_RULE_PACKS });
+  return createDenoPlugin(TEST_PLUGIN_NAME, catalog, { rulePacks: TEST_RULE_PACKS });
 }

@@ -4,11 +4,11 @@
  * @description Generic lint-rule engine: catalog loader, plugin factory, registry, metadata, configuration compiler, and descriptor contracts.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [src/engine/catalog.ts, src/engine/plugin.ts, src/engine/registry.ts, src/rules/meta.ts, src/config/compile.ts]
+ * @related-files [src/engine/catalog.ts, src/engine/rule_gate.ts, src/engine/registry.ts, src/rules/meta.ts, src/config/compile.ts]
  */
 
 export { CatalogError, classifyPath, parseCatalog, PATH_CLASS, ruleSettings } from "./src/engine/catalog.ts";
-export { createLintPlugin, selectionEnvName } from "./src/engine/plugin.ts";
+export { selectionEnvName } from "./src/engine/rule_gate.ts";
 export {
   formatTraceRecord,
   INTERNAL_COVERAGE_RULE,
@@ -24,14 +24,11 @@ export {
   TraceProtocolError,
 } from "./src/engine/trace.ts";
 export { createRuleRegistry, RuleRegistryError } from "./src/engine/registry.ts";
-export { runPlugin } from "./src/engine/run_plugin.ts";
 export { compileConfig, NOT_ENABLED_REASON } from "./src/config/compile.ts";
-export { collectRunReport, failingFindings } from "./src/report/collect.ts";
 export { migrateCatalog, semanticCatalogProjection, semanticCompiledProjection } from "./src/config/migrate.ts";
 export { DEFAULT_HOST_MODE, hostBaseLevel, PLUGIN_RULE_CONTROLS } from "./src/config/descriptor.ts";
 export { configJsonSchema } from "./src/config/json_schema.ts";
 export { PRESET_IDS, PRESETS } from "./src/config/presets.ts";
-export { createUnslopProject } from "./src/config/project.ts";
 export { ConfigError, ConfigV2Schema, JsonValueSchema, RuleSettingSchema, ScopeSchema } from "./src/config/schema.ts";
 export { disableRule, EditRefusalError, enableRule, setOption, unsetOption } from "./src/config/edit.ts";
 export { DENO_RULE_PACK, TYPESCRIPT_RULE_PACK } from "./src/rules/mod.ts";
@@ -51,24 +48,12 @@ export type {
 } from "./src/config/descriptor.ts";
 export type { IPreset, PresetId } from "./src/config/presets.ts";
 export type { ICatalogProjection, IMigrationResult, IRuleProjection } from "./src/config/migrate.ts";
-export type { IUnslopProject, IUnslopProjectInput } from "./src/config/project.ts";
 export type { IRegistryEntry } from "./src/config/registry.ts";
 export type { IEditContext } from "./src/config/edit.ts";
 export type { IConfigV2 } from "./src/config/schema.ts";
 export type { ICatalog, IResolvedRuleSettings, JsonValue, PathClass } from "./src/engine/catalog.ts";
 export type { ICatalogLoadOptions, ScriptRuleSchemas } from "./src/engine/catalog.ts";
 export type { RuleScope, RuleSeverity } from "./src/engine/catalog.ts";
-export type { ILintPluginOptions } from "./src/engine/plugin.ts";
-export type {
-  IFinding,
-  IHostDiagnostic,
-  IHostError,
-  ILintRunInput,
-  ILintRunResult,
-  INotRunCheck,
-  IRuleRunSummary,
-  IRunReport,
-} from "./src/report/model.ts";
 export type {
   ITraceCheckedRecord,
   ITraceExpectation,

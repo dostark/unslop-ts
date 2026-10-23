@@ -75,13 +75,14 @@ export function demoCatalog(): Record<string, JsonValue> {
 
 function pluginSource(options: IDemoProjectOptions): string {
   return [
-    `import { createLintPlugin, createRuleRegistry, DENO_RULE_PACK, parseCatalog, TYPESCRIPT_RULE_PACK } from "${ENGINE_ALIAS}";`,
+    `import { createRuleRegistry, DENO_RULE_PACK, parseCatalog, TYPESCRIPT_RULE_PACK } from "${ENGINE_ALIAS}";`,
+    `import { createDenoPlugin } from "${ENGINE_ALIAS}/deno";`,
     "const packs = [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK];",
     `const registry = createRuleRegistry(${JSON.stringify(DEMO_PLUGIN_NAME)}, packs);`,
     `const catalog = parseCatalog(${
       JSON.stringify(options.catalog ?? demoCatalog())
     }, { scriptRuleSchemas: null, registry });`,
-    `export default createLintPlugin(${JSON.stringify(DEMO_PLUGIN_NAME)}, catalog, { rulePacks: packs });`,
+    `export default createDenoPlugin(${JSON.stringify(DEMO_PLUGIN_NAME)}, catalog, { rulePacks: packs });`,
     "",
   ].join("\n");
 }
@@ -89,7 +90,11 @@ function pluginSource(options: IDemoProjectOptions): string {
 async function configSource(options: IDemoProjectOptions): Promise<string> {
   const ownConfig = JSON.parse(await Deno.readTextFile(new URL("../../deno.json", import.meta.url)));
   return JSON.stringify({
-    imports: { [ENGINE_ALIAS]: new URL("../../mod.ts", import.meta.url).href, zod: ownConfig.imports.zod },
+    imports: {
+      [ENGINE_ALIAS]: new URL("../../mod.ts", import.meta.url).href,
+      [`${ENGINE_ALIAS}/deno`]: new URL("../../deno.ts", import.meta.url).href,
+      zod: ownConfig.imports.zod,
+    },
     lint: { plugins: [`./${PLUGIN_FILE}`], rules: { tags: ["recommended"], ...options.lintRules } },
   });
 }

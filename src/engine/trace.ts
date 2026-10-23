@@ -105,10 +105,10 @@ function checkedRunId(value: string | null): string | null {
   return value;
 }
 
-export function resolveTraceRunId(pluginName: string, explicit: string | undefined): string | null {
+export function resolveTraceRunId(explicit: string | undefined, envValue: string | undefined): string | null {
   if (explicit !== undefined) return checkedRunId(normalizeTraceValue(explicit));
   try {
-    return checkedRunId(normalizeTraceValue(Deno.env.get(traceEnvName(pluginName))));
+    return checkedRunId(normalizeTraceValue(envValue));
   } catch {
     return null;
   }

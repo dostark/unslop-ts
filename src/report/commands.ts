@@ -12,7 +12,6 @@ import { DEFAULT_HOST_MODE } from "../config/descriptor.ts";
 import type { IProjectDescriptor, IResolvedRule } from "../config/descriptor.ts";
 import type { INotRunCheck } from "./model.ts";
 
-const WHOLE_TREE_CLI = fromFileUrl(new URL("../cli/whole_tree.ts", import.meta.url));
 const WHOLE_TREE_CLI_ARG = "whole_tree.ts";
 const CATALOG_PLACEHOLDER = "--catalog=<catalog>";
 
@@ -22,8 +21,9 @@ export function resolveHostCommand(
   descriptor: IProjectDescriptor,
 ): readonly string[] | null {
   if (command === null) return null;
+  const wholeTreeCli = fromFileUrl(new URL("../cli/whole_tree.ts", import.meta.url));
   return command.map((arg) => {
-    if (arg.endsWith(WHOLE_TREE_CLI_ARG)) return WHOLE_TREE_CLI;
+    if (arg.endsWith(WHOLE_TREE_CLI_ARG)) return wholeTreeCli;
     if (arg === CATALOG_PLACEHOLDER) return `--plugin=${fromFileUrl(descriptor.pluginUrl)}`;
     return arg;
   });

@@ -8,10 +8,11 @@
  */
 
 import type { RuleSeverity } from "../engine/catalog.ts";
-import { selectionEnvName } from "../engine/plugin.ts";
+import { selectionEnvName } from "../engine/rule_gate.ts";
 import type { ICompiledConfig, IResolvedRule } from "../config/descriptor.ts";
 import type { IConfigV2 } from "../config/schema.ts";
 import {
+  type IResolvedSelection,
   resolveRuleId as resolveId,
   resolveSelectorTokens,
   SelectorError,
@@ -24,12 +25,6 @@ export type RuleStatus = "active" | "parked" | "off" | "not-selected";
 
 /** Every status a `--status` filter accepts. */
 export const RULE_STATUSES: readonly RuleStatus[] = ["active", "parked", "off", "not-selected"];
-
-/** The selected ids and tags. Null means no selection, so every configured rule keeps its own level. */
-export interface IResolvedSelection {
-  readonly ids: ReadonlySet<string>;
-  readonly tags: ReadonlySet<string>;
-}
 
 const EFFECTIVE_ERROR: RuleSeverity = "error";
 

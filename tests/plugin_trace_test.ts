@@ -10,7 +10,6 @@
 import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { z } from "zod";
 import {
-  createLintPlugin,
   createRuleRegistry,
   formatTraceRecord,
   type IRulePack,
@@ -27,6 +26,7 @@ import {
   TraceProtocolError,
   TYPESCRIPT_RULE_PACK,
 } from "../mod.ts";
+import { createDenoPlugin } from "../deno.ts";
 import { runDeno, withDemoProject } from "./helpers/demo_project.ts";
 import { loadTestCatalog, TEST_PLUGIN_NAME, TEST_RULE_PACKS } from "./helpers/registry.ts";
 
@@ -224,7 +224,7 @@ Deno.test("trace_all_off_host_excluded_and_cached_runs", async () => {
   });
   const programRegistry = createRuleRegistry("demo", [...TEST_RULE_PACKS, programPack]);
   const parsedProgram = parseCatalog(programCatalog, { scriptRuleSchemas: null, registry: programRegistry });
-  const plugin = createLintPlugin("demo", parsedProgram, {
+  const plugin = createDenoPlugin("demo", parsedProgram, {
     rulePacks: [...TEST_RULE_PACKS, programPack],
     selection: "",
     trace: "1",
@@ -260,12 +260,13 @@ Deno.test("restricted_env_and_explicit_trace_override", async () => {
     await Deno.writeTextFile(
       script,
       [
-        `import { createLintPlugin, createRuleRegistry, parseCatalog, TYPESCRIPT_RULE_PACK } from ${
+        `import { createRuleRegistry, parseCatalog, TYPESCRIPT_RULE_PACK } from ${
           JSON.stringify(new URL("../mod.ts", import.meta.url).href)
         };`,
+        `import { createDenoPlugin } from ${JSON.stringify(new URL("../deno.ts", import.meta.url).href)};`,
         'const registry = createRuleRegistry("demo", [TYPESCRIPT_RULE_PACK]);',
         'const catalog = parseCatalog({ version: "1", scopes: { test: [], fixture: [] }, tagVocabulary: {}, rules: {} }, { scriptRuleSchemas: null, registry });',
-        'createLintPlugin("demo", catalog, { rulePacks: [TYPESCRIPT_RULE_PACK], selection: "", trace: "manual" });',
+        'createDenoPlugin("demo", catalog, { rulePacks: [TYPESCRIPT_RULE_PACK], selection: "", trace: "manual" });',
         'console.log("ok");',
         "",
       ].join("\n"),
@@ -287,7 +288,7 @@ Deno.test("restricted_env_and_explicit_trace_override", async () => {
   const before = Deno.env.get(TRACE_ENV);
   Deno.env.set(TRACE_ENV, "preserved");
   try {
-    createLintPlugin("demo", loadTestCatalog(catalogWith({})), {
+    createDenoPlugin("demo", loadTestCatalog(catalogWith({})), {
       rulePacks: TEST_RULE_PACKS,
       selection: "",
       trace: "explicit",
@@ -353,7 +354,8 @@ Deno.test("throwing_rule_never_emits_checked", async () => {
   });
   const catalogJson = JSON.stringify(catalog);
   const pluginSource = [
-    `import { createLintPlugin, createRuleRegistry, parseCatalog, TYPESCRIPT_RULE_PACK } from "engine";`,
+    `import { createRuleRegistry, parseCatalog, TYPESCRIPT_RULE_PACK } from "engine";`,
+    `import { createDenoPlugin } from "engine/deno";`,
     `import { z } from "zod";`,
     `const throwing = {`,
     `  name: "throwing",`,
@@ -363,7 +365,7 @@ Deno.test("throwing_rule_never_emits_checked", async () => {
     `const packs = [TYPESCRIPT_RULE_PACK, throwing];`,
     `const registry = createRuleRegistry("demo", packs);`,
     `const catalog = parseCatalog(${catalogJson}, { scriptRuleSchemas: null, registry });`,
-    `export default createLintPlugin("demo", catalog, { rulePacks: packs });`,
+    `export default createDenoPlugin("demo", catalog, { rulePacks: packs });`,
     "",
   ].join("\n");
   await withDemoProject({ files: { "a.ts": "export const x = 1;\n" }, catalog, pluginSource }, async (dir) => {
@@ -387,7 +389,7 @@ Deno.test("reserved_observer_key_collision_is_refused", () => {
   };
   assertThrows(
     () =>
-      createLintPlugin(TEST_PLUGIN_NAME, loadTestCatalog(catalogWith({})), {
+      createDenoPlugin(TEST_PLUGIN_NAME, loadTestCatalog(catalogWith({})), {
         rulePacks: [...TEST_RULE_PACKS, reserved],
       }),
     Error,
@@ -405,5 +407,5 @@ Deno.test("trace_protocol_filters_another_run_before_parsing", () => {
 Deno.test("trace_protocol_rejects_line_breaks_in_run_ids", () => {
   const checked: ITraceRecord = { kind: "checked", runId: "bad\n", plugin: "demo", file: "a.ts", rule: "demo/x" };
   assertThrows(() => formatTraceRecord(checked), TraceProtocolError);
-  assertThrows(() => resolveTraceRunId("demo", "bad\n"), TraceProtocolError);
+  assertThrows(() => resolveTraceRunId("bad\n", undefined), TraceProtocolError);
 });

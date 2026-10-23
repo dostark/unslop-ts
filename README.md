@@ -19,8 +19,9 @@ rule packs and script checks, so project-specific rules stay in the project.
 1. Write the project descriptor. `examples/unslop.project.ts` exports the plugin name, the rule packs,
    the configuration location, and any consumer script or whole-tree host descriptors. It reads no
    configuration file, so it stays importable when the configuration is absent or invalid.
-1. Write the plugin entry. `examples/lint_plugin.ts` compiles the configuration with
-   `createUnslopProject({ descriptor, config })` and default-exports `project.plugin`.
+1. Write the plugin entry. `examples/lint_plugin.ts` imports `createUnslopProject` from
+   `@dostark/unslop-ts/deno`, compiles the configuration with
+   `createUnslopProject({ descriptor, config })`, and default-exports `project.plugin`.
 1. Register the entry in the project's `deno.json` with `"lint": { "plugins": ["./examples/lint_plugin.ts"] }`,
    and run `deno lint`.
 1. To run a subset locally, export `<NAME>_LINT_RULES`, where `<NAME>` is the plugin name in upper case

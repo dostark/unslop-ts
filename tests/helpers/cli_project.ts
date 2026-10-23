@@ -42,7 +42,7 @@ export const descriptor: IProjectDescriptor = {
 };
 `;
 
-const PLUGIN_SOURCE = `import { createUnslopProject } from "@dostark/unslop-ts";
+const PLUGIN_SOURCE = `import { createUnslopProject } from "@dostark/unslop-ts/deno";
 import { descriptor } from "./unslop.project.ts";
 import config from "./unslop.config.json" with { type: "json" };
 
@@ -96,7 +96,11 @@ const CONFIG_PATH = "examples/unslop.config.json";
 function projectDenoConfig(engineUrl: string, zodSpecifier: string, plugins: readonly string[]): string {
   return JSON.stringify(
     {
-      imports: { "@dostark/unslop-ts": engineUrl, zod: zodSpecifier },
+      imports: {
+        "@dostark/unslop-ts": engineUrl,
+        "@dostark/unslop-ts/deno": engineUrl.replace(/mod\.ts$/, "deno.ts"),
+        zod: zodSpecifier,
+      },
       lint: { plugins },
     },
     null,

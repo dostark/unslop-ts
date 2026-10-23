@@ -7,7 +7,8 @@
  */
 
 import { assertArrayIncludes, assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";
-import { CatalogError, createLintPlugin, type JsonValue, runPlugin, selectionEnvName } from "../mod.ts";
+import { CatalogError, type JsonValue, selectionEnvName } from "../mod.ts";
+import { createDenoPlugin, runPlugin } from "../deno.ts";
 import { lintJson, packRuleKeys, withDemoProject } from "./helpers/demo_project.ts";
 import { createTestPlugin, loadTestCatalog, TEST_PLUGIN_NAME, TEST_RULE_PACKS } from "./helpers/registry.ts";
 
@@ -147,9 +148,9 @@ Deno.test("a test-scope rule is registered and reports nothing on a production f
   assertEquals(reporting(`demo/${TEST_ONLY_RULE}`), []);
 });
 
-Deno.test("createLintPlugin rejects a catalog whose plugin rule no registered pack defines", () => {
+Deno.test("createDenoPlugin rejects a catalog whose plugin rule no registered pack defines", () => {
   const catalog = loadTestCatalog(buildCatalog());
-  const error = assertThrows(() => createLintPlugin(TEST_PLUGIN_NAME, catalog, { rulePacks: [] }), CatalogError);
+  const error = assertThrows(() => createDenoPlugin(TEST_PLUGIN_NAME, catalog, { rulePacks: [] }), CatalogError);
   assertInstanceOf(error, CatalogError);
   assertStringIncludes(error.path, "rules.demo/");
   assertStringIncludes(error.message, "no plugin rule implementation is registered for this id");
@@ -173,7 +174,7 @@ Deno.test("a plugin ignores the selection variable of another plugin", () => {
 Deno.test("an explicit selection option wins over the selection variable", () => {
   const catalog = loadTestCatalog(buildCatalog());
   const plugin = withSelection("demo/does-not-exist", () =>
-    createLintPlugin(TEST_PLUGIN_NAME, catalog, {
+    createDenoPlugin(TEST_PLUGIN_NAME, catalog, {
       rulePacks: TEST_RULE_PACKS,
       selection: `demo/${OFF_RULE}`,
     }));

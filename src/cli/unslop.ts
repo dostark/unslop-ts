@@ -29,7 +29,8 @@ import { type IRuleEditRequest, runRuleEdit } from "./commands/rules_write.ts";
 import { listRules, showRule } from "./rules_read.ts";
 import { resolve } from "@std/path";
 import { PartialWriteError, writeMigrationPair, WriteRefusalError } from "./safe_write.ts";
-import { type IResolvedSelection, resolveSelection } from "./selection.ts";
+import type { IResolvedSelection } from "../config/selectors.ts";
+import { resolveSelection } from "./selection.ts";
 import type { JsonValue } from "../engine/catalog.ts";
 import type { ICompiledConfig, IProjectDescriptor } from "../config/descriptor.ts";
 

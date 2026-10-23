@@ -27,6 +27,12 @@ export interface IResolvedSelector {
   readonly tags: ReadonlySet<string>;
 }
 
+/** The selected ids and tags. Null means no selection, so every configured rule keeps its own level. */
+export interface IResolvedSelection {
+  readonly ids: ReadonlySet<string>;
+  readonly tags: ReadonlySet<string>;
+}
+
 const TAG_PREFIX = "tag:";
 const SEPARATOR = "/";
 

@@ -67,7 +67,7 @@ const V1_CATALOG = {
   },
 };
 
-const V2_PLUGIN_SOURCE = `import { createUnslopProject } from "@dostark/unslop-ts";
+const V2_PLUGIN_SOURCE = `import { createUnslopProject } from "@dostark/unslop-ts/deno";
 import { descriptor } from "./unslop.project.ts";
 import config from "../unslop.config.json" with { type: "json" };
 

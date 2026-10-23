@@ -17,19 +17,13 @@ import type {
 } from "../config/descriptor.ts";
 import type { IRuleMeta, RuleCategory } from "../rules/meta.ts";
 import { RULE_CATEGORIES } from "../rules/meta.ts";
+import type { IResolvedSelection } from "../config/selectors.ts";
 import { CliError, USAGE_EXIT } from "./error.ts";
 import { jsonText, type ReportFormat, tableText } from "./output.ts";
 import { markdownTable } from "../report/markdown.ts";
 import { sarifRules } from "../report/sarif.ts";
 import { resolveHostCommand } from "../report/commands.ts";
-import {
-  type IResolvedSelection,
-  resolveRuleId,
-  RULE_STATUSES,
-  ruleEffectiveLevel,
-  type RuleStatus,
-  ruleStatus,
-} from "./selection.ts";
+import { resolveRuleId, RULE_STATUSES, ruleEffectiveLevel, type RuleStatus, ruleStatus } from "./selection.ts";
 
 /** Options shared by both read commands. */
 export interface IRuleQuery {

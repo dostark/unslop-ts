@@ -7,7 +7,8 @@
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { type JsonValue, runPlugin } from "../mod.ts";
+import type { JsonValue } from "../mod.ts";
+import { runPlugin } from "../deno.ts";
 import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {

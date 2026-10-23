@@ -6,7 +6,9 @@
     ".": "./mod.ts",
     "./cli/rule_ceiling": "./src/cli/rule_ceiling.ts",
     "./whole-tree": "./src/rules/whole_tree/mod.ts",
-    "./cli": "./src/cli/unslop.ts"
+    "./cli": "./src/cli/unslop.ts",
+    "./deno": "./deno.ts",
+    "./report": "./src/report/mod.ts"
   },
   "imports": {
     "@dostark/unslop-ts": "./mod.ts",

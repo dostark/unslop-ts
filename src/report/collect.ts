@@ -12,7 +12,7 @@ import type { IResolvedRule } from "../config/descriptor.ts";
 import type { ISourceSnapshot } from "./context.ts";
 import { TOOL_VERSION } from "./version.ts";
 import { fingerprintOf } from "./fingerprint.ts";
-import type { IResolvedSelection } from "../cli/selection.ts";
+import type { IResolvedSelection } from "../config/selectors.ts";
 import { type ITraceRecord, SKIP_REASONS, type SkipReason } from "../engine/trace.ts";
 import { notRunCheck } from "./commands.ts";
 import type { IRunContext } from "./context.ts";

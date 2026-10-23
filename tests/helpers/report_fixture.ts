@@ -7,7 +7,8 @@
  * @related-files [tests/report_markdown_test.ts, src/report/markdown.ts]
  */
 
-import type { IHostDiagnostic, IResolvedRule, IRunReport } from "../../mod.ts";
+import type { IResolvedRule } from "../../mod.ts";
+import type { IHostDiagnostic, IRunReport } from "../../src/report/mod.ts";
 
 const RULE: IResolvedRule = {
   id: "demo/rule",

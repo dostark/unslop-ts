@@ -19,7 +19,7 @@ import { fromFileUrl, relative } from "@std/path";
 import { CliError } from "./error.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
 import { CatalogError, type JsonValue } from "../engine/catalog.ts";
-import { selectionEnvNameForRule } from "../engine/plugin.ts";
+import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
 import {
   checkRepository as checkOptionalParams,

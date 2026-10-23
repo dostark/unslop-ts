@@ -10,7 +10,7 @@
  *   Add `"lint": { "plugins": ["./examples/lint_plugin.ts"] }` to the `deno.json` of the project, then run `deno lint`.
  */
 
-import { createUnslopProject } from "@dostark/unslop-ts";
+import { createUnslopProject } from "@dostark/unslop-ts/deno";
 import { descriptor } from "./unslop.project.ts";
 import config from "./unslop.config.json" with { type: "json" };
 

@@ -10,14 +10,8 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { canCreateSymlinks } from "./helpers/permissions.ts";
-import {
-  collectRunReport,
-  compileConfig,
-  type IHostDiagnostic,
-  type ILintRunResult,
-  type IRunReport,
-  traceEnvName,
-} from "../mod.ts";
+import { compileConfig, traceEnvName } from "../mod.ts";
+import { collectRunReport, type IHostDiagnostic, type ILintRunResult, type IRunReport } from "../src/report/mod.ts";
 import { runReport } from "../src/cli/commands/report.ts";
 import { configPath, runCli, runReportCli, runReportWriteCli, withCliProject } from "./helpers/cli_project.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
@@ -221,11 +215,12 @@ Deno.test("report_binds_explicit_plugin_config_and_root", async () => {
     await Deno.writeTextFile(
       copy,
       [
-        'import { createLintPlugin, createRuleRegistry, parseCatalog, TYPESCRIPT_RULE_PACK } from "@dostark/unslop-ts";',
+        'import { createRuleRegistry, parseCatalog, TYPESCRIPT_RULE_PACK } from "@dostark/unslop-ts";',
+        'import { createDenoPlugin } from "@dostark/unslop-ts/deno";',
         "const packs = [TYPESCRIPT_RULE_PACK];",
         'const registry = createRuleRegistry("other", packs);',
         'const catalog = parseCatalog({ version: "1", scopes: { test: [], fixture: [] }, tagVocabulary: {}, rules: {} }, { scriptRuleSchemas: null, registry });',
-        'export default createLintPlugin("other", catalog, { rulePacks: packs });',
+        'export default createDenoPlugin("other", catalog, { rulePacks: packs });',
         "",
       ].join("\n"),
     );

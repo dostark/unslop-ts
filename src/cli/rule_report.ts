@@ -12,7 +12,7 @@
  */
 
 import { fromFileUrl, relative } from "@std/path";
-import { selectionEnvNameForRule } from "../engine/plugin.ts";
+import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 
 /** One ranked finding. */
 export interface IRankedFinding {
