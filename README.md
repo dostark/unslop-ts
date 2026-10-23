@@ -36,36 +36,103 @@ own rule packs and script checks, so project-specific rules stay in the project.
 
 ## Hosts
 
-| Host               | Entry                                                                 | Runtime      |
-| ------------------ | --------------------------------------------------------------------- | ------------ |
-| `deno lint`        | `@dostark/unslop-ts/deno` in `lint.plugins`, or `dist/deno_plugin.js` | Deno         |
-| ESLint 9 and later | `@dostark/unslop-ts/eslint` as a plugin                               | Node.js, Bun |
-| Oxlint             | the same ESLint plugin through `jsPlugins`                            | Node.js      |
+| Host                             | Entry                                                                 | Runtime      | Status       |
+| -------------------------------- | --------------------------------------------------------------------- | ------------ | ------------ |
+| `deno lint`                      | `@dostark/unslop-ts/deno` in `lint.plugins`, or `dist/deno_plugin.js` | Deno         | supported    |
+| ESLint 9.0.0 and later, below 11 | `@dostark/unslop-ts/eslint` as a plugin                               | Node.js, Bun | supported    |
+| Oxlint 1.88                      | the same ESLint plugin through `jsPlugins`                            | Node.js      | experimental |
 
-The rule set is the same on every host, and the conformance suite proves one case table per rule on
-`deno lint`, ESLint on Node.js, ESLint on Bun, and Oxlint on Node.js.
+The same rule modules run on every host. The conformance suite drives one case table
+(`tests/cases/conformance.json`) through `deno lint`, ESLint on Node.js, ESLint on Bun, and Oxlint on
+Node.js, so parity is a property of the code, not of a particular editor.
+
+### What parity covers
+
+- The rule id, message text, line, and column are identical. ESLint and Oxlint append `Hint:` and the
+  hint after the message; `deno lint` keeps the hint in its own field.
+- The option schema is the same. An invalid option fails the host with a named error instead of
+  silently changing behavior.
+- Both comment-aware rules read the Deno, ESLint, and Oxlint suppression dialects; each host reads its
+  own dialect by default.
+- Adding a preset or a generated fragment changes no foreign diagnostic. The additivity suite runs on
+  Deno, ESLint, and Oxlint.
+- A rule that declares a `duplicate` overlap is turned off by `typescript-eslint-compat`; the README
+  overlap table is generated from the same metadata.
+
+### Verification matrix
+
+| Guarantee                                                            | Test                                                                             | Hosts                                      | Command                                                                              |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| 39 rules report the same result                                      | `tests_node/conformance.test.mjs`, `tests/conformance_test.ts`                   | ESLint/Node, ESLint/Bun, Oxlint/Node, Deno | `npm --prefix hosts run test:node`, `bun run --cwd hosts test:bun`, `deno task test` |
+| Adapter works at the supported ESLint range                          | `tests_node/eslint_adapter.test.mjs`                                             | ESLint 9.0.0, 9.39.5, 10.13.0              | `npm --prefix hosts run test:node`                                                   |
+| Presets and fragments are additive                                   | `tests_node/additivity.test.mjs`, `tests/additivity_test.ts`                     | Deno, ESLint, Oxlint                       | `deno task test`, `npm --prefix hosts run test:node`                                 |
+| Generated configuration matches the golden and refuses unsafe writes | `tests_node/host_config.test.mjs`, `tests/cli_config_test.ts`                    | Node.js, Bun, Deno                         | `npm --prefix hosts run test:node`, `deno task test`                                 |
+| The real CLIs accept the plugin                                      | `tests_node/examples_integration.test.mjs`, `tests/examples_deno_bundle_test.ts` | Node.js, Bun, Deno                         | `npm --prefix hosts run test:node`, `bun run --cwd hosts test:bun`, `deno task test` |
+| Both comment-aware rules handle three dialects                       | `tests_node/suppression_dialects.test.mjs`                                       | ESLint, Oxlint, Deno                       | `npm --prefix hosts run test:node`, `deno task test`                                 |
+| Duplicate overlaps are declared and disabled                         | `tests_node/overlap.test.mjs`                                                    | ESLint, Oxlint                             | `npm --prefix hosts run test:node`                                                   |
+| The package imports outside Deno                                     | `tests_node/runtime_import.test.mjs`, `tests_node/package_pins.test.mjs`         | Node.js, Bun                               | `npm --prefix hosts run test:node`, `bun run --cwd hosts test:bun`                   |
+
+Oxlint is not part of the Bun column: the conformance test skips its Oxlint branch under `bun test`,
+because Oxlint support is pinned to Node.js. An Oxlint divergence is reported by the separate
+`test:oxlint` step and does not fail the host job.
 
 ## Runtimes
 
-- Deno 2.9 is the reference runtime and owns the `deno lint` host.
-- Node.js 24 runs ESLint and Oxlint. Node strips TypeScript types, so the adapter imports from a
-  relative path outside `node_modules`.
+- Deno 2.9 is the reference runtime and owns the `deno lint` host, the CLI, `unslop report`, the
+  coverage trace protocol, and `./whole-tree`.
+- Node.js 24 runs ESLint and Oxlint. Node strips TypeScript types, so the adapter imports a relative
+  path outside `node_modules`.
 - Bun 1.4 runs ESLint. The `test:bun` task needs no Deno.
+- Oxlint is pinned at 1.88.0. Its JavaScript-plugin API is still marked experimental upstream, so the
+  integration is labeled experimental and the pin guards it.
 
 The root export imports only `zod`. The Deno globals live in `deno.ts`, which the ESLint and Oxlint
 entries never import.
 
 ## Adding to your linter
 
-- ESLint: `import { createEslintPlugin } from "@dostark/unslop-ts/eslint"` and add
-  `...unslop.configs.recommended` after your baseline. The supported range is 9.0.0 and later, below 11.
-  The presets are `recommended`, `strict`, `strict-error`, `deno`, and `typescript-eslint-compat`.
-- Oxlint: add the plugin module to `jsPlugins`, list `unslop/...` rules under `rules`, and set
-  `settings.unslop`. `unslop config export --host=oxlint --out=.oxlintrc.json` writes a fragment.
-- `deno lint`: register the plugin entry or the release bundle in `lint.plugins`.
+### ESLint
 
-A preset adds only the plugin, `unslop/...` rules, and the `unslop` settings key. To set a rule to
-`warn` after spreading a preset, add `"unslop/<rule>": "warn"` in a later config object.
+- Install `@dostark/unslop-ts` and import `createEslintPlugin` from `@dostark/unslop-ts/eslint`.
+- The supported range is 9.0.0 and later, below 11. The adapter table runs at 9.0.0, 9.39.5, and
+  10.13.0.
+- Spread a preset after your baseline: `...unslop.configs.recommended`. The presets are `recommended`,
+  `strict`, `strict-error`, `deno`, and `typescript-eslint-compat`.
+- A preset adds only the plugin, `unslop/...` rules at `warn`, and the `unslop` settings key. It sets no
+  parser and no foreign rule. To change a rule after the spread, add a later object with
+  `"unslop/<rule>": "error"` or `"warn"`.
+- If your baseline already enables a typescript-eslint rule that duplicates an unslop rule, spread
+  `typescript-eslint-compat` last. It turns the unslop duplicates off; the generated overlap table
+  names each one.
+- ESLint exits 0 when it reports only warnings. Use `--max-warnings 0` in a gate that must fail on
+  them.
+
+### Oxlint
+
+- Add the plugin module to `jsPlugins`, enable the `unslop/...` rules you want, and set
+  `settings.unslop`. Rules that classify test or fixture paths read `testGlobs`, `fixtureGlobs`, and
+  `ignoreGlobs` from that object. A missing settings object fails with a named `EslintAdapterError`;
+  this is deliberate, so a path-sensitive rule never guesses.
+- Generate a starting config with
+  `unslop config export --host=oxlint --out=.oxlintrc.json`, then merge the fragment into your existing
+  config. The CLI refuses an existing file unless you pass `--overwrite`, and refuses a symlink.
+- Oxlint warns without failing and fails on an `error` level.
+- Oxlint is experimental upstream. The integration pins 1.88.0; treat a version bump as a compatibility
+  change that must pass the conformance suite.
+
+### deno lint
+
+- Register the plugin entry or the release bundle in `lint.plugins`, or compile a version 2
+  configuration with `createUnslopProject`.
+- Plugin rules are `error` or `off`; a configured `warn` becomes `error` because `deno lint` has one
+  severity for plugin findings.
+- The Deno suppression dialect applies: `// deno-lint-ignore <code> -- reason`.
+
+### One source of truth
+
+The packs and their metadata are shared. A version 2 configuration compiles to the Deno catalog, and
+the ESLint presets and Oxlint fragments are derived from the same packs. The generator and presets
+never change a foreign diagnostic; the additivity suite checks that on all three hosts.
 
 The invariants hold for every host:
 
@@ -74,6 +141,15 @@ The invariants hold for every host:
 3. A preset sets no parser and no foreign rule.
 4. Plugin rules are `error` or `off`; `warn` becomes `error` in `deno lint`.
 5. Suppression follows the dialect the host understands.
+
+### Current limits
+
+- Oxlint support is experimental and pinned to 1.88.0. It is not part of the Bun column.
+- The JSR-install smoke run (`npx jsr add`, `bunx jsr add`) is `PENDING VERIFICATION` until the user
+  publishes `@dostark/unslop-ts`. The example projects import the adapter by relative path.
+- The CLI, `unslop report`, the coverage trace protocol, and `./whole-tree` are Deno-only.
+- There is no Biome host. Biome keeps its own rules and suppressions; unslop-ts reads only the three
+  dialects above.
 
 ## Suppression comments
 
@@ -90,11 +166,12 @@ A suppression needs a reason after `--`.
 
 ## Working with Biome
 
-Biome is a formatter and linter. unslop-ts does not replace it: Biome keeps formatting and its own
-lint rules, and unslop-ts adds the rule families it owns. The overlap table lists the Biome rules that
-duplicate or relate to unslop-ts rules. When a rule duplicates, turn one of the two off. Biome
-suppressions stay Biome's (`// biome-ignore lint/<group>/<rule>: reason`); unslop-ts reads only the
-three dialects in the table above.
+Biome is a formatter and linter, and unslop-ts has no Biome host. The two coexist: Biome keeps
+formatting and its own lint rules, and unslop-ts adds the rule families it owns. The generated overlap
+table lists the Biome rules that duplicate or relate to unslop-ts rules, with `duplicate` or `related`
+as the kind. When a rule duplicates, turn one of the two off. Biome suppressions stay Biome's
+(`// biome-ignore lint/<group>/<rule>: reason`); unslop-ts does not parse them and reports only the
+Deno, ESLint, and Oxlint dialects.
 
 ## Lockfiles
 
@@ -106,16 +183,40 @@ Do not edit a lockfile by hand; regenerate it with the tool that owns it.
 
 ## Choosing a host
 
+- Run `deno lint` when the project already uses Deno. It gets the version 2 configuration, the CLI,
+  `unslop report`, and the whole-tree checks.
+- Run ESLint when the project uses ESLint 9 or 10. It gets the presets, the adapter range tested at
+  9.0.0, 9.39.5, and 10.13.0, and the host's own formatter and reporting.
+- Run Oxlint when the project already uses it and accepts the experimental label. The plugin runs
+  through `jsPlugins` on Node.js and is pinned to 1.88.0.
+
 Install only the tools of the host you run. The published package depends on `zod` only, so an ESLint
-or Oxlint project does not install Deno. The `unslop` CLI, `unslop report`, the coverage trace
-protocol, and `./whole-tree` run on the Deno host only; ESLint and Oxlint users use their host's
-formatters and `unslop report --format` is not available to them.
+or Oxlint project does not install Deno. The CLI, `unslop report`, the coverage trace protocol, and
+`./whole-tree` run on the Deno host only; ESLint and Oxlint users use their host's formatters.
 
 ## Contributing without Deno
 
-The CI `verify` job runs the gates that need Deno: `fmt`, `lint`, `check`, `deno publish --dry-run`,
-the purity tests, the dogfood test, the bundle test, and the Deno conformance column. The
-`hosts-node` and `hosts-bun` jobs install no Deno and run the Node.js and Bun columns.
+The CI `verify` job needs Deno and runs `fmt`, `lint`, `check`, `deno publish --dry-run`, the purity
+tests, the dogfood test, the bundle test, and the Deno conformance column. Two jobs need no Deno:
+
+- `hosts-node` (Node.js 24): `npm ci` in `hosts`, then `npm --prefix hosts run test:node`, which
+  covers ESLint/Node and Oxlint/Node. The Oxlint example runs as a separate `test:oxlint` step with
+  `continue-on-error`, so an Oxlint divergence is reported without failing the job.
+- `hosts-bun` (Bun 1.4.3): `bun install --frozen-lockfile` in `hosts`, then
+  `bun run --cwd hosts test:bun`, which covers ESLint/Bun. Oxlint is not part of this column.
+
+Locally, the same commands run from `unslop-ts/`:
+
+```sh
+npm --prefix hosts run test:node
+npm --prefix hosts run test:oxlint
+bun run --cwd hosts test:bun
+deno task test
+```
+
+The Deno job installs no Node.js or Bun, and the host jobs install no Deno. The JSR-install smoke run
+(`npx jsr add`, `bunx jsr add`) stays `PENDING VERIFICATION` until the user publishes
+`@dostark/unslop-ts`.
 
 ## Verifying release bundles
 
@@ -387,8 +488,12 @@ adapter, so the separate catalog is temporary.
 ## Development
 
 `deno task test`, `deno task lint`, `deno task check`, and `deno fmt --check` run in this repository
-alone. The engine tests import the package by relative path. `deno task cli` runs the CLI from the
-checkout.
+alone. The engine tests import the package by relative path. `deno task unslop` runs the CLI from the
+checkout; add `:write` for edits, and use `unslop:report` for `report`.
+
+The conformance data in `tests/cases/conformance.json` is the single source of the named cases. A new
+rule needs one entry before its host tests can pass. The host suites live in `tests_node/` and the
+shared runners in `tests/hosts/`; they run through npm or Bun, as the matrix above shows.
 
 ## Rule ownership and guide links
 

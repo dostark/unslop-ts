@@ -488,3 +488,7 @@ Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these
    every host, so a new rule without a case fails the check.
 6. Suppression parsing stays in the shared ignore-directive helper. A rule never parses a
    `deno-lint-ignore`, `eslint-disable`, or `oxlint-disable` comment itself.
+7. A rule declares its options with the zod schema. The ESLint adapter derives its JSON schema from
+   that declaration; no host gets a hand-written schema.
+8. A rule does not branch on the host. The host entry normalizes settings, options, and paths before
+   the rule runs, and the conformance suite holds that normalization to one result.
