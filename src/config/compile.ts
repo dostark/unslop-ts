@@ -149,68 +149,73 @@ function normalizeInput(raw: IRawSetting): INormalizedInput {
   };
 }
 
-function normalizeSetting(entry: IRegistryEntry, key: string, raw: IRawSetting): ISetting {
-  const {
-    level,
-    options,
-    optionsSupplied,
-    scope,
-    include,
-    exclude,
-    optIn,
-    reason,
-    docs,
-    limits,
-    tags,
-    exclusionCodes,
-  } = normalizeInput(raw);
-  const controls = entry.controls;
-
+function validateReason(key: string, level: string, optIn: boolean, reason: string | null): void {
   if ((level === OFF || optIn) && !reason?.trim()) {
     throw new ConfigError(`rules.${key}.reason`, "'off' and 'optIn' require a reason");
   }
-  if (!controls.editable.includes("level")) {
-    const base = hostBaseLevel(controls);
+}
+
+function validateLevel(entry: IRegistryEntry, key: string, level: string): void {
+  if (!entry.controls.editable.includes("level")) {
+    const base = hostBaseLevel(entry.controls);
     if (level !== base) {
       throw new ConfigError(`rules.${key}.level`, `the ${entry.engine} host fixes the level at '${base}'`);
     }
   } else if (entry.engine === PLUGIN_ENGINE && level === WARN) {
     throw new ConfigError(`rules.${key}.level`, "plugin rules support only 'error' or 'off'");
   }
-  if (scope !== null && !controls.editable.includes("scope")) {
-    const fixed = controls.fixedScope ?? DEFAULT_SCOPE;
-    if (scope !== fixed) {
-      throw new ConfigError(`rules.${key}.scope`, `the ${entry.engine} host fixes the scope at '${fixed}'`);
-    }
+}
+
+function validateScope(entry: IRegistryEntry, key: string, scope: string | null): void {
+  if (scope === null || entry.controls.editable.includes("scope")) return;
+  const fixed = entry.controls.fixedScope ?? DEFAULT_SCOPE;
+  if (scope !== fixed) {
+    throw new ConfigError(`rules.${key}.scope`, `the ${entry.engine} host fixes the scope at '${fixed}'`);
   }
-  if (include !== null && !controls.editable.includes("include") && !sameList(include, controls.fixedInclude ?? [])) {
+}
+
+function validateLists(
+  entry: IRegistryEntry,
+  key: string,
+  include: readonly string[] | null,
+  exclude: readonly string[] | null,
+): void {
+  if (
+    include !== null && !entry.controls.editable.includes("include") &&
+    !sameList(include, entry.controls.fixedInclude ?? [])
+  ) {
     throw new ConfigError(`rules.${key}.include`, `the ${entry.engine} host fixes the include list`);
   }
-  if (exclude !== null && !controls.editable.includes("exclude") && !sameList(exclude, controls.fixedExclude ?? [])) {
+  if (
+    exclude !== null && !entry.controls.editable.includes("exclude") &&
+    !sameList(exclude, entry.controls.fixedExclude ?? [])
+  ) {
     throw new ConfigError(`rules.${key}.exclude`, `the ${entry.engine} host fixes the exclude list`);
   }
-  if (optionsSupplied && Object.keys(options).length > 0 && !controls.editable.includes("options")) {
+}
+
+function validateOptions(
+  entry: IRegistryEntry,
+  key: string,
+  options: Record<string, JsonValue>,
+  supplied: boolean,
+): void {
+  if (supplied && Object.keys(options).length > 0 && !entry.controls.editable.includes("options")) {
     throw new ConfigError(`rules.${key}.options`, `the ${entry.engine} host does not read options`);
   }
-  if (exclusionCodes !== null && entry.engineOwned) {
+}
+
+function normalizeSetting(entry: IRegistryEntry, key: string, raw: IRawSetting): ISetting {
+  const normalized = normalizeInput(raw);
+  validateReason(key, normalized.level, normalized.optIn, normalized.reason);
+  validateLevel(entry, key, normalized.level);
+  validateScope(entry, key, normalized.scope);
+  validateLists(entry, key, normalized.include, normalized.exclude);
+  validateOptions(entry, key, normalized.options, normalized.optionsSupplied);
+  if (normalized.exclusionCodes !== null && entry.engineOwned) {
     throw new ConfigError(`rules.${key}.exclusionCodes`, "exclusion codes are consumer-only");
   }
-
-  return {
-    origin: `config:rules.${key}`,
-    level,
-    options,
-    optionsSupplied,
-    scope,
-    include,
-    exclude,
-    optIn,
-    reason,
-    docs,
-    limits,
-    tags,
-    exclusionCodes,
-  };
+  return { origin: `config:rules.${key}`, ...normalized };
 }
 
 function presetSetting(entry: IRegistryEntry, presetId: string): ISetting {

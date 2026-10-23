@@ -45,6 +45,14 @@ function templateOf(init: ILintNode | undefined): { template: ILintNode; tagged:
   return null;
 }
 
+/** True when the template is an inline structured fixture rather than an ordinary string. */
+function isInlineFixture(shape: ITemplateShape, tagged: boolean, named: boolean, minLines: number): boolean {
+  const big = shape.lineCount >= minLines && !shape.interpolated;
+  const document = !tagged && shape.firstLine !== null && DOCUMENT_START.test(shape.firstLine);
+  const frontMatter = !tagged && big && shape.firstLine !== null && FRONT_MATTER_START.test(shape.firstLine);
+  return document || (named && big) || frontMatter;
+}
+
 export function createTestInlineMultilineFixture(
   context: IRuleContext,
   ctx: IPluginRuleContext,
@@ -65,11 +73,7 @@ export function createTestInlineMultilineFixture(
       const found = templateOf(node.init ? asNode(node.init) : undefined);
       const shape = found ? shapeOf(context.sourceCode.text, found.template) : null;
       if (!found || !shape) return;
-      const named = names.has(String(id.name));
-      const document = !found.tagged && shape.firstLine !== null && DOCUMENT_START.test(shape.firstLine);
-      const big = shape.lineCount >= minLines && !shape.interpolated;
-      const frontMatter = !found.tagged && big && shape.firstLine !== null && FRONT_MATTER_START.test(shape.firstLine);
-      if (!document && !(named && big) && !frontMatter) return;
+      if (!isInlineFixture(shape, found.tagged, names.has(String(id.name)), minLines)) return;
       context.report({
         node: rawNode,
         message:

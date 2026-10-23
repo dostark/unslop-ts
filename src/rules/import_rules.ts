@@ -162,6 +162,31 @@ function importedNames(program: ILintNode, starts: readonly number[]): Map<strin
   return names;
 }
 
+function isReExport(node: ILintNode): boolean {
+  const source = nodeOrNull(node.source);
+  return node.type === EXPORT_ALL || (node.type === EXPORT_NAMED && source !== null);
+}
+
+function reportExportedImports(
+  node: ILintNode,
+  imported: ReadonlyMap<string, { readonly line: number }>,
+  starts: readonly number[],
+  context: IRuleContext,
+): void {
+  if (node.type !== EXPORT_NAMED || node.declaration) return;
+  const exportLine = lineAt(starts, node.range?.[0] ?? 0);
+  for (const specifier of Array.isArray(node.specifiers) ? node.specifiers : []) {
+    const local = nodeOrNull(nodeOrNull(specifier)?.local);
+    const name = typeof local?.name === "string" ? local.name : null;
+    const origin = name === null ? undefined : imported.get(name);
+    if (name === null || origin === undefined) continue;
+    const message = origin.line + 1 === exportLine
+      ? `Improper re-export of '${name}' on the next line after its import. Combine into 'export { ... } from ...' or define it locally.`
+      : `Exporting imported entity '${name}' (imported on line ${origin.line}) is prohibited. Define it locally or export it from its origin.`;
+    context.report({ node, message, hint: "Define the entity locally or export it from its origin." });
+  }
+}
+
 export function createReExportImported(context: IRuleContext, _ctx: IPluginRuleContext): LintVisitor {
   return {
     Program(rawNode: IRuleNode): void {
@@ -171,8 +196,7 @@ export function createReExportImported(context: IRuleContext, _ctx: IPluginRuleC
       for (const entry of Array.isArray(program.body) ? program.body : []) {
         const node = nodeOrNull(entry);
         if (node === null || node.range === undefined) continue;
-        const source = nodeOrNull(node.source);
-        if (node.type === EXPORT_ALL || (node.type === EXPORT_NAMED && source !== null)) {
+        if (isReExport(node)) {
           context.report({
             node,
             message:
@@ -181,22 +205,7 @@ export function createReExportImported(context: IRuleContext, _ctx: IPluginRuleC
           });
           continue;
         }
-        if (node.type !== EXPORT_NAMED || node.declaration) continue;
-        const exportLine = lineAt(starts, node.range[0]);
-        for (const specifier of Array.isArray(node.specifiers) ? node.specifiers : []) {
-          const local = nodeOrNull(nodeOrNull(specifier)?.local);
-          const name = typeof local?.name === "string" ? local.name : null;
-          const origin = name === null ? undefined : imported.get(name);
-          if (name === null || origin === undefined) continue;
-          const message = origin.line + 1 === exportLine
-            ? `Improper re-export of '${name}' on the next line after its import. Combine into 'export { ... } from ...' or define it locally.`
-            : `Exporting imported entity '${name}' (imported on line ${origin.line}) is prohibited. Define it locally or export it from its origin.`;
-          context.report({
-            node,
-            message,
-            hint: "Define the entity locally or export it from its origin.",
-          });
-        }
+        reportExportedImports(node, imported, starts, context);
       }
     },
   };

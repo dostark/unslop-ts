@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "plugin": "self",
+  "extends": ["unslop:recommended"],
+  "docsBase": "docs/style_guide.md",
+  "paths": {
+    "test": ["**/*_test.ts", "**/tests/**"],
+    "fixture": ["**/tests/fixtures/**"],
+    "ignore": []
+  }
+}

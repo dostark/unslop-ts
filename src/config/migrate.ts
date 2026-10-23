@@ -191,12 +191,11 @@ function effectiveOptions(
   return parsed.data as Record<string, JsonValue>;
 }
 
-function settingFor(
+function validateMigratedEntry(
   id: string,
   entry: ICatalog["rules"][string],
   owner: IOwner,
-  docsBase: string,
-): Record<string, JsonValue> {
+): void {
   const controls = owner.controls;
   const base = hostBaseLevel(controls);
   if (!controls.editable.includes("level") && entry.severity !== base) {
@@ -215,27 +214,66 @@ function settingFor(
   if (entry.options && Object.keys(entry.options).length > 0 && !controls.editable.includes("options")) {
     throw new ConfigError(`rules.${id}.options`, `the ${owner.engine} host does not read options`);
   }
+}
 
-  const setting: Record<string, JsonValue> = { level: entry.severity };
-  if (entry.options && Object.keys(entry.options).length > 0) {
-    setting.options = entry.options as Record<string, JsonValue>;
-  }
-  if (entry.scope !== "all" && controls.editable.includes("scope")) setting.scope = entry.scope;
-  if (entry.include && controls.editable.includes("include")) setting.include = entry.include;
-  if (entry.exclude && controls.editable.includes("exclude")) setting.exclude = entry.exclude;
-  if (entry.optIn === true) setting.optIn = true;
-  if (entry.reason !== undefined) setting.reason = entry.reason;
+function optionFields(entry: ICatalog["rules"][string]): Record<string, JsonValue> {
+  return entry.options && Object.keys(entry.options).length > 0
+    ? { options: entry.options as Record<string, JsonValue> }
+    : {};
+}
+
+function pathFields(entry: ICatalog["rules"][string], controls: IRuleControls): Record<string, JsonValue> {
+  const fields: Record<string, JsonValue> = {};
+  if (entry.scope !== "all" && controls.editable.includes("scope")) fields.scope = entry.scope;
+  if (entry.include && controls.editable.includes("include")) fields.include = entry.include;
+  if (entry.exclude && controls.editable.includes("exclude")) fields.exclude = entry.exclude;
+  return fields;
+}
+
+function metadataFields(
+  id: string,
+  entry: ICatalog["rules"][string],
+  owner: IOwner,
+  docsBase: string,
+): Record<string, JsonValue> {
+  const fields: Record<string, JsonValue> = {};
+  if (entry.optIn === true) fields.optIn = true;
+  if (entry.reason !== undefined) fields.reason = entry.reason;
   const defaultDocs = owner.engineOwned ? `${docsBase}${owner.meta.docs}` : owner.meta.docs;
-  if (entry.codeStyle !== undefined && entry.codeStyle !== defaultDocs) setting.docs = entry.codeStyle;
-  if (entry.limits !== undefined && entry.limits !== owner.meta.limits) setting.limits = entry.limits;
-  if (!sameList(entry.tags, [owner.meta.category])) setting.tags = entry.tags;
+  if (entry.codeStyle !== undefined && entry.codeStyle !== defaultDocs) fields.docs = entry.codeStyle;
+  if (entry.limits !== undefined && entry.limits !== owner.meta.limits) fields.limits = entry.limits;
+  if (!sameList(entry.tags, [owner.meta.category])) fields.tags = entry.tags;
   if (entry.exclusionCodes !== undefined) {
     if (owner.engine !== "script") {
       throw new ConfigError(`rules.${id}.exclusionCodes`, "exclusion codes are consumer-only");
     }
-    setting.exclusionCodes = entry.exclusionCodes;
+    fields.exclusionCodes = entry.exclusionCodes;
   }
-  return setting;
+  return fields;
+}
+
+function migratedSetting(
+  id: string,
+  entry: ICatalog["rules"][string],
+  owner: IOwner,
+  docsBase: string,
+): Record<string, JsonValue> {
+  return {
+    level: entry.severity,
+    ...optionFields(entry),
+    ...pathFields(entry, owner.controls),
+    ...metadataFields(id, entry, owner, docsBase),
+  };
+}
+
+function settingFor(
+  id: string,
+  entry: ICatalog["rules"][string],
+  owner: IOwner,
+  docsBase: string,
+): Record<string, JsonValue> {
+  validateMigratedEntry(id, entry, owner);
+  return migratedSetting(id, entry, owner, docsBase);
 }
 
 function tagDefinitions(catalog: ICatalog): Record<string, JsonValue> {

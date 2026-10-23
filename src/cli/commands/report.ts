@@ -123,41 +123,55 @@ function configuredPluginPaths(lintConfig: JsonValue, lintConfigPath: string): s
     .map((plugin) => resolve(base, plugin));
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPosition(value: unknown): value is { line: number; col: number } {
+  return isObject(value) && typeof value.line === "number" && typeof value.col === "number";
+}
+
+function isOrderedRange(start: { line: number; col: number }, end: { line: number; col: number }): boolean {
+  return Number.isInteger(start.line) && Number.isInteger(start.col) &&
+    Number.isInteger(end.line) && Number.isInteger(end.col) &&
+    start.line >= 1 && start.col >= 0 && end.line >= start.line &&
+    (end.line !== start.line || end.col >= start.col);
+}
+
+interface IDiagnosticRecord {
+  readonly filename: string;
+  readonly code: string;
+  readonly message: string;
+  readonly hint?: string | null;
+}
+
+function isDiagnosticRecord(entry: Record<string, unknown>): entry is Record<string, unknown> & IDiagnosticRecord {
+  return typeof entry.filename === "string" && entry.filename.length > 0 &&
+    typeof entry.code === "string" && entry.code.length > 0 &&
+    typeof entry.message === "string" &&
+    (entry.hint === undefined || entry.hint === null || typeof entry.hint === "string");
+}
+
+function diagnosticOf(entry: unknown): IHostDiagnostic {
+  if (!isObject(entry)) throw new Error("the host JSON has a malformed diagnostic");
+  const range = isObject(entry.range) ? entry.range : null;
+  const start = range === null ? null : range.start;
+  const end = range === null ? null : range.end;
+  if (!isPosition(start) || !isPosition(end)) throw new Error("the host JSON has a malformed diagnostic");
+  if (!isDiagnosticRecord(entry)) throw new Error("the host JSON has a malformed diagnostic");
+  if (!isOrderedRange(start, end)) throw new Error("the host JSON has a malformed diagnostic");
+  return {
+    filename: entry.filename,
+    range: { start: { line: start.line, col: start.col }, end: { line: end.line, col: end.col } },
+    code: entry.code,
+    message: entry.message,
+    hint: entry.hint ?? null,
+  };
+}
+
 function parseDiagnostics(value: unknown): IHostDiagnostic[] {
   if (!Array.isArray(value)) throw new Error("the host JSON has no diagnostics array");
-  return value.map((entry) => {
-    const record = asRecord(entry);
-    const range = record ? asRecord(record.range) : null;
-    const start = range ? asRecord(range.start) : null;
-    const end = range ? asRecord(range.end) : null;
-    if (
-      !record || !range || !start || !end ||
-      typeof record.filename !== "string" || record.filename.length === 0 ||
-      typeof record.code !== "string" || record.code.length === 0 ||
-      typeof record.message !== "string" ||
-      typeof start.line !== "number" || typeof start.col !== "number" ||
-      typeof end.line !== "number" || typeof end.col !== "number" ||
-      !Number.isInteger(start.line) || !Number.isInteger(start.col) ||
-      !Number.isInteger(end.line) || !Number.isInteger(end.col) ||
-      start.line < 1 || start.col < 0 || end.line < start.line ||
-      (end.line === start.line && end.col < start.col)
-    ) {
-      throw new Error("the host JSON has a malformed diagnostic");
-    }
-    if (record.hint !== undefined && record.hint !== null && typeof record.hint !== "string") {
-      throw new Error("the host JSON has a malformed diagnostic hint");
-    }
-    return {
-      filename: record.filename,
-      range: {
-        start: { line: start.line, col: start.col },
-        end: { line: end.line, col: end.col },
-      },
-      code: record.code,
-      message: record.message,
-      hint: record.hint ?? null,
-    };
-  });
+  return value.map(diagnosticOf);
 }
 
 function parseErrors(value: unknown): IHostError[] {
@@ -244,18 +258,46 @@ function failedResult(
 }
 
 /** Runs one report and returns the collected result. Binding failures throw a usage error. */
-export async function runReport(
-  cwd: string,
-  options: IReportOptions,
-  hooks: IReportHooks,
-): Promise<IRunReport> {
-  let descriptor: IProjectDescriptor;
+async function descriptorOrFail(cwd: string, options: IReportOptions): Promise<IProjectDescriptor> {
   try {
-    descriptor = await loadConfigDescriptor(cwd, options.descriptor, options.plugin);
+    return await loadConfigDescriptor(cwd, options.descriptor, options.plugin);
   } catch (error) {
     if (error instanceof CliError) throw error;
     usage(`${messageOf(error)}`);
   }
+}
+
+function requireInside(root: string, entries: readonly (readonly [string, string])[]): void {
+  for (const [label, path] of entries) {
+    if (!isWithin(root, path)) usage(`${path}: the ${label} must be inside the project root.`);
+  }
+}
+
+function compileOrFail(rawConfig: JsonValue, descriptor: IProjectDescriptor, configPath: string) {
+  try {
+    return compileConfig(rawConfig, descriptor);
+  } catch (error) {
+    if (error instanceof ConfigError) usage(`${configPath}: ${error.message}`);
+    usage(`${messageOf(error)}`);
+  }
+}
+
+interface IBoundProject {
+  readonly descriptor: IProjectDescriptor;
+  readonly reportDescriptor: IProjectDescriptor;
+  readonly root: string;
+  readonly configPath: string;
+  readonly lintConfigPath: string;
+  readonly configBytes: Uint8Array;
+  readonly lintConfigBytes: Uint8Array;
+  readonly rawConfig: JsonValue;
+  readonly config: IConfigV2;
+  readonly compiled: ReturnType<typeof compileConfig>;
+  readonly lintConfig: JsonValue;
+}
+
+async function boundProject(cwd: string, options: IReportOptions): Promise<IBoundProject> {
+  const descriptor = await descriptorOrFail(cwd, options);
   const root = await realDirectory(descriptor.rootUrl);
   const reportDescriptor = {
     ...descriptor,
@@ -264,29 +306,40 @@ export async function runReport(
   const configPath = await realFile(descriptor.configUrl);
   const lintConfigPath = await realFile(descriptor.lintConfigUrl);
   const pluginPath = await realFile(descriptor.pluginUrl);
-  for (
-    const [label, path] of [["configuration", configPath], ["lint configuration", lintConfigPath], [
-      "plugin",
-      pluginPath,
-    ]] as const
-  ) {
-    if (!isWithin(root, path)) usage(`${path}: the ${label} must be inside the project root.`);
-  }
+  requireInside(root, [
+    ["configuration", configPath],
+    ["lint configuration", lintConfigPath],
+    ["plugin", pluginPath],
+  ]);
   const configBytes = await readBytesOrNull(configPath);
   const lintConfigBytes = await readBytesOrNull(lintConfigPath);
   if (configBytes === null || lintConfigBytes === null) usage(`${configPath}: cannot read the binding files.`);
   const rawConfig = readJson(configBytes, configPath);
   const config = parseConfig(rawConfig, descriptor);
-  let compiled: ReturnType<typeof compileConfig>;
-  try {
-    compiled = compileConfig(rawConfig, descriptor);
-  } catch (error) {
-    if (error instanceof ConfigError) usage(`${configPath}: ${error.message}`);
-    usage(`${messageOf(error)}`);
-  }
+  const compiled = compileOrFail(rawConfig, descriptor, configPath);
   const lintConfig = readJson(lintConfigBytes, lintConfigPath);
+  return {
+    descriptor,
+    reportDescriptor,
+    root,
+    configPath,
+    lintConfigPath,
+    configBytes,
+    lintConfigBytes,
+    rawConfig,
+    config,
+    compiled,
+    lintConfig,
+  };
+}
+
+async function ensurePluginSelected(
+  lintConfig: JsonValue,
+  lintConfigPath: string,
+  pluginUrl: URL,
+): Promise<void> {
   const pluginPaths = configuredPluginPaths(lintConfig, lintConfigPath);
-  const selectedPlugin = await realFile(descriptor.pluginUrl);
+  const selectedPlugin = await realFile(pluginUrl);
   const matching = await Promise.all(pluginPaths.map(async (path) => {
     try {
       return await Deno.realPath(path);
@@ -297,8 +350,11 @@ export async function runReport(
   if (matching.filter((path) => path === selectedPlugin).length !== 1) {
     usage(`${lintConfigPath}: the selected plugin must appear exactly once in lint.plugins.`);
   }
+}
+
+async function operandPathsOrFail(cwd: string, root: string, operands: readonly string[]): Promise<string[]> {
   const paths: string[] = [];
-  for (const operand of options.paths.length === 0 ? [cwd] : options.paths) {
+  for (const operand of operands.length === 0 ? [cwd] : operands) {
     if (JSON_FORMAT.test(operand) && !WINDOWS_DRIVE.test(operand)) {
       usage(`'${operand}' is not a filesystem path.`);
     }
@@ -311,20 +367,114 @@ export async function runReport(
     if (!isWithin(root, path)) usage(`${path}: the operand is outside the project root.`);
     paths.push(path);
   }
-  let sources: ReadonlyMap<string, ISourceSnapshot>;
+  return paths;
+}
+
+async function captureOrFail(paths: readonly string[], root: string): Promise<ReadonlyMap<string, ISourceSnapshot>> {
   try {
-    sources = await captureSources(paths, root);
+    return await captureSources(paths, root);
   } catch (error) {
     if (error instanceof SnapshotError) usage(error.message);
     usage(`${messageOf(error)}`);
   }
-  let selection: IResolvedSelection | null;
+}
+
+function resolveSelectionOrFail(
+  compiled: IBoundProject["compiled"],
+  config: IConfigV2,
+  pluginName: string,
+  select: string | null,
+  profile: string | null,
+): IResolvedSelection | null {
   try {
-    selection = resolveSelection(compiled, config, descriptor.pluginName, options.select, options.profile);
+    return resolveSelection(compiled, config, pluginName, select, profile);
   } catch (error) {
     if (error instanceof CliError) throw error;
     usage(messageOf(error));
   }
+}
+
+interface IHostParse {
+  readonly diagnostics: readonly IHostDiagnostic[];
+  readonly errors: readonly IHostError[];
+  readonly records: ILintRunResult["records"];
+  readonly hostStderr: string;
+  readonly failure: string | null;
+}
+
+function parseHostRun(
+  stdout: string,
+  stderr: string,
+  runId: string,
+  descriptor: IProjectDescriptor,
+  compiled: IBoundProject["compiled"],
+  selection: IResolvedSelection | null,
+): IHostParse {
+  try {
+    const report = JSON.parse(stdout) as Record<string, unknown>;
+    const diagnostics = parseDiagnostics(report.diagnostics);
+    const errors = parseErrors(report.errors);
+    const trace = parseTraceStderr(stderr, runId);
+    const activeRules = new Set(
+      Object.values(compiled.rules)
+        .filter((rule) => rule.engine === "plugin" && ruleStatus(rule, selection) === "active")
+        .map((rule) => rule.id),
+    );
+    const records = reconcileTraceRecords(trace.records, {
+      runId,
+      plugin: descriptor.pluginName,
+      activeRules,
+    });
+    return { diagnostics, errors, records, hostStderr: trace.unrelated.join("\n"), failure: null };
+  } catch (error) {
+    const failure = error instanceof TraceProtocolError
+      ? `trace protocol failure: ${error.message}`
+      : `host output failure: ${messageOf(error)}`;
+    return { diagnostics: [], errors: [], records: [], hostStderr: "", failure };
+  }
+}
+
+function completionFailure(
+  initial: string | null,
+  host: IHostOutput,
+  policyStable: boolean,
+  errors: readonly IHostError[],
+  sourceStable: boolean,
+  diagnostics: readonly IHostDiagnostic[],
+): string | null {
+  let failure = initial;
+  if (!sourceStable) failure = "the diagnosed source changed during the run";
+  if (host.signal !== null) failure = `the lint host terminated with signal ${host.signal}`;
+  if (host.code === null) failure ??= "the lint host exited without a code";
+  if (errors.length > 0) failure ??= `the lint host reported ${errors.length} error(s)`;
+  if (!policyStable) failure ??= "the policy changed during the run";
+  if (failure === null && host.code !== 0 && diagnostics.length === 0) {
+    failure = `the lint host exited with code ${host.code} without findings`;
+  }
+  return failure;
+}
+
+export async function runReport(
+  cwd: string,
+  options: IReportOptions,
+  hooks: IReportHooks,
+): Promise<IRunReport> {
+  const bound = await boundProject(cwd, options);
+  const {
+    descriptor,
+    reportDescriptor,
+    root,
+    configPath,
+    lintConfigPath,
+    configBytes,
+    lintConfigBytes,
+    config,
+    compiled,
+  } = bound;
+  await ensurePluginSelected(bound.lintConfig, lintConfigPath, descriptor.pluginUrl);
+  const paths = await operandPathsOrFail(cwd, root, options.paths);
+  const sources = await captureOrFail(paths, root);
+  const selection = resolveSelectionOrFail(compiled, config, descriptor.pluginName, options.select, options.profile);
   const selectionTokens = options.profile !== null
     ? config.profiles[options.profile]?.join(",") ?? null
     : options.select;
@@ -355,60 +505,38 @@ export async function runReport(
   await hooks.afterSpawn?.();
   const policyStable = bytesEqual(configBytes, await readBytesOrNull(configPath)) &&
     bytesEqual(lintConfigBytes, await readBytesOrNull(lintConfigPath));
-  let diagnostics: IHostDiagnostic[] = [];
-  let errors: IHostError[] = [];
-  let records: ILintRunResult["records"] = [];
-  let hostStderr = "";
-  let failure: string | null = null;
-  const stdout = DECODER.decode(host.stdout);
-  const stderr = DECODER.decode(host.stderr);
-  try {
-    const report = JSON.parse(stdout) as Record<string, unknown>;
-    diagnostics = parseDiagnostics(report.diagnostics);
-    errors = parseErrors(report.errors);
-    const trace = parseTraceStderr(stderr, runId);
-    hostStderr = trace.unrelated.join("\n");
-    const activeRules = new Set(
-      Object.values(compiled.rules)
-        .filter((rule) => rule.engine === "plugin" && ruleStatus(rule, selection) === "active")
-        .map((rule) => rule.id),
-    );
-    records = reconcileTraceRecords(trace.records, {
-      runId,
-      plugin: descriptor.pluginName,
-      activeRules,
-    });
-  } catch (error) {
-    failure = error instanceof TraceProtocolError
-      ? `trace protocol failure: ${error.message}`
-      : `host output failure: ${messageOf(error)}`;
-  }
-  const sourceStable = await diagnosedSourcesStable(diagnostics, sources, root);
-  if (!sourceStable) failure = "the diagnosed source changed during the run";
-  if (host.signal !== null) failure = `the lint host terminated with signal ${host.signal}`;
-  if (host.code === null) failure ??= "the lint host exited without a code";
-  if (errors.length > 0) failure ??= `the lint host reported ${errors.length} error(s)`;
-  if (!policyStable) failure ??= "the policy changed during the run";
-  if (failure === null && host.code !== 0 && diagnostics.length === 0) {
-    failure = `the lint host exited with code ${host.code} without findings`;
-  }
-  const completion = failure === null ? "complete" : "failed";
-  const input = {
-    descriptor: reportDescriptor,
-    selectedPluginUrl: descriptor.pluginUrl,
-    paths,
-    selection: selectionTokens,
+  const parsed = parseHostRun(
+    DECODER.decode(host.stdout),
+    DECODER.decode(host.stderr),
     runId,
-  };
+    descriptor,
+    compiled,
+    selection,
+  );
+  const sourceStable = await diagnosedSourcesStable(parsed.diagnostics, sources, root);
+  const failure = completionFailure(
+    parsed.failure,
+    host,
+    policyStable,
+    parsed.errors,
+    sourceStable,
+    parsed.diagnostics,
+  );
   const result: ILintRunResult = {
-    input,
+    input: {
+      descriptor: reportDescriptor,
+      selectedPluginUrl: descriptor.pluginUrl,
+      paths,
+      selection: selectionTokens,
+      runId,
+    },
     exitCode: host.code,
-    diagnostics,
-    errors,
-    records,
-    hostStderr,
+    diagnostics: parsed.diagnostics,
+    errors: parsed.errors,
+    records: parsed.records,
+    hostStderr: parsed.hostStderr,
     signal: host.signal,
-    completion,
+    completion: failure === null ? "complete" : "failed",
     failure,
   };
   return collectRunReport(

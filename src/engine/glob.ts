@@ -19,205 +19,267 @@ const POSIX_GLOBSTAR = "(?:[^/]*(?:/|$)+)*";
 const POSIX_WILDCARD = "[^/]*";
 const ESCAPE_PREFIX = "\\";
 const EMPTY_GLOB = /(?!)/;
+const EXTENDED_GROUP_OPENERS: Readonly<Record<string, string>> = { "+": "+", "@": "@", "!": "!", "*": "*" };
+const POSIX_CLASSES: Readonly<Record<string, string>> = {
+  alnum: "\\dA-Za-z",
+  alpha: "A-Za-z",
+  ascii: "\x00-\x7F",
+  blank: "\t ",
+  cntrl: "\x00-\x1F\x7F",
+  digit: "\\d",
+  graph: "\x21-\x7E",
+  lower: "a-z",
+  print: "\x20-\x7E",
+  punct: "!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_‘{|}~",
+  space: "\\s\v",
+  upper: "A-Z",
+  word: "\\w",
+  xdigit: "\\dA-Fa-f",
+};
 
-const compiledGlobs = new Map<string, RegExp>();
+interface ISegmentState {
+  readonly glob: string;
+  segment: string;
+  readonly groupStack: string[];
+  inRange: boolean;
+  inEscape: boolean;
+  endsWithSep: boolean;
+  index: number;
+}
+
+type Consumer = (state: ISegmentState) => boolean;
+
+const CONSUMERS: readonly Consumer[] = [
+  consumeEscape,
+  consumeRangeStart,
+  consumeRangeClass,
+  consumeRangeEnd,
+  consumeRangeBody,
+  consumeGroupClose,
+  consumeGroupBar,
+  consumeAnyCharacter,
+  consumeGroupOpen,
+  consumeBrace,
+  consumeStar,
+];
+
+function consumeEscape(state: ISegmentState): boolean {
+  const character = globCharacter(state);
+  if (!state.inEscape && character !== ESCAPE_PREFIX) return false;
+  if (!state.inEscape) {
+    state.inEscape = true;
+    return true;
+  }
+  state.inEscape = false;
+  const escapeChars = state.inRange ? RANGE_ESCAPE_CHARS : REG_EXP_ESCAPE_CHARS;
+  state.segment += escapeChars.includes(character) ? `\\${character}` : character;
+  return true;
+}
+
+function globCharacter(state: ISegmentState): string {
+  return state.glob[state.index];
+}
+
+function consumeRangeStart(state: ISegmentState): boolean {
+  if (globCharacter(state) !== "[" || state.inRange) return false;
+  state.inRange = true;
+  state.segment += "[";
+  const next = state.glob[state.index + 1];
+  if (next === "!") {
+    state.index++;
+    state.segment += "^";
+  } else if (next === "^") {
+    state.index++;
+    state.segment += "\\^";
+  }
+  return true;
+}
+
+function consumeRangeClass(state: ISegmentState): boolean {
+  if (!state.inRange || globCharacter(state) !== "[" || state.glob[state.index + 1] !== ":") return false;
+  let cursor = state.index + 1;
+  let name = "";
+  while (state.glob[cursor + 1] !== undefined && state.glob[cursor + 1] !== ":") {
+    name += state.glob[cursor + 1];
+    cursor++;
+  }
+  if (state.glob[cursor + 1] !== ":" || state.glob[cursor + 2] !== "]") {
+    state.segment += "[";
+    return true;
+  }
+  state.index = cursor + 2;
+  state.segment += POSIX_CLASSES[name] ?? "";
+  return true;
+}
+
+function consumeRangeEnd(state: ISegmentState): boolean {
+  if (globCharacter(state) !== "]" || !state.inRange) return false;
+  state.inRange = false;
+  state.segment += "]";
+  return true;
+}
+
+function consumeRangeBody(state: ISegmentState): boolean {
+  if (!state.inRange) return false;
+  state.segment += globCharacter(state);
+  return true;
+}
+
+function consumeGroupClose(state: ISegmentState): boolean {
+  if (globCharacter(state) !== ")" || state.groupStack.length === 0) return false;
+  if (state.groupStack[state.groupStack.length - 1] === "BRACE") return false;
+  state.segment += ")";
+  const type = state.groupStack.pop();
+  if (type === "!") state.segment += POSIX_WILDCARD;
+  else if (type !== "@") state.segment += type ?? "";
+  return true;
+}
+
+function consumeGroupBar(state: ISegmentState): boolean {
+  if (globCharacter(state) !== "|" || state.groupStack.length === 0) return false;
+  if (state.groupStack[state.groupStack.length - 1] === "BRACE") return false;
+  state.segment += "|";
+  return true;
+}
+
+function consumeAnyCharacter(state: ISegmentState): boolean {
+  if (globCharacter(state) !== "?") return false;
+  if (state.glob[state.index + 1] === "(") {
+    state.index++;
+    state.groupStack.push("?");
+    state.segment += "(?:";
+    return true;
+  }
+  state.segment += ".";
+  return true;
+}
+
+function consumeGroupOpen(state: ISegmentState): boolean {
+  if (state.glob[state.index + 1] !== "(") return false;
+  const opener = globCharacter(state);
+  if (opener === "?") {
+    state.index++;
+    state.groupStack.push("?");
+    state.segment += "(?:";
+    return true;
+  }
+  const type = EXTENDED_GROUP_OPENERS[opener];
+  if (type === undefined) return false;
+  state.index++;
+  state.groupStack.push(type);
+  state.segment += type === "!" ? "(?!" : "(?:";
+  return true;
+}
+
+function consumeBrace(state: ISegmentState): boolean {
+  const character = globCharacter(state);
+  const top = state.groupStack[state.groupStack.length - 1];
+  if (character === "{") {
+    state.groupStack.push("BRACE");
+    state.segment += "(?:";
+    return true;
+  }
+  if (character === "}" && top === "BRACE") {
+    state.groupStack.pop();
+    state.segment += ")";
+    return true;
+  }
+  if (character === "," && top === "BRACE") {
+    state.segment += "|";
+    return true;
+  }
+  return false;
+}
+
+function consumeStar(state: ISegmentState): boolean {
+  if (globCharacter(state) !== "*") return false;
+  if (state.glob[state.index + 1] === "(") {
+    state.index++;
+    state.groupStack.push("*");
+    state.segment += "(?:";
+    return true;
+  }
+  const previous = state.glob[state.index - 1];
+  let stars = 1;
+  while (state.glob[state.index + 1] === "*") {
+    state.index++;
+    stars++;
+  }
+  const next = state.glob[state.index + 1];
+  const atBoundary = (character: string | undefined): boolean =>
+    character === undefined || character === POSIX_SEPARATOR;
+  if (stars === 2 && atBoundary(previous) && atBoundary(next)) {
+    state.segment += POSIX_GLOBSTAR;
+    state.endsWithSep = true;
+  } else {
+    state.segment += POSIX_WILDCARD;
+  }
+  return true;
+}
+
+function consumeLiteral(state: ISegmentState): void {
+  const character = globCharacter(state);
+  state.segment += REG_EXP_ESCAPE_CHARS.includes(character) ? `\\${character}` : character;
+}
+
+function trimTrailingSeparators(glob: string): string {
+  let length = glob.length;
+  for (; length > 1 && glob[length - 1] === POSIX_SEPARATOR; length--);
+  return glob.slice(0, length);
+}
+
+function literalSegment(glob: string, start: number, end: number): string {
+  let segment = "";
+  for (const character of glob.slice(start, end)) {
+    segment += REG_EXP_ESCAPE_CHARS.includes(character) ? `\\${character}` : character;
+  }
+  return segment;
+}
 
 /** Converts an extended, globstar POSIX glob to an anchored regular expression. */
 export function globToRegExp(glob: string): RegExp {
   if (glob === "") return EMPTY_GLOB;
-
-  let newLength = glob.length;
-  for (; newLength > 1 && glob[newLength - 1] === POSIX_SEPARATOR; newLength--);
-  glob = glob.slice(0, newLength);
-
+  glob = trimTrailingSeparators(glob);
   let regExpString = "";
-
-  // Each iteration handles one path segment.
-  for (let j = 0; j < glob.length;) {
-    let segment = "";
-    const groupStack: string[] = [];
-    let inRange = false;
-    let inEscape = false;
-    let endsWithSep = false;
-    let i = j;
-
-    for (; i < glob.length && !(glob[i] === POSIX_SEPARATOR && groupStack.length === 0); i++) {
-      if (inEscape) {
-        inEscape = false;
-        const escapeChars = inRange ? RANGE_ESCAPE_CHARS : REG_EXP_ESCAPE_CHARS;
-        segment += escapeChars.includes(glob[i]) ? `\\${glob[i]}` : glob[i];
-        continue;
-      }
-
-      if (glob[i] === ESCAPE_PREFIX) {
-        inEscape = true;
-        continue;
-      }
-
-      if (glob[i] === "[") {
-        if (!inRange) {
-          inRange = true;
-          segment += "[";
-          if (glob[i + 1] === "!") {
-            i++;
-            segment += "^";
-          } else if (glob[i + 1] === "^") {
-            i++;
-            segment += "\\^";
-          }
-          continue;
-        } else if (glob[i + 1] === ":") {
-          let k = i + 1;
-          let value = "";
-          while (glob[k + 1] !== undefined && glob[k + 1] !== ":") {
-            value += glob[k + 1];
-            k++;
-          }
-          if (glob[k + 1] === ":" && glob[k + 2] === "]") {
-            i = k + 2;
-            if (value === "alnum") segment += "\\dA-Za-z";
-            else if (value === "alpha") segment += "A-Za-z";
-            else if (value === "ascii") segment += "\x00-\x7F";
-            else if (value === "blank") segment += "\t ";
-            else if (value === "cntrl") segment += "\x00-\x1F\x7F";
-            else if (value === "digit") segment += "\\d";
-            else if (value === "graph") segment += "\x21-\x7E";
-            else if (value === "lower") segment += "a-z";
-            else if (value === "print") segment += "\x20-\x7E";
-            else if (value === "punct") {
-              segment += "!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_‘{|}~";
-            } else if (value === "space") segment += "\\s\v";
-            else if (value === "upper") segment += "A-Z";
-            else if (value === "word") segment += "\\w";
-            else if (value === "xdigit") segment += "\\dA-Fa-f";
-            continue;
-          }
-        }
-      }
-
-      if (glob[i] === "]" && inRange) {
-        inRange = false;
-        segment += "]";
-        continue;
-      }
-
-      if (inRange) {
-        segment += glob[i];
-        continue;
-      }
-
-      if (glob[i] === ")" && groupStack.length > 0 && groupStack[groupStack.length - 1] !== "BRACE") {
-        segment += ")";
-        const type = groupStack.pop();
-        if (type === "!") {
-          segment += POSIX_WILDCARD;
-        } else if (type !== "@") {
-          segment += type ?? "";
-        }
-        continue;
-      }
-
-      if (glob[i] === "|" && groupStack.length > 0 && groupStack[groupStack.length - 1] !== "BRACE") {
-        segment += "|";
-        continue;
-      }
-
-      if (glob[i] === "+" && glob[i + 1] === "(") {
-        i++;
-        groupStack.push("+");
-        segment += "(?:";
-        continue;
-      }
-
-      if (glob[i] === "@" && glob[i + 1] === "(") {
-        i++;
-        groupStack.push("@");
-        segment += "(?:";
-        continue;
-      }
-
-      if (glob[i] === "?") {
-        if (glob[i + 1] === "(") {
-          i++;
-          groupStack.push("?");
-          segment += "(?:";
-        } else {
-          segment += ".";
-        }
-        continue;
-      }
-
-      if (glob[i] === "!" && glob[i + 1] === "(") {
-        i++;
-        groupStack.push("!");
-        segment += "(?!";
-        continue;
-      }
-
-      if (glob[i] === "{") {
-        groupStack.push("BRACE");
-        segment += "(?:";
-        continue;
-      }
-
-      if (glob[i] === "}" && groupStack[groupStack.length - 1] === "BRACE") {
-        groupStack.pop();
-        segment += ")";
-        continue;
-      }
-
-      if (glob[i] === "," && groupStack[groupStack.length - 1] === "BRACE") {
-        segment += "|";
-        continue;
-      }
-
-      if (glob[i] === "*") {
-        if (glob[i + 1] === "(") {
-          i++;
-          groupStack.push("*");
-          segment += "(?:";
-        } else {
-          const prevChar = glob[i - 1];
-          let numStars = 1;
-          while (glob[i + 1] === "*") {
-            i++;
-            numStars++;
-          }
-          const nextChar = glob[i + 1];
-          const atBoundary = (char: string | undefined): boolean => char === undefined || char === POSIX_SEPARATOR;
-          if (numStars === 2 && atBoundary(prevChar) && atBoundary(nextChar)) {
-            segment += POSIX_GLOBSTAR;
-            endsWithSep = true;
-          } else {
-            segment += POSIX_WILDCARD;
-          }
-        }
-        continue;
-      }
-
-      segment += REG_EXP_ESCAPE_CHARS.includes(glob[i]) ? `\\${glob[i]}` : glob[i];
+  for (let start = 0; start < glob.length;) {
+    const state: ISegmentState = {
+      glob,
+      segment: "",
+      groupStack: [],
+      inRange: false,
+      inEscape: false,
+      endsWithSep: false,
+      index: start,
+    };
+    for (
+      ;
+      state.index < glob.length &&
+      !(globCharacter(state) === POSIX_SEPARATOR && state.groupStack.length === 0);
+      state.index++
+    ) {
+      applyConsumer(state);
     }
-
-    // An unclosed group, an open range, or a dangling escape makes the segment literal.
-    if (groupStack.length > 0 || inRange || inEscape) {
-      segment = "";
-      for (const character of glob.slice(j, i)) {
-        segment += REG_EXP_ESCAPE_CHARS.includes(character) ? `\\${character}` : character;
-        endsWithSep = false;
-      }
+    const end = state.index;
+    if (state.groupStack.length > 0 || state.inRange || state.inEscape) {
+      state.segment = literalSegment(state.glob, start, end);
+      state.endsWithSep = false;
     }
-
-    regExpString += segment;
-    if (!endsWithSep) {
-      regExpString += i < glob.length ? POSIX_SEP : POSIX_SEP_MAYBE;
-    }
-
-    while (glob[i] === POSIX_SEPARATOR) i++;
-    j = i;
+    regExpString += state.segment;
+    if (!state.endsWithSep) regExpString += end < glob.length ? POSIX_SEP : POSIX_SEP_MAYBE;
+    start = end;
+    while (glob[start] === POSIX_SEPARATOR) start++;
   }
-
   return new RegExp(`^${regExpString}$`);
 }
+
+function applyConsumer(state: ISegmentState): void {
+  for (const consume of CONSUMERS) {
+    if (consume(state)) return;
+  }
+  consumeLiteral(state);
+}
+
+const compiledGlobs = new Map<string, RegExp>();
 
 function globRegex(glob: string): RegExp {
   let regex = compiledGlobs.get(glob);

@@ -77,6 +77,7 @@ export async function resolveLocalEntry(value: string, cwd: string): Promise<URL
 export async function loadLocalModule(value: string, cwd: string): Promise<Record<string, unknown>> {
   const url = await resolveLocalEntry(value, cwd);
   try {
+    // deno-lint-ignore self/import-inside-statement -- the plugin entry is a runtime path
     return await import(url.href) as Record<string, unknown>;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

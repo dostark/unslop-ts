@@ -168,11 +168,12 @@ function asError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-/**
- * Writes a layout/config pair. It stages both files, hard-links the layout first and the
- * configuration last, and never overwrites an input or an existing destination.
- */
-export async function writeMigrationPair(inputs: IMigrationWriteInputs): Promise<IMigrationWriteResult> {
+/** Resolves and validates the two destinations of a migration pair. */
+async function migrationTargets(inputs: IMigrationWriteInputs): Promise<{
+  readonly configTarget: string;
+  readonly layoutTarget: string | null;
+  readonly targets: readonly string[];
+}> {
   const configTarget = await canonicalDestination(inputs.config.path);
   const layoutTarget = inputs.layout === null ? null : await canonicalDestination(inputs.layout.path);
   if (layoutTarget !== null && layoutTarget === configTarget) {
@@ -185,40 +186,67 @@ export async function writeMigrationPair(inputs: IMigrationWriteInputs): Promise
       throw new WriteRefusalError(`${target}: the destination aliases an input file.`);
     }
   }
+  return { configTarget, layoutTarget, targets };
+}
 
+/** Cleans up a half-linked pair and reports the paths that survived. */
+async function failAfterLayoutLink(
+  configTarget: string,
+  layoutTarget: string,
+  layoutTemp: IStagedFile,
+  error: unknown,
+): Promise<never> {
+  const surviving: string[] = [];
+  if (!await removeOwnInode(layoutTarget, layoutTemp.ino)) surviving.push(layoutTarget);
+  if (surviving.length > 0) {
+    throw new PartialWriteError(
+      `${configTarget}: the configuration was not created and cleanup failed (${asError(error).message})`,
+      surviving,
+    );
+  }
+  throw asError(error);
+}
+
+/** Links the staged files, layout first, then the configuration. */
+async function linkMigrationPair(
+  configTarget: string,
+  layoutTarget: string | null,
+  layoutTemp: IStagedFile | null,
+  temps: readonly IStagedFile[],
+  inputs: IMigrationWriteInputs,
+): Promise<void> {
+  if (layoutTemp === null || layoutTarget === null) {
+    await Deno.link(temps[0].path, configTarget);
+    return;
+  }
+  await Deno.link(layoutTemp.path, layoutTarget);
+  try {
+    if (inputs.hooks?.afterLayoutLinked) {
+      await inputs.hooks.afterLayoutLinked({ configPath: configTarget, layoutPath: layoutTarget });
+    }
+    await Deno.link(temps[0].path, configTarget);
+  } catch (error) {
+    await failAfterLayoutLink(configTarget, layoutTarget, layoutTemp, error);
+  }
+}
+
+/**
+ * Writes a layout/config pair. It stages both files, hard-links the layout first and the
+ * configuration last, and never overwrites an input or an existing destination.
+ */
+export async function writeMigrationPair(inputs: IMigrationWriteInputs): Promise<IMigrationWriteResult> {
+  const { configTarget, layoutTarget, targets } = await migrationTargets(inputs);
   const locks: string[] = [];
   const temps: IStagedFile[] = [];
   try {
     for (const target of [...targets].sort()) locks.push(await acquireLock(target));
     for (const target of targets) await existingRefusal(target);
-
     temps.push(await stage(configTarget, inputs.config.contents));
     const layoutTemp = layoutTarget === null || inputs.layout === null
       ? null
       : await stage(layoutTarget, inputs.layout.contents);
     if (layoutTemp) temps.push(layoutTemp);
-
-    if (layoutTemp && layoutTarget) {
-      await Deno.link(layoutTemp.path, layoutTarget);
-      try {
-        if (inputs.hooks?.afterLayoutLinked) {
-          await inputs.hooks.afterLayoutLinked({ configPath: configTarget, layoutPath: layoutTarget });
-        }
-        await Deno.link(temps[0].path, configTarget);
-      } catch (error) {
-        const surviving: string[] = [];
-        if (!await removeOwnInode(layoutTarget, layoutTemp.ino)) surviving.push(layoutTarget);
-        if (surviving.length > 0) {
-          throw new PartialWriteError(
-            `${configTarget}: the configuration was not created and cleanup failed (${asError(error).message})`,
-            surviving,
-          );
-        }
-        throw asError(error);
-      }
-    } else {
-      await Deno.link(temps[0].path, configTarget);
-    }
+    await linkMigrationPair(configTarget, layoutTarget, layoutTemp, temps, inputs);
     return { configPath: configTarget, layoutPath: layoutTarget };
   } finally {
     for (const temp of temps) await removeQuietly(temp.path);

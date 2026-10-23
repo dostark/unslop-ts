@@ -10,7 +10,6 @@
  * The helpers accept strings only, so the URL overloads of the originals are omitted.
  */
 
-const CHAR_DOT = 46;
 const CHAR_FORWARD_SLASH = 47;
 const SEPARATOR = "/";
 
@@ -20,69 +19,17 @@ function isPosixPathSeparator(code: number): boolean {
 
 /** Resolves `.` and `..` elements in a path with directory names. */
 function normalizeString(path: string, allowAboveRoot: boolean): string {
-  let res = "";
-  let lastSegmentLength = 0;
-  let lastSlash = -1;
-  let dots = 0;
-  let code: number | undefined;
-  for (let i = 0; i <= path.length; ++i) {
-    if (i < path.length) {
-      code = path.charCodeAt(i);
-    } else if (isPosixPathSeparator(code ?? 0)) {
-      break;
-    } else {
-      code = CHAR_FORWARD_SLASH;
+  const segments: string[] = [];
+  for (const segment of path.split(SEPARATOR)) {
+    if (segment === "" || segment === ".") continue;
+    if (segment !== "..") {
+      segments.push(segment);
+      continue;
     }
-
-    if (isPosixPathSeparator(code ?? 0)) {
-      if (lastSlash === i - 1 || dots === 1) {
-        // A repeated separator or a single dot: nothing to add.
-      } else if (lastSlash !== i - 1 && dots === 2) {
-        if (
-          res.length < 2 ||
-          lastSegmentLength !== 2 ||
-          res.charCodeAt(res.length - 1) !== CHAR_DOT ||
-          res.charCodeAt(res.length - 2) !== CHAR_DOT
-        ) {
-          if (res.length > 2) {
-            const lastSlashIndex = res.lastIndexOf(SEPARATOR);
-            if (lastSlashIndex === -1) {
-              res = "";
-              lastSegmentLength = 0;
-            } else {
-              res = res.slice(0, lastSlashIndex);
-              lastSegmentLength = res.length - 1 - res.lastIndexOf(SEPARATOR);
-            }
-            lastSlash = i;
-            dots = 0;
-            continue;
-          } else if (res.length === 2 || res.length === 1) {
-            res = "";
-            lastSegmentLength = 0;
-            lastSlash = i;
-            dots = 0;
-            continue;
-          }
-        }
-        if (allowAboveRoot) {
-          if (res.length > 0) res += `${SEPARATOR}..`;
-          else res = "..";
-          lastSegmentLength = 2;
-        }
-      } else {
-        if (res.length > 0) res += SEPARATOR + path.slice(lastSlash + 1, i);
-        else res = path.slice(lastSlash + 1, i);
-        lastSegmentLength = i - lastSlash - 1;
-      }
-      lastSlash = i;
-      dots = 0;
-    } else if (code === CHAR_DOT && dots !== -1) {
-      ++dots;
-    } else {
-      dots = -1;
-    }
+    if (segments.length > 0 && segments[segments.length - 1] !== "..") segments.pop();
+    else if (allowAboveRoot) segments.push("..");
   }
-  return res;
+  return segments.join(SEPARATOR);
 }
 
 function stripTrailingSeparators(segment: string): string {
@@ -157,59 +104,12 @@ export function resolve(...segments: string[]): string {
 
 /** Returns the relative path from `from` to `to`. Both are resolved from the root first. */
 export function relative(from: string, to: string): string {
-  from = resolve(from);
-  to = resolve(to);
-  if (from === to) return "";
-
-  let fromStart = 1;
-  const fromEnd = from.length;
-  for (; fromStart < fromEnd; ++fromStart) {
-    if (!isPosixPathSeparator(from.charCodeAt(fromStart))) break;
-  }
-  const fromLen = fromEnd - fromStart;
-
-  let toStart = 1;
-  const toEnd = to.length;
-  for (; toStart < toEnd; ++toStart) {
-    if (!isPosixPathSeparator(to.charCodeAt(toStart))) break;
-  }
-  const toLen = toEnd - toStart;
-
-  const length = fromLen < toLen ? fromLen : toLen;
-  let lastCommonSep = -1;
-  let i = 0;
-  for (; i <= length; ++i) {
-    if (i === length) {
-      if (toLen > length) {
-        if (isPosixPathSeparator(to.charCodeAt(toStart + i))) {
-          return to.slice(toStart + i + 1);
-        } else if (i === 0) {
-          return to.slice(toStart + i);
-        }
-      } else if (fromLen > length) {
-        if (isPosixPathSeparator(from.charCodeAt(fromStart + i))) {
-          lastCommonSep = i;
-        } else if (i === 0) {
-          lastCommonSep = 0;
-        }
-      }
-      break;
-    }
-    const fromCode = from.charCodeAt(fromStart + i);
-    const toCode = to.charCodeAt(toStart + i);
-    if (fromCode !== toCode) break;
-    else if (isPosixPathSeparator(fromCode)) lastCommonSep = i;
-  }
-
-  let out = "";
-  for (i = fromStart + lastCommonSep + 1; i <= fromEnd; ++i) {
-    if (i === fromEnd || isPosixPathSeparator(from.charCodeAt(i))) {
-      out += out.length === 0 ? ".." : "/..";
-    }
-  }
-
-  if (out.length > 0) return out + to.slice(toStart + lastCommonSep);
-  toStart += lastCommonSep;
-  if (isPosixPathSeparator(to.charCodeAt(toStart))) ++toStart;
-  return to.slice(toStart);
+  const fromPath = resolve(from);
+  const toPath = resolve(to);
+  if (fromPath === toPath) return "";
+  const fromParts = fromPath.split(SEPARATOR).filter((part) => part.length > 0);
+  const toParts = toPath.split(SEPARATOR).filter((part) => part.length > 0);
+  let common = 0;
+  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) common++;
+  return [...Array<string>(fromParts.length - common).fill(".."), ...toParts.slice(common)].join(SEPARATOR);
 }
