@@ -29,6 +29,98 @@ rule packs and script checks, so project-specific rules stay in the project.
    `tag:<tag>` selectors. The CLI `--select` and `--profile` options replace that variable for one call.
    `selectionEnvName(name)` returns the variable name.
 
+## Hosts
+
+| Host               | Entry                                                                 | Runtime      |
+| ------------------ | --------------------------------------------------------------------- | ------------ |
+| `deno lint`        | `@dostark/unslop-ts/deno` in `lint.plugins`, or `dist/deno_plugin.js` | Deno         |
+| ESLint 9 and later | `@dostark/unslop-ts/eslint` as a plugin                               | Node.js, Bun |
+| Oxlint             | the same ESLint plugin through `jsPlugins`                            | Node.js      |
+
+The rule set is the same on every host, and the conformance suite proves one case table per rule on
+`deno lint`, ESLint on Node.js, ESLint on Bun, and Oxlint on Node.js.
+
+## Runtimes
+
+- Deno 2.9 is the reference runtime and owns the `deno lint` host.
+- Node.js 24 runs ESLint and Oxlint. Node strips TypeScript types, so the adapter imports from a
+  relative path outside `node_modules`.
+- Bun 1.4 runs ESLint. The `test:bun` task needs no Deno.
+
+The root export imports only `zod`. The Deno globals live in `deno.ts`, which the ESLint and Oxlint
+entries never import.
+
+## Adding to your linter
+
+- ESLint: `import { createEslintPlugin } from "@dostark/unslop-ts/eslint"` and add
+  `...unslop.configs.recommended` after your baseline. The supported range is 9.0.0 and later, below 11.
+  The presets are `recommended`, `strict`, `strict-error`, `deno`, and `typescript-eslint-compat`.
+- Oxlint: add the plugin module to `jsPlugins`, list `unslop/...` rules under `rules`, and set
+  `settings.unslop`. `unslop config export --host=oxlint --out=.oxlintrc.json` writes a fragment.
+- `deno lint`: register the plugin entry or the release bundle in `lint.plugins`.
+
+A preset adds only the plugin, `unslop/...` rules, and the `unslop` settings key. To set a rule to
+`warn` after spreading a preset, add `"unslop/<rule>": "warn"` in a later config object.
+
+The invariants hold for every host:
+
+1. Adding the plugin leaves every foreign diagnostic unchanged.
+2. The plugin reports only `unslop/...` ids.
+3. A preset sets no parser and no foreign rule.
+4. Plugin rules are `error` or `off`; `warn` becomes `error` in `deno lint`.
+5. Suppression follows the dialect the host understands.
+
+## Suppression comments
+
+A suppression needs a reason after `--`.
+
+| Dialect | Ignore one line                                | Ignore the file                             | Used by     |
+| ------- | ---------------------------------------------- | ------------------------------------------- | ----------- |
+| Deno    | `// deno-lint-ignore <code> -- reason`         | `// deno-lint-ignore-file <code> -- reason` | `deno lint` |
+| ESLint  | `// eslint-disable-next-line <rule> -- reason` | `/* eslint-disable <rule> -- reason */`     | ESLint      |
+| Oxlint  | `// oxlint-disable-next-line <rule> -- reason` | `/* oxlint-disable <rule> -- reason */`     | Oxlint      |
+
+`unslop/ignore-needs-reason` and `unslop/no-forbidden-lint-ignore` read the dialect list from their
+`dialects` option; by default each host reads its own dialect.
+
+## Working with Biome
+
+Biome is a formatter and linter. unslop-ts does not replace it: Biome keeps formatting and its own
+lint rules, and unslop-ts adds the rule families it owns. The overlap table lists the Biome rules that
+duplicate or relate to unslop-ts rules. When a rule duplicates, turn one of the two off. Biome
+suppressions stay Biome's (`// biome-ignore lint/<group>/<rule>: reason`); unslop-ts reads only the
+three dialects in the table above.
+
+## Lockfiles
+
+- `deno.lock` belongs to Deno and covers the engine and the Deno test suite.
+- `hosts/package-lock.json` belongs to npm and covers the Node.js host suite.
+- `hosts/bun.lock` belongs to Bun and covers the Bun host suite.
+
+Do not edit a lockfile by hand; regenerate it with the tool that owns it.
+
+## Choosing a host
+
+Install only the tools of the host you run. The published package depends on `zod` only, so an ESLint
+or Oxlint project does not install Deno. The `unslop` CLI, `unslop report`, the coverage trace
+protocol, and `./whole-tree` run on the Deno host only; ESLint and Oxlint users use their host's
+formatters and `unslop report --format` is not available to them.
+
+## Contributing without Deno
+
+The CI `verify` job runs the gates that need Deno: `fmt`, `lint`, `check`, `deno publish --dry-run`,
+the purity tests, the dogfood test, the bundle test, and the Deno conformance column. The
+`hosts-node` and `hosts-bun` jobs install no Deno and run the Node.js and Bun columns.
+
+## Verifying release bundles
+
+```sh
+sha256sum -c dist/unslop_engine.js.sha256
+sha256sum -c dist/deno_plugin.js.sha256
+```
+
+Both bundles and both checksum files attach to a release. `deno task bundle` rebuilds them.
+
 ## Configuration (version 2)
 
 ```json
@@ -367,3 +459,27 @@ A skipped or changed upstream case carries its reason next to the case in the te
 
 MIT notice (anti-slop): Copyright (c) its authors, MIT License. The type environment and the
 type-safety rules are reimplementations; the licence text is not copied here.
+
+## Overlaps
+
+This table is generated from `IPluginRule.overlaps` by `scripts/generate_overlap_table.mjs`.
+
+<!-- BEGIN GENERATED OVERLAPS -->
+
+| unslop rule                         | Ecosystem         | Foreign rule                    | Kind      | Guidance                                                                       |
+| ----------------------------------- | ----------------- | ------------------------------- | --------- | ------------------------------------------------------------------------------ |
+| `unslop/no-chained-type-assertions` | typescript-eslint | `no-unnecessary-type-assertion` | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/no-explicit-unknown`        | typescript-eslint | `no-explicit-any`               | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/no-unsafe-dictionary`       | typescript-eslint | `no-explicit-any`               | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/no-typeof-escape`           | typescript-eslint | `no-explicit-any`               | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/no-pass-through-type-alias` | typescript-eslint | `no-unnecessary-type-assertion` | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/no-runtime-typeof`          | eslint            | `valid-typeof`                  | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/max-cyclomatic-complexity`  | eslint            | `complexity`                    | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/max-class-size`             | eslint            | `max-classes-per-file`          | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/ts-suppression-pragmas`     | typescript-eslint | `ban-ts-comment`                | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/max-params`                 | eslint            | `max-params`                    | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/exported-interface-naming`  | typescript-eslint | `naming-convention`             | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/ignore-needs-reason`        | eslint-comments   | `require-description`           | duplicate | Turn one of the two off; `typescript-eslint-compat` turns the unslop rule off. |
+| `unslop/no-forbidden-lint-ignore`   | eslint-comments   | `no-unlimited-disable`          | related   | Both may run; the unslop rule is narrower and states the reason.               |
+
+<!-- END GENERATED OVERLAPS -->

@@ -471,3 +471,20 @@ whether the current selection enables a rule. They never change how a host runs 
 keep their host modes: `unused-exports` warns until `--strict`, and `optional-params` warns until
 `--fail` or `--staged`. A script rule's configured level does not override a fixed host flag. The CLI
 prints the editable controls and the host modes, so the enforcement owner stays visible.
+
+## Rule authoring for every host {#rule-authoring}
+
+Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these rules:
+
+1. A rule module uses no runtime global. It does not read `Deno`, `process`, or `Bun`; the host entry
+   passes the paths it needs.
+2. A rule reads only the `IRuleContext` subset: `sourceCode.text`, `report`, `filename`, and the
+   normalized `options`. Host-specific state does not reach a rule.
+3. A rule declares `meta`, `requiresTestGlobs`, and `overlaps`. The presets, the README overlap table,
+   and the compatibility overlay read that metadata.
+4. A rule emits the bare message and an optional hint. The host entry adds the plugin id and the docs
+   link, so a message never names a host.
+5. A rule's cases live in `unslop-ts/tests/cases/conformance.json`. The conformance suite runs the same case on
+   every host, so a new rule without a case fails the check.
+6. Suppression parsing stays in the shared ignore-directive helper. A rule never parses a
+   `deno-lint-ignore`, `eslint-disable`, or `oxlint-disable` comment itself.
