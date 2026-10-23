@@ -11,7 +11,13 @@ import { assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 
 const PACKAGE_ROOT = fromFileUrl(new URL("..", import.meta.url));
-const HOST_PATHS = ["/hosts/", "/tests_node/", "/examples/node-project/", "/examples/bun-project/", "/dist/"];
+const HOST_PATHS = [
+  "/unslop-ts/hosts/",
+  "/unslop-ts/tests_node/",
+  "/unslop-ts/examples/node-project/",
+  "/unslop-ts/examples/bun-project/",
+  "/unslop-ts/dist/",
+];
 
 Deno.test("deno publish dry-run reports no slow type and no host tooling", async () => {
   const result = await new Deno.Command(Deno.execPath(), {

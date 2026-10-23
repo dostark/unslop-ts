@@ -54,6 +54,9 @@ export interface IRuleContext {
 /** A visitor map keyed by node type or selector, as the host linter dispatches them. */
 export type LintVisitor = Record<string, (node: IRuleNode) => void>;
 
+/** A suppression-comment dialect the comment rules can check. */
+export type SuppressionDialect = "deno" | "eslint" | "oxlint";
+
 export interface IPluginRuleContext {
   /** Options parsed and defaulted from the rule's catalog entry. */
   readonly options: Record<string, JsonValue>;
@@ -65,6 +68,8 @@ export interface IPluginRuleContext {
   readonly codeStyle?: string;
   /** The name the plugin is registered under, which prefixes its catalog ids. */
   readonly pluginName: string;
+  /** The suppression dialects the host honors. Absent means Deno only. */
+  readonly dialects?: readonly SuppressionDialect[];
 }
 
 export interface IPluginRule {

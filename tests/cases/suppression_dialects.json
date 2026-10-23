@@ -1,0 +1,104 @@
+[
+  {
+    "dialect": "deno",
+    "code": "// deno-lint-ignore {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "deno",
+    "code": "// deno-lint-ignore {{plugin}}/no-explicit-unknown -- checked\nexport const value: unknown = 1;\n",
+    "needsReason": false,
+    "forbidden": false
+  },
+  {
+    "dialect": "deno",
+    "code": "// deno-lint-ignore no-explicit-any\nexport const value = 1;\n",
+    "needsReason": false,
+    "forbidden": true
+  },
+  {
+    "dialect": "eslint",
+    "code": "// eslint-disable-next-line {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "eslint",
+    "code": "// eslint-disable-next-line {{plugin}}/no-explicit-unknown -- checked\nexport const value: unknown = 1;\n",
+    "needsReason": false,
+    "forbidden": false
+  },
+  {
+    "dialect": "eslint",
+    "code": "// eslint-disable-line {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "eslint",
+    "code": "// eslint-disable {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "eslint",
+    "code": "/* eslint-disable {{plugin}}/no-explicit-unknown */\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "eslint",
+    "code": "// eslint-disable-next-line no-explicit-any\nexport const value = 1;\n",
+    "needsReason": false,
+    "forbidden": true
+  },
+  {
+    "dialect": "eslint",
+    "code": "/* eslint-disable no-explicit-any */\nexport const value = 1;\n",
+    "needsReason": false,
+    "forbidden": true
+  },
+  {
+    "dialect": "oxlint",
+    "code": "// oxlint-disable-next-line {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "oxlint",
+    "code": "// oxlint-disable-next-line {{plugin}}/no-explicit-unknown -- checked\nexport const value: unknown = 1;\n",
+    "needsReason": false,
+    "forbidden": false
+  },
+  {
+    "dialect": "oxlint",
+    "code": "// oxlint-disable-line {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "oxlint",
+    "code": "// oxlint-disable {{plugin}}/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "oxlint",
+    "code": "/* oxlint-disable {{plugin}}/no-explicit-unknown */\nexport const value: unknown = 1;\n",
+    "needsReason": true,
+    "forbidden": false
+  },
+  {
+    "dialect": "oxlint",
+    "code": "// oxlint-disable-next-line no-explicit-any\nexport const value = 1;\n",
+    "needsReason": false,
+    "forbidden": true
+  },
+  {
+    "dialect": "oxlint",
+    "code": "/* oxlint-disable no-explicit-any */\nexport const value = 1;\n",
+    "needsReason": false,
+    "forbidden": true
+  }
+]

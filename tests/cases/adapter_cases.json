@@ -396,10 +396,10 @@
   {
     "rule": "ignore-needs-reason",
     "valid": [
-      "// deno-lint-ignore unslop/no-explicit-unknown -- explained\nexport const value: unknown = 1;\n"
+      "// eslint-disable-next-line unslop/no-explicit-unknown -- checked\nexport const value: unknown = 1;\n"
     ],
     "invalid": [
-      "// deno-lint-ignore unslop/no-explicit-unknown\nexport const value: unknown = 1;\n"
+      "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n"
     ]
   },
   {
@@ -408,7 +408,16 @@
       "export const value = 1;\n"
     ],
     "invalid": [
-      "// deno-lint-ignore no-explicit-any\nexport const value = 1;\n"
+      {
+        "code": "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n",
+        "options": [
+          {
+            "forbiddenRules": [
+              "unslop/no-explicit-unknown"
+            ]
+          }
+        ]
+      }
     ]
   },
   {

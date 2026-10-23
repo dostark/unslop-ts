@@ -35,7 +35,7 @@ export const ENGINE_DOCS_URL = "https://github.com/dostark/unslop-ts/blob/main/d
 /** Separates the message from the hint under a host with no hint field. */
 export const HINT_SEPARATOR = " Hint: ";
 /** The suppression dialects the adapter understands. */
-export const DEFAULT_DIALECTS = ["deno", "eslint"] as const;
+export const DEFAULT_DIALECTS = ["eslint", "oxlint"] as const;
 
 /** A named adapter failure. */
 export class EslintAdapterError extends Error {
@@ -207,6 +207,7 @@ function ruleOf(
         isTestFile: pathClass === PATH_CLASS.test,
         codeStyle: codeStyleOf(settings, key, rule.meta.docs),
         pluginName: options.name,
+        dialects: DEFAULT_DIALECTS,
       });
     },
   };

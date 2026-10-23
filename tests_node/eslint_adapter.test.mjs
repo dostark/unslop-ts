@@ -43,7 +43,7 @@ function caseObjects(entries) {
 
 // RuleTester registers suites, so the table runs at module scope for Node.js and Bun.
 for (const [, RuleTester] of RULE_TESTERS) {
-  const tester = new RuleTester({ languageOptions: LANGUAGE, settings: SETTINGS });
+  const tester = new RuleTester({ languageOptions: LANGUAGE, settings: SETTINGS, plugins: { unslop: PLUGIN } });
   for (const entry of table) {
     const rule = PLUGIN.rules[entry.rule];
     assert.ok(rule, entry.rule);
@@ -91,11 +91,17 @@ test("every range-only reporter yields a located message and no crash", () => {
     ["ephemeral-comment", "export const value = 1;\n// 2024-01-02\n"],
     ["decorative-comment", "export const value = 1;\n// ==========================\n"],
     ["ts-suppression-pragmas", "// @ts-ignore: legacy code\nexport const value = 1;\n"],
-    ["ignore-needs-reason", "// deno-lint-ignore unslop/no-explicit-unknown\nexport const value: unknown = 1;\n"],
-    ["no-forbidden-lint-ignore", "// deno-lint-ignore no-explicit-any\nexport const value = 1;\n"],
+    [
+      "ignore-needs-reason",
+      "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    ],
+    ["no-forbidden-lint-ignore", "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value = 1;\n", {
+      forbiddenRules: ["unslop/no-explicit-unknown"],
+    }],
   ];
-  for (const [rule, code] of samples) {
-    const messages = verify(code, { [`unslop/${rule}`]: "error" });
+  for (const [rule, code, options] of samples) {
+    const rules = { [`unslop/${rule}`]: options ? ["error", options] : "error" };
+    const messages = verify(code, rules).filter((message) => message.ruleId === `unslop/${rule}`);
     assert.equal(messages.length, 1, rule);
     assert.ok(messages[0].line >= 1 && messages[0].column >= 1, `${rule} has no location`);
     assert.ok(messages[0].message.length > 0, rule);
