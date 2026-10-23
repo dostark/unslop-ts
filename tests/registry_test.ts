@@ -9,6 +9,7 @@
 import { assertEquals, assertInstanceOf, assertStringIncludes, assertThrows } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { z } from "zod";
+import { runDeno } from "./helpers/demo_project.ts";
 import {
   createRuleRegistry,
   DENO_RULE_PACK,
@@ -113,11 +114,6 @@ Deno.test("the Deno rule pack holds the Deno rules, each with an option schema, 
 });
 
 Deno.test("existing_engine_regression", async () => {
-  const output = await new Deno.Command(Deno.execPath(), {
-    args: ["check", META_FIXTURE],
-    cwd: PACKAGE_ROOT,
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  assertEquals(output.success, true, new TextDecoder().decode(output.stderr));
+  const output = await runDeno(["check", META_FIXTURE], PACKAGE_ROOT);
+  assertEquals(output.code, 0, output.stderr);
 });

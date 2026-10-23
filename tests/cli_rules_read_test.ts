@@ -10,6 +10,7 @@
 import { assert, assertArrayIncludes, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { configPath, runCli, withCliProject } from "./helpers/cli_project.ts";
+import { runDeno } from "./helpers/demo_project.ts";
 
 interface IRuleView {
   readonly id: string;
@@ -203,12 +204,7 @@ Deno.test("generic_not_run_commands_are_runnable", async () => {
     assert(command.length > 0);
     await Deno.mkdir(join(dir, "src"), { recursive: true });
     await Deno.writeTextFile(join(dir, "src", "constants.ts"), 'export const HOSTS = ["a.test"];\n');
-    const result = await new Deno.Command(Deno.execPath(), {
-      args: command.slice(1),
-      cwd: dir,
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
+    const result = await runDeno(command.slice(1), dir);
+    assertEquals(result.code, 0, result.stderr);
   });
 });

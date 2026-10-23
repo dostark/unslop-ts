@@ -9,6 +9,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
+import { canCreateSymlinks } from "./helpers/permissions.ts";
 import { replaceFile, WriteRefusalError } from "../src/cli/safe_write.ts";
 import { CLI_PATH, withCliProject } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
@@ -44,52 +45,58 @@ const VIOLATION = [
   "",
 ].join("\n");
 
-Deno.test("a_failed_compilation_leaves_the_file_unchanged", async () => {
-  await withCliProject(async (dir) => {
-    const before = await Deno.readTextFile(configFile(dir));
-    const invalid = await runWriteCli(dir, ["rules", "set", "demo/max-params", 'max="wrong"']);
-    assertEquals(invalid.code, 1);
-    assertEquals(await Deno.readTextFile(configFile(dir)), before);
+const CAN_CREATE_SYMLINKS = await canCreateSymlinks();
 
-    const warn = await runWriteCli(dir, ["rules", "enable", "demo/import-boundaries", "--level=warn"]);
-    assertEquals(warn.code, 2);
-    assertEquals(await Deno.readTextFile(configFile(dir)), before);
+Deno.test({
+  name: "a_failed_compilation_leaves_the_file_unchanged",
+  ignore: !CAN_CREATE_SYMLINKS,
+  fn: async () => {
+    await withCliProject(async (dir) => {
+      const before = await Deno.readTextFile(configFile(dir));
+      const invalid = await runWriteCli(dir, ["rules", "set", "demo/max-params", 'max="wrong"']);
+      assertEquals(invalid.code, 1);
+      assertEquals(await Deno.readTextFile(configFile(dir)), before);
 
-    const fixed = await runWriteCli(dir, ["rules", "enable", "optional-params"]);
-    assertEquals(fixed.code, 2);
-    assertEquals(await Deno.readTextFile(configFile(dir)), before);
+      const warn = await runWriteCli(dir, ["rules", "enable", "demo/import-boundaries", "--level=warn"]);
+      assertEquals(warn.code, 2);
+      assertEquals(await Deno.readTextFile(configFile(dir)), before);
 
-    const lock = join(dir, "examples", ".unslop.config.json.unslop.lock");
-    await Deno.writeTextFile(lock, "");
-    const locked = await runWriteCli(dir, ["rules", "set", "demo/max-params", "max=9"]);
-    assertEquals(locked.code, 2);
-    assertStringIncludes(locked.stderr, "holds");
-    assertEquals(await Deno.readTextFile(configFile(dir)), before);
-    await Deno.remove(lock);
+      const fixed = await runWriteCli(dir, ["rules", "enable", "optional-params"]);
+      assertEquals(fixed.code, 2);
+      assertEquals(await Deno.readTextFile(configFile(dir)), before);
 
-    const copy = join(dir, "examples", "copy.json");
-    await Deno.copyFile(configFile(dir), copy);
-    await Deno.remove(configFile(dir));
-    await Deno.symlink(copy, configFile(dir));
-    const linked = await runWriteCli(dir, ["rules", "set", "demo/max-params", "max=9"]);
-    assertEquals(linked.code, 2);
-    assertStringIncludes(linked.stderr, "symlink");
-    assertEquals(await Deno.readTextFile(copy), before);
-  });
+      const lock = join(dir, "examples", ".unslop.config.json.unslop.lock");
+      await Deno.writeTextFile(lock, "");
+      const locked = await runWriteCli(dir, ["rules", "set", "demo/max-params", "max=9"]);
+      assertEquals(locked.code, 2);
+      assertStringIncludes(locked.stderr, "holds");
+      assertEquals(await Deno.readTextFile(configFile(dir)), before);
+      await Deno.remove(lock);
 
-  const dir = await Deno.makeTempDir({ prefix: "unslop_stale_" });
-  try {
-    const path = join(dir, "config.json");
-    await Deno.writeTextFile(path, "original\n");
-    const error = await runStaleEdit(path);
-    assertEquals(error instanceof WriteRefusalError, true);
-    assertEquals(await Deno.readTextFile(path), "external\n");
-    const names: string[] = [];
-    for await (const entry of Deno.readDir(dir)) names.push(entry.name);
-    assertEquals(names, ["config.json"]);
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
+      const copy = join(dir, "examples", "copy.json");
+      await Deno.copyFile(configFile(dir), copy);
+      await Deno.remove(configFile(dir));
+      await Deno.symlink(copy, configFile(dir));
+      const linked = await runWriteCli(dir, ["rules", "set", "demo/max-params", "max=9"]);
+      assertEquals(linked.code, 2);
+      assertStringIncludes(linked.stderr, "symlink");
+      assertEquals(await Deno.readTextFile(copy), before);
+    });
+
+    const dir = await Deno.makeTempDir({ prefix: "unslop_stale_" });
+    try {
+      const path = join(dir, "config.json");
+      await Deno.writeTextFile(path, "original\n");
+      const error = await runStaleEdit(path);
+      assertEquals(error instanceof WriteRefusalError, true);
+      assertEquals(await Deno.readTextFile(path), "external\n");
+      const names: string[] = [];
+      for await (const entry of Deno.readDir(dir)) names.push(entry.name);
+      assertEquals(names, ["config.json"]);
+    } finally {
+      await Deno.remove(dir, { recursive: true });
+    }
+  },
 });
 
 async function runStaleEdit(path: string): Promise<unknown> {

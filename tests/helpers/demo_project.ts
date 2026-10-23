@@ -94,12 +94,43 @@ async function configSource(options: IDemoProjectOptions): Promise<string> {
   });
 }
 
-/** Runs the Deno binary. `env` adds to the inherited environment, and the selection variable is cleared first. */
+const CHILD_ENV_NAMES: readonly string[] = [
+  "PATH",
+  "HOME",
+  "DENO_DIR",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "USER",
+  "LANG",
+  "LC_ALL",
+  "NO_COLOR",
+  "FORCE_COLOR",
+  "TERM",
+  "CI",
+];
+
+/** Keeps the child environment minimal so loader variables never reach a scoped spawn. */
+function childEnvironment(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const name of CHILD_ENV_NAMES) {
+    try {
+      const value = Deno.env.get(name);
+      if (value !== undefined) env[name] = value;
+    } catch {
+      // The compatibility check grants only a safe subset of environment variables.
+    }
+  }
+  return env;
+}
+
+/** Runs the Deno binary with a minimal environment; `env` adds test-specific values. */
 export async function runDeno(args: readonly string[], cwd: string, env: Record<string, string> = {}): Promise<IDeno> {
   const output = await new Deno.Command(Deno.execPath(), {
     args: [...args],
     cwd,
-    env: { [`${DEMO_PLUGIN_NAME.toUpperCase()}_LINT_RULES`]: "", ...env },
+    clearEnv: true,
+    env: { ...childEnvironment(), [`${DEMO_PLUGIN_NAME.toUpperCase()}_LINT_RULES`]: "", ...env },
     stdout: "piped",
     stderr: "piped",
   }).output();

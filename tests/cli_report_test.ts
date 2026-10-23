@@ -9,6 +9,7 @@
 
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
+import { canCreateSymlinks } from "./helpers/permissions.ts";
 import {
   collectRunReport,
   compileConfig,
@@ -23,6 +24,7 @@ import { testDescriptor } from "./helpers/descriptor.ts";
 import { captureSources, SnapshotError } from "../src/report/snapshot.ts";
 import type { ISourceSnapshot } from "../src/report/context.ts";
 
+const CAN_CREATE_SYMLINKS = await canCreateSymlinks();
 const UNKNOWN_SOURCE = "export let value: unknown = 1;\n";
 const CLEAN_SOURCE = "export const value = 1;\n";
 
@@ -245,34 +247,38 @@ Deno.test("report_binds_explicit_plugin_config_and_root", async () => {
   });
 });
 
-Deno.test("report_operand_and_output_boundaries", async () => {
-  await withCliProject(async (dir) => {
-    await writeFiles(dir, { "-weird.ts": UNKNOWN_SOURCE, "src/clean.ts": CLEAN_SOURCE });
-    const weird = await runReportCli(dir, ["--format=json", "--", "-weird.ts"]);
-    assertEquals(weird.code, 1, weird.stderr);
-    assert(reportOf(weird.stdout).findings.some((finding) => finding.file === "-weird.ts"));
+Deno.test({
+  name: "report_operand_and_output_boundaries",
+  ignore: !CAN_CREATE_SYMLINKS,
+  fn: async () => {
+    await withCliProject(async (dir) => {
+      await writeFiles(dir, { "-weird.ts": UNKNOWN_SOURCE, "src/clean.ts": CLEAN_SOURCE });
+      const weird = await runReportCli(dir, ["--format=json", "--", "-weird.ts"]);
+      assertEquals(weird.code, 1, weird.stderr);
+      assert(reportOf(weird.stdout).findings.some((finding) => finding.file === "-weird.ts"));
 
-    const unknown = await runReportCli(dir, ["--nope"]);
-    assertEquals(unknown.code, 2);
-    const data = await runReportCli(dir, ["--", "data:text/typescript,export const x = 1;"]);
-    assertEquals(data.code, 2);
+      const unknown = await runReportCli(dir, ["--nope"]);
+      assertEquals(unknown.code, 2);
+      const data = await runReportCli(dir, ["--", "data:text/typescript,export const x = 1;"]);
+      assertEquals(data.code, 2);
 
-    const outside = await Deno.makeTempFile({ prefix: "outside_" });
-    try {
-      await Deno.writeTextFile(outside, UNKNOWN_SOURCE);
-      await Deno.symlink(outside, join(dir, "escape.ts"));
-      const escape = await runReportCli(dir, ["--", "escape.ts"]);
-      assertEquals(escape.code, 2, escape.stderr);
-    } finally {
-      await Deno.remove(outside);
-    }
+      const outside = await Deno.makeTempFile({ prefix: "outside_" });
+      try {
+        await Deno.writeTextFile(outside, UNKNOWN_SOURCE);
+        await Deno.symlink(outside, join(dir, "escape.ts"));
+        const escape = await runReportCli(dir, ["--", "escape.ts"]);
+        assertEquals(escape.code, 2, escape.stderr);
+      } finally {
+        await Deno.remove(outside);
+      }
 
-    const existing = join(dir, "report.json");
-    await Deno.writeTextFile(existing, "{}");
-    const out = await runReportWriteCli(dir, ["--format=json", "--out=report.json", "src/clean.ts"]);
-    assertEquals(out.code, 2, out.stderr);
-    assertEquals(await Deno.readTextFile(existing), "{}");
-  });
+      const existing = join(dir, "report.json");
+      await Deno.writeTextFile(existing, "{}");
+      const out = await runReportWriteCli(dir, ["--format=json", "--out=report.json", "src/clean.ts"]);
+      assertEquals(out.code, 2, out.stderr);
+      assertEquals(await Deno.readTextFile(existing), "{}");
+    });
+  },
 });
 
 Deno.test("report_preserves_operand_scope", async () => {
@@ -421,35 +427,39 @@ Deno.test("snapshot_scope_matches_the_host_operands", async () => {
   });
 });
 
-Deno.test("snapshot_walk_handles_internal_symlinks_and_rejects_escapes", async () => {
-  await withCliProject(async (dir) => {
-    await Deno.mkdir(join(dir, "tree"), { recursive: true });
-    await Deno.writeTextFile(join(dir, "tree/a.ts"), UNKNOWN_SOURCE);
-    await Deno.symlink("a.ts", join(dir, "tree/alias.ts"));
-    await Deno.symlink(".", join(dir, "tree/loop"));
-    const sources = await captureSources([join(dir, "tree")], dir);
-    const direct = sources.get("tree/a.ts");
-    const alias = sources.get("tree/alias.ts");
-    assert(direct);
-    assert(alias);
-    assertEquals(direct, alias);
-    await Deno.symlink("tree", join(dir, "alias-dir"));
-    const aliased = await captureSources([join(dir, "tree"), join(dir, "alias-dir")], dir);
-    assertEquals(aliased.get("alias-dir/a.ts"), aliased.get("tree/a.ts"));
+Deno.test({
+  name: "snapshot_walk_handles_internal_symlinks_and_rejects_escapes",
+  ignore: !CAN_CREATE_SYMLINKS,
+  fn: async () => {
+    await withCliProject(async (dir) => {
+      await Deno.mkdir(join(dir, "tree"), { recursive: true });
+      await Deno.writeTextFile(join(dir, "tree/a.ts"), UNKNOWN_SOURCE);
+      await Deno.symlink("a.ts", join(dir, "tree/alias.ts"));
+      await Deno.symlink(".", join(dir, "tree/loop"));
+      const sources = await captureSources([join(dir, "tree")], dir);
+      const direct = sources.get("tree/a.ts");
+      const alias = sources.get("tree/alias.ts");
+      assert(direct);
+      assert(alias);
+      assertEquals(direct, alias);
+      await Deno.symlink("tree", join(dir, "alias-dir"));
+      const aliased = await captureSources([join(dir, "tree"), join(dir, "alias-dir")], dir);
+      assertEquals(aliased.get("alias-dir/a.ts"), aliased.get("tree/a.ts"));
 
-    const outside = await Deno.makeTempFile({ prefix: "snapshot_outside_" });
-    try {
-      await Deno.writeTextFile(outside, UNKNOWN_SOURCE);
-      await Deno.symlink(outside, join(dir, "tree/escape.ts"));
-      await assertRejects(
-        () => captureSources([join(dir, "tree")], dir),
-        SnapshotError,
-        "escapes",
-      );
-    } finally {
-      await Deno.remove(outside);
-    }
-  });
+      const outside = await Deno.makeTempFile({ prefix: "snapshot_outside_" });
+      try {
+        await Deno.writeTextFile(outside, UNKNOWN_SOURCE);
+        await Deno.symlink(outside, join(dir, "tree/escape.ts"));
+        await assertRejects(
+          () => captureSources([join(dir, "tree")], dir),
+          SnapshotError,
+          "escapes",
+        );
+      } finally {
+        await Deno.remove(outside);
+      }
+    });
+  },
 });
 
 Deno.test("snapshot_fingerprints_use_captured_lines_without_serializing_source", async () => {

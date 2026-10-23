@@ -9,6 +9,7 @@
 
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
+import { canCreateSymlinks } from "./helpers/permissions.ts";
 import { PartialWriteError, writeMigrationPair } from "../src/cli/safe_write.ts";
 import { CLI_PATH } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
@@ -167,35 +168,47 @@ Deno.test("v1_only_project_migrates_without_v2_import", async () => {
   });
 });
 
-Deno.test("migration_refuses_existing_aliased_or_symlink_outputs", async () => {
-  await withV1Project(async (paths) => {
-    const layoutArgs = "--layout-out=layout.json";
-    const cases: readonly (readonly string[])[] = [
-      ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=catalog.json", layoutArgs],
-      [
-        "migrate",
-        "--descriptor=examples/unslop.project.ts",
-        "--from=catalog.json",
-        "--out=same.json",
-        "--layout-out=same.json",
-      ],
-      ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=unslop.config.json"],
-      ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=existing.json", layoutArgs],
-      ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=link.json", layoutArgs],
-      ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=locked.json", layoutArgs],
-    ];
-    await Deno.writeTextFile(join(paths.dir, "existing.json"), "{}\n");
-    await Deno.writeTextFile(join(paths.dir, "target.json"), "{}\n");
-    await Deno.symlink(join(paths.dir, "target.json"), join(paths.dir, "link.json"));
-    await Deno.writeTextFile(join(paths.dir, ".locked.json.unslop.lock"), "");
+const CAN_CREATE_SYMLINKS = await canCreateSymlinks();
 
-    for (const args of cases) {
-      const result = await runMigrateCli(paths.dir, args);
-      assertEquals(result.code, 2, `${args.join(" ")}: ${result.stderr}`);
-    }
-    assertEquals(await exists(paths.config), false);
-    assertEquals(await exists(paths.layout), false);
-  });
+Deno.test({
+  name: "migration_refuses_existing_aliased_or_symlink_outputs",
+  ignore: !CAN_CREATE_SYMLINKS,
+  fn: async () => {
+    await withV1Project(async (paths) => {
+      const layoutArgs = "--layout-out=layout.json";
+      const cases: readonly (readonly string[])[] = [
+        ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=catalog.json", layoutArgs],
+        [
+          "migrate",
+          "--descriptor=examples/unslop.project.ts",
+          "--from=catalog.json",
+          "--out=same.json",
+          "--layout-out=same.json",
+        ],
+        ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=unslop.config.json"],
+        [
+          "migrate",
+          "--descriptor=examples/unslop.project.ts",
+          "--from=catalog.json",
+          "--out=existing.json",
+          layoutArgs,
+        ],
+        ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=link.json", layoutArgs],
+        ["migrate", "--descriptor=examples/unslop.project.ts", "--from=catalog.json", "--out=locked.json", layoutArgs],
+      ];
+      await Deno.writeTextFile(join(paths.dir, "existing.json"), "{}\n");
+      await Deno.writeTextFile(join(paths.dir, "target.json"), "{}\n");
+      await Deno.symlink(join(paths.dir, "target.json"), join(paths.dir, "link.json"));
+      await Deno.writeTextFile(join(paths.dir, ".locked.json.unslop.lock"), "");
+
+      for (const args of cases) {
+        const result = await runMigrateCli(paths.dir, args);
+        assertEquals(result.code, 2, `${args.join(" ")}: ${result.stderr}`);
+      }
+      assertEquals(await exists(paths.config), false);
+      assertEquals(await exists(paths.layout), false);
+    });
+  },
 });
 
 async function exists(path: string): Promise<boolean> {

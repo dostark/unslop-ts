@@ -202,7 +202,12 @@ async function defaultSpawn(args: readonly string[], cwd: string, env: Record<st
 }
 
 function childEnvironment(pluginName: string, selectionTokens: string | null, runId: string): Record<string, string> {
-  const env = { ...Deno.env.toObject() };
+  let env: Record<string, string> = {};
+  try {
+    env = { ...Deno.env.toObject() };
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotCapable)) throw error;
+  }
   for (const key of Object.keys(env)) {
     if (key.startsWith("LD_") || key.startsWith("DYLD_")) delete env[key];
   }
