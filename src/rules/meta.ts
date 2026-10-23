@@ -39,6 +39,9 @@ export interface IRuleMeta {
   readonly limits: string | null;
 }
 
+/** The published guide every host links to. */
+export const ENGINE_DOCS_URL = "https://github.com/dostark/unslop-ts/blob/main/docs/style_guide.md";
+
 /** The largest accepted description. A longer sentence belongs in the guide. */
 export const DESCRIPTION_MAX_LENGTH = 120;
 

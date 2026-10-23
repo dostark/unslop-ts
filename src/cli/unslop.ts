@@ -21,6 +21,8 @@
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "./error.ts";
 import { listPresets, showPreset } from "./presets.ts";
 import { printConfigText, schemaText, validationText } from "./config_read.ts";
+import { writeGeneratedFile } from "./safe_write.ts";
+import { renderEslintFragment, renderOxlintFragment, toHostConfig } from "../config/to_host_config.ts";
 import { parseFormat, parseReportFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
 import { runMigrate } from "./commands/migrate.ts";
@@ -49,6 +51,7 @@ const USAGE = [
   "  unslop config validate [--descriptor=<entry>]",
   "  unslop config print [--resolved] [--descriptor=<entry>]",
   "  unslop config schema",
+  "  unslop config export --host=eslint|oxlint --out=<path> [--overwrite] [--descriptor=<entry>]",
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
   "  unslop report [--format=table|json|markdown|sarif] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
@@ -305,6 +308,36 @@ async function configCommand(args: readonly string[]): Promise<number> {
       option(parsed, "plugin") ?? null,
     );
     print(printConfigText(await readAndCompile(descriptor), parsed.flags.has("resolved")));
+    return 0;
+  }
+  if (sub === "export") {
+    const parsed = parseArgs(rest, ["host", "out", "descriptor", "plugin"], ["overwrite"]);
+    requirePositionals(parsed, 0, "config export");
+    const host = option(parsed, "host");
+    if (host !== "eslint" && host !== "oxlint") {
+      throw new CliError(USAGE_EXIT, "config export needs --host=eslint|oxlint");
+    }
+    const out = option(parsed, "out");
+    if (out === undefined) throw new CliError(USAGE_EXIT, "config export needs --out=<path>");
+    const descriptor = await loadConfigDescriptor(
+      Deno.cwd(),
+      option(parsed, "descriptor") ?? null,
+      option(parsed, "plugin") ?? null,
+    );
+    const compiled = await readAndCompile(descriptor);
+    const fragment = toHostConfig(compiled, host);
+    const contents = host === "eslint"
+      ? renderEslintFragment(fragment, descriptor.pluginName)
+      : renderOxlintFragment(fragment);
+    let written: string;
+    try {
+      written = await writeGeneratedFile({ path: out, contents, overwrite: parsed.flags.has("overwrite") });
+    } catch (error) {
+      if (error instanceof WriteRefusalError) throw new CliError(USAGE_EXIT, error.message);
+      throw error;
+    }
+    print(`wrote ${written}\n`);
+    if (fragment.skipped.length > 0) print(`skipped: ${fragment.skipped.join(", ")}\n`);
     return 0;
   }
   throw new CliError(USAGE_EXIT, `unknown config command '${sub ?? ""}'\n${USAGE}`);

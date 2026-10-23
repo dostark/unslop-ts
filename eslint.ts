@@ -13,8 +13,10 @@ import { matchesAnyGlob } from "./src/engine/glob.ts";
 import { relative, resolve } from "./src/engine/posix_path.ts";
 import type { IRulePack } from "./src/engine/registry.ts";
 import { asNode } from "./src/engine/type_environment.ts";
-import type { RuleCategory } from "./src/rules/meta.ts";
+import { ENGINE_DOCS_URL, type RuleCategory } from "./src/rules/meta.ts";
 import type { IRuleContext, IRuleNode, IRuleReport, IRuleSourceCode } from "./src/rules/types.ts";
+
+export { ENGINE_DOCS_URL };
 
 /** The ESLint rule type of each category. */
 export const ESLINT_RULE_TYPE: Readonly<Record<RuleCategory, "problem" | "suggestion">> = {
@@ -30,8 +32,6 @@ export const ESLINT_RULE_TYPE: Readonly<Record<RuleCategory, "problem" | "sugges
   "optional-parameters": "suggestion",
   "comments": "suggestion",
 };
-/** The published guide every rule links to. */
-export const ENGINE_DOCS_URL = "https://github.com/dostark/unslop-ts/blob/main/docs/style_guide.md";
 /** Separates the message from the hint under a host with no hint field. */
 export const HINT_SEPARATOR = " Hint: ";
 /** The suppression dialects the adapter understands. */
@@ -94,10 +94,27 @@ export interface IEslintRule {
   create(context: IEslintContext): Record<string, (node: IRuleNode) => void>;
 }
 
+/** The `settings.unslop` defaults a preset carries. */
+const PRESET_SETTINGS: IUnslopSettings = {
+  testGlobs: ["**/*_test.ts", "**/tests/**"],
+  fixtureGlobs: ["**/tests/fixtures/**"],
+  ignoreGlobs: [],
+  docsBase: ENGINE_DOCS_URL,
+  docs: {},
+};
+
+/** One additive flat-config preset. */
+export interface IEslintConfig {
+  readonly plugins: { readonly unslop: IEslintPlugin };
+  readonly settings: { readonly unslop: IUnslopSettings };
+  readonly rules: Readonly<Record<string, "warn" | "error" | "off">>;
+}
+
 /** The ESLint plugin shape the adapter emits. */
 export interface IEslintPlugin {
   readonly meta: { readonly name: string };
   readonly rules: Readonly<Record<string, IEslintRule>>;
+  readonly configs: Readonly<Record<string, IEslintConfig>>;
 }
 
 /** The `settings.unslop` block the adapter reads. */
@@ -213,6 +230,53 @@ function ruleOf(
   };
 }
 
+/** The rule keys of a pack whose metadata preset is one of the memberships. */
+function membershipKeys(pack: IRulePack, memberships: readonly string[]): string[] {
+  return Object.entries(pack.rules)
+    .filter(([, rule]) => memberships.includes(rule.meta.preset))
+    .map(([key]) => key);
+}
+
+function presetRules(
+  pack: IRulePack,
+  memberships: readonly string[],
+  severity: "warn" | "error",
+): Record<string, "warn" | "error"> {
+  return Object.fromEntries(membershipKeys(pack, memberships).map((key) => [`unslop/${key}`, severity]));
+}
+
+function presetConfig(
+  plugin: IEslintPlugin,
+  rules: Readonly<Record<string, "warn" | "error" | "off">>,
+): IEslintConfig {
+  return { plugins: { unslop: plugin }, settings: { unslop: PRESET_SETTINGS }, rules };
+}
+
+function buildConfigs(
+  plugin: IEslintPlugin,
+  typescript: IRulePack,
+  deno: IRulePack | undefined,
+): Record<string, IEslintConfig> {
+  const strictAll = {
+    ...presetRules(typescript, ["recommended", "strict"], "warn"),
+    ...(deno === undefined ? {} : presetRules(deno, ["recommended", "strict"], "warn")),
+  };
+  const duplicates = Object.entries(typescript.rules)
+    .filter(([, rule]) =>
+      rule.overlaps.some((overlap) => overlap.ecosystem === "typescript-eslint" && overlap.kind === "duplicate")
+    )
+    .map(([key]) => key);
+  return {
+    "recommended": presetConfig(plugin, presetRules(typescript, ["recommended"], "warn")),
+    "strict": presetConfig(plugin, presetRules(typescript, ["recommended", "strict"], "warn")),
+    "deno": presetConfig(plugin, strictAll),
+    "strict-error": presetConfig(plugin, presetRules(typescript, ["recommended", "strict"], "error")),
+    "typescript-eslint-compat": presetConfig(plugin, {
+      ...Object.fromEntries(duplicates.map((key) => [`unslop/${key}`, "off" as const])),
+    }),
+  };
+}
+
 /** Builds an ESLint or Oxlint plugin from the registered rule packs. */
 export function createEslintPlugin(packs: readonly IRulePack[], options: IEslintPluginOptions): IEslintPlugin {
   const rules: Record<string, IEslintRule> = {};
@@ -222,5 +286,8 @@ export function createEslintPlugin(packs: readonly IRulePack[], options: IEslint
       if (rule !== null) rules[key] = rule;
     }
   }
-  return { meta: { name: options.name }, rules };
+  const typescript = packs.find((pack) => pack.name === "typescript") ?? packs[0];
+  const deno = packs.find((pack) => pack.name === "deno");
+  const plugin: IEslintPlugin = { meta: { name: options.name }, rules, configs: {} };
+  return { ...plugin, configs: buildConfigs(plugin, typescript, deno) };
 }

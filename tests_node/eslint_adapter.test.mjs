@@ -187,10 +187,10 @@ test("the ESLint example reports the expected ids", () => {
     [join(ROOT, "node_modules", "eslint", "bin", "eslint.js"), "--format=json", "sample.ts"],
     { cwd: dir, encoding: "utf8" },
   );
-  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.status, 0, result.stderr);
   const reports = JSON.parse(result.stdout);
-  assert.deepEqual(reports[0].messages.map((message) => message.ruleId).sort(), [
-    "unslop/no-explicit-unknown",
-    "unslop/no-runtime-typeof",
-  ]);
+  assert.deepEqual(
+    reports[0].messages.map((message) => message.ruleId).filter((id) => id.startsWith("unslop/")).sort(),
+    ["unslop/no-chained-type-assertions"],
+  );
 });

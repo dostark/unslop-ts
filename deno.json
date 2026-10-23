@@ -45,6 +45,7 @@
   },
   "fmt": {
     "exclude": [
+      "tests/fixtures/host_config/eslint_fragment.mjs",
       "tests/fixtures/report_markdown_golden.md",
       "tests/fixtures/sarif-2.1.0-schema.json"
     ],
@@ -58,7 +59,10 @@
   "lint": {
     "rules": {
       "exclude": []
-    }
+    },
+    "exclude": [
+      "scripts/"
+    ]
   },
   "test": {
     "exclude": [

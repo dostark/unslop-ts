@@ -26,6 +26,12 @@ export {
 export { createRuleRegistry, RuleRegistryError } from "./src/engine/registry.ts";
 export { compileConfig, NOT_ENABLED_REASON } from "./src/config/compile.ts";
 export { migrateCatalog, semanticCatalogProjection, semanticCompiledProjection } from "./src/config/migrate.ts";
+export {
+  HostConfigError,
+  renderEslintFragment,
+  renderOxlintFragment,
+  toHostConfig,
+} from "./src/config/to_host_config.ts";
 export { DEFAULT_HOST_MODE, hostBaseLevel, PLUGIN_RULE_CONTROLS } from "./src/config/descriptor.ts";
 export { configJsonSchema } from "./src/config/json_schema.ts";
 export { PRESET_IDS, PRESETS } from "./src/config/presets.ts";
@@ -51,6 +57,14 @@ export type { ICatalogProjection, IMigrationResult, IRuleProjection } from "./sr
 export type { IRegistryEntry } from "./src/config/registry.ts";
 export type { IEditContext } from "./src/config/edit.ts";
 export type { IConfigV2 } from "./src/config/schema.ts";
+export type {
+  HostId,
+  HostRuleSetting,
+  HostSeverity,
+  IHostConfigFragment,
+  IHostConfigGroup,
+  IHostConfigSettings,
+} from "./src/config/to_host_config.ts";
 export type { ICatalog, IResolvedRuleSettings, JsonValue, PathClass } from "./src/engine/catalog.ts";
 export type { ICatalogLoadOptions, ScriptRuleSchemas } from "./src/engine/catalog.ts";
 export type { RuleScope, RuleSeverity } from "./src/engine/catalog.ts";

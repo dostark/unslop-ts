@@ -1,3 +1,3 @@
+// deno-lint-ignore-file -- the sample demonstrates a violation
 /** @module Sample */
-export const value: unknown = 1;
-export const isText = typeof value === "string";
+export const value = input as unknown as string;

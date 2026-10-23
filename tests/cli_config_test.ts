@@ -8,7 +8,7 @@
  */
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { join, toFileUrl } from "@std/path";
+import { fromFileUrl, join, toFileUrl } from "@std/path";
 import { configPath, runCli, runCliAt, withCliProject } from "./helpers/cli_project.ts";
 
 interface IPrintedCatalog {
@@ -196,4 +196,48 @@ Deno.test("config_validate_refuses_a_malformed_descriptor", async () => {
     assertEquals(result.code, 2);
     assertStringIncludes(result.stderr, "must export 'descriptor'");
   });
+});
+
+const PACKAGE_ROOT = fromFileUrl(new URL("..", import.meta.url));
+
+async function runExport(args: readonly string[]): Promise<Deno.CommandOutput> {
+  return await new Deno.Command(Deno.execPath(), {
+    args: ["run", "--allow-read", "--allow-env", "--allow-write", "src/cli/unslop.ts", "config", "export", ...args],
+    cwd: PACKAGE_ROOT,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+}
+
+Deno.test("config_export_writes_the_golden_and_refuses_unsafe_writes", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "unslop_export_" });
+  try {
+    const out = join(dir, "eslint_fragment.mjs");
+    const result = await runExport(["--host=eslint", `--out=${out}`, "--descriptor=examples/unslop.project.ts"]);
+    assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
+    assertEquals(
+      await Deno.readTextFile(out),
+      await Deno.readTextFile(join(PACKAGE_ROOT, "tests/fixtures/host_config/eslint_fragment.mjs")),
+    );
+    assertStringIncludes(new TextDecoder().decode(result.stdout), "skipped: duplicate-type");
+
+    const existing = await runExport(["--host=eslint", `--out=${out}`, "--descriptor=examples/unslop.project.ts"]);
+    assertEquals(existing.code, 2);
+    assertStringIncludes(new TextDecoder().decode(existing.stderr), "the file exists");
+
+    const target = join(dir, "target.mjs");
+    await Deno.writeTextFile(target, "keep\n");
+    const link = join(dir, "link.mjs");
+    await Deno.symlink(target, link);
+    const symlinked = await runExport([
+      "--host=eslint",
+      `--out=${link}`,
+      "--descriptor=examples/unslop.project.ts",
+      "--overwrite",
+    ]);
+    assertEquals(symlinked.code, 2);
+    assertStringIncludes(new TextDecoder().decode(symlinked.stderr), "symlink");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });

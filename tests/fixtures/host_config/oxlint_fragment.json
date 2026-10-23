@@ -1,0 +1,167 @@
+{
+  "jsPlugins": [
+    "./unslop.plugin.mjs"
+  ],
+  "rules": {
+    "demo/no-chained-type-assertions": [
+      "error",
+      {
+        "allowPartialMockInTests": true,
+        "allowNeverAnyMockInTests": true
+      }
+    ],
+    "demo/no-explicit-unknown": "off",
+    "demo/no-unsafe-dictionary": "off",
+    "demo/no-typeof-escape": "off",
+    "demo/no-pass-through-type-alias": "error",
+    "demo/no-object-parameters": "off",
+    "demo/require-safety-comment": "off",
+    "demo/no-conditional-empty-object-spread": "off",
+    "demo/no-boolean-assert": "off",
+    "demo/no-repeated-assert-call": "off",
+    "demo/no-constant-substring-assert": "off",
+    "demo/max-cyclomatic-complexity": [
+      "error",
+      {
+        "max": 15
+      }
+    ],
+    "demo/max-class-size": "off",
+    "demo/require-optional-wrapper": "off",
+    "demo/import-inside-statement": [
+      "error",
+      {
+        "allowDynamicImports": []
+      }
+    ],
+    "demo/dynamic-import": "off",
+    "demo/inline-type-import": "error",
+    "demo/re-export-imported": "off",
+    "demo/import-placement": "off",
+    "demo/exported-interface-placement": "off",
+    "demo/promise-response-alias": "error",
+    "demo/promise-response-return": "off",
+    "demo/ts-suppression-pragmas": "error",
+    "demo/magic-union-type": "off",
+    "demo/long-comment": "off",
+    "demo/ephemeral-comment": "off",
+    "demo/decorative-comment": "error",
+    "demo/max-params": [
+      "error",
+      {
+        "max": 2
+      }
+    ],
+    "demo/test-inline-multiline-fixture": "off",
+    "demo/require-module-header": "off",
+    "demo/ephemeral-filename": [
+      "error",
+      {
+        "pattern": "(?:^|[_.-])phase[-_]?(\\d+)(?:[_.-]|$)",
+        "label": "phase"
+      }
+    ],
+    "demo/exported-interface-naming": [
+      "off",
+      {
+        "prefix": "I"
+      }
+    ],
+    "demo/no-interface-rename-on-import": [
+      "off",
+      {
+        "prefix": "I"
+      }
+    ],
+    "demo/import-boundaries": [
+      "off",
+      {
+        "zones": [
+          {
+            "id": "ui-data",
+            "files": [
+              "src/ui/**"
+            ],
+            "except": [],
+            "deny": [
+              {
+                "specifier": "^(\\.\\./)+data/",
+                "message": "UI files must not import from the data layer."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "unslop": {
+      "testGlobs": [
+        "**/tests/**",
+        "**/*_test.ts"
+      ],
+      "fixtureGlobs": [
+        "**/tests/fixtures/**"
+      ],
+      "ignoreGlobs": [],
+      "docsBase": "https://github.com/dostark/unslop-ts/blob/main/docs/style_guide.md",
+      "docs": {
+        "demo/no-chained-type-assertions": "docs/style_guide.md#strict-type-safety",
+        "demo/no-explicit-unknown": "docs/style_guide.md#strict-type-safety",
+        "demo/no-unsafe-dictionary": "docs/style_guide.md#strict-type-safety",
+        "demo/no-typeof-escape": "docs/style_guide.md#strict-type-safety",
+        "demo/no-pass-through-type-alias": "docs/style_guide.md#strict-type-safety",
+        "demo/no-object-parameters": "docs/style_guide.md#strict-type-safety",
+        "demo/require-safety-comment": "docs/style_guide.md#strict-type-safety",
+        "demo/no-runtime-typeof": "docs/style_guide.md#strict-type-safety",
+        "demo/no-conditional-empty-object-spread": "docs/style_guide.md#strict-type-safety",
+        "demo/no-boolean-assert": "docs/style_guide.md#test-assertions",
+        "demo/no-repeated-assert-call": "docs/style_guide.md#test-assertions",
+        "demo/no-constant-substring-assert": "docs/style_guide.md#test-assertions",
+        "demo/max-cyclomatic-complexity": "docs/style_guide.md#complexity-rules",
+        "demo/max-class-size": "docs/style_guide.md#complexity-rules",
+        "demo/require-optional-wrapper": "docs/style_guide.md#optional-parameters",
+        "demo/import-inside-statement": "docs/style_guide.md#imports-at-the-top",
+        "demo/dynamic-import": "docs/style_guide.md#dynamic-imports",
+        "demo/inline-type-import": "docs/style_guide.md#no-inline-type-imports",
+        "demo/re-export-imported": "docs/style_guide.md#no-re-exporting",
+        "demo/import-placement": "docs/style_guide.md#imports-at-the-top",
+        "demo/exported-interface-placement": "docs/style_guide.md#interface-conventions",
+        "demo/promise-response-alias": "docs/style_guide.md#strict-type-safety",
+        "demo/promise-response-return": "docs/style_guide.md#strict-type-safety",
+        "demo/ts-suppression-pragmas": "docs/style_guide.md#strict-type-safety",
+        "demo/magic-union-type": "docs/style_guide.md#no-magic-values",
+        "demo/long-comment": "docs/style_guide.md#comment-discipline",
+        "demo/ephemeral-comment": "docs/style_guide.md#comment-discipline",
+        "demo/decorative-comment": "docs/style_guide.md#comment-discipline",
+        "demo/max-params": "docs/style_guide.md#complexity-rules",
+        "demo/test-inline-multiline-fixture": "docs/style_guide.md#test-fixtures",
+        "demo/require-module-header": "docs/style_guide.md#module-order",
+        "demo/ephemeral-filename": "docs/style_guide.md#comment-discipline",
+        "demo/exported-interface-naming": "docs/style_guide.md#interface-conventions",
+        "demo/no-interface-rename-on-import": "docs/style_guide.md#interface-conventions",
+        "demo/import-boundaries": "docs/style_guide.md#import-boundaries"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*"
+      ],
+      "excludedFiles": [
+        "**/tests/**",
+        "**/*_test.ts",
+        "**/tests/fixtures/**"
+      ],
+      "rules": {
+        "demo/no-runtime-typeof": [
+          "error",
+          {
+            "allowInTypeGuards": true
+          }
+        ]
+      }
+    }
+  ]
+}

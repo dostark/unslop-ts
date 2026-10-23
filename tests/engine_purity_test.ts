@@ -23,6 +23,15 @@ const SCANNED = ["src", "tests", "docs", "examples"];
 const SCANNED_FILES = ["mod.ts", "README.md", "deno.json"];
 const SCANNED_EXTENSIONS = [".ts", ".md", ".json"];
 const ALLOWED_PACKAGES = ["@std/", "zod", "typescript", "@dostark/unslop-ts"];
+/** Host tools that a host-specific example may import. */
+const EXAMPLE_HOST_PACKAGES = [
+  "eslint",
+  "typescript-eslint",
+  "oxlint",
+  "@typescript-eslint/",
+  "@eslint/",
+  "@eslint-community/",
+];
 /** Exact-pinned schema validators that only the test suite needs. */
 const TEST_ONLY_PACKAGES = ["ajv", "ajv-draft-04", "ajv-formats"];
 // The words are joined here so that this file does not contain them.
@@ -36,6 +45,9 @@ const IMPORT_PATTERN = /^(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^imp
 
 function isAllowedImport(specifier: string, path: string): boolean {
   if (specifier.startsWith(".") || specifier.startsWith("node:")) return true;
+  if (path.startsWith("examples/") && EXAMPLE_HOST_PACKAGES.some((allowed) => specifier.startsWith(allowed))) {
+    return true;
+  }
   const testOnly = TEST_ONLY_PACKAGES.some((allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`));
   if (testOnly) return path.startsWith("tests/");
   return ALLOWED_PACKAGES.some((allowed) => specifier === allowed || specifier.startsWith(allowed));

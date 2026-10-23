@@ -267,3 +267,45 @@ export async function replaceFile(input: IReplaceFileInput): Promise<string> {
     await removeQuietly(lock);
   }
 }
+
+/** A generated file to create, or to replace when the caller allows an overwrite. */
+export interface IGeneratedFileInput {
+  readonly path: string;
+  readonly contents: string;
+  readonly overwrite: boolean;
+}
+
+/**
+ * Writes a generated file without following a symbolic link. A new file is created
+ * exclusively; an overwrite replaces a regular file after comparing its current bytes.
+ */
+export async function writeGeneratedFile(input: IGeneratedFileInput): Promise<string> {
+  const target = await canonicalDestination(input.path);
+  const existing = await lstatOrNull(target);
+  if (!existing) return await writeNewFile(target, input.contents);
+  if (!input.overwrite) {
+    throw new WriteRefusalError(`${target}: the file exists; pass --overwrite to replace it.`);
+  }
+  if (existing.isSymlink) throw new WriteRefusalError(`${target}: the destination is a symlink.`);
+  if (!existing.isFile) throw new WriteRefusalError(`${target}: the destination is not a regular file.`);
+  const expected = await Deno.readTextFile(target);
+  return await replaceFile({ path: target, contents: input.contents, expected });
+}
+
+async function writeNewFile(target: string, contents: string): Promise<string> {
+  let file: Deno.FsFile;
+  try {
+    file = await Deno.open(target, { write: true, createNew: true });
+  } catch (error) {
+    if (error instanceof Deno.errors.AlreadyExists) {
+      throw new WriteRefusalError(`${target}: the file exists; pass --overwrite to replace it.`);
+    }
+    throw error;
+  }
+  try {
+    await file.write(ENCODER.encode(contents));
+  } finally {
+    file.close();
+  }
+  return target;
+}
