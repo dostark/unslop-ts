@@ -67,13 +67,17 @@ const RequireOptionalWrapperOptions = z.object({
   wrapperType: z.string().default("Opt"),
 }).strict();
 
+const SuppressionDialects = z.array(z.enum(["deno", "eslint", "oxlint"]));
+
 const IgnoreNeedsReasonOptions = z.object({
   separator: z.string().default(DEFAULT_REASON_SEPARATOR),
+  dialects: SuppressionDialects.optional(),
 }).strict();
 
 const NoForbiddenLintIgnoreOptions = z.object({
   forbiddenRules: z.array(z.string()).default([...DEFAULT_FORBIDDEN_IGNORES]),
   includeFileIgnores: z.boolean().default(true),
+  dialects: SuppressionDialects.optional(),
 }).strict();
 
 const RequireDenoShebangOptions = z.object({

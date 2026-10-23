@@ -15,7 +15,7 @@ import { RuleTester as RuleTesterFloor } from "eslint-floor";
 import parser from "@typescript-eslint/parser";
 import { createEslintPlugin, HINT_SEPARATOR } from "../eslint.ts";
 import { DENO_RULE_PACK, TYPESCRIPT_RULE_PACK } from "../mod.ts";
-import table from "../tests/cases/adapter_cases.json" with { type: "json" };
+import table from "../tests/cases/conformance.json" with { type: "json" };
 
 const RULE_TESTERS = [
   ["10.13.0", RuleTester10],
@@ -49,7 +49,12 @@ for (const [, RuleTester] of RULE_TESTERS) {
     assert.ok(rule, entry.rule);
     tester.run(entry.rule, rule, {
       valid: caseObjects(entry.valid),
-      invalid: caseObjects(entry.invalid).map((value) => ({ errors: 1, ...value })),
+      invalid: entry.invalid.map((value) => ({
+        code: value.code,
+        filename: value.filename ?? DEFAULT_FILENAME,
+        ...(value.options === undefined ? {} : { options: value.options }),
+        errors: 1,
+      })),
     });
   }
 }

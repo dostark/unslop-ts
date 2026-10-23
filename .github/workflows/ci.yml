@@ -17,3 +17,28 @@ jobs:
       - run: deno task lint
       - run: deno task check
       - run: deno task test
+
+  hosts-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+        working-directory: hosts
+      - run: npm --prefix hosts run test:node
+      - name: Oxlint column (non-blocking)
+        continue-on-error: true
+        run: npm --prefix hosts run test:oxlint
+
+  hosts-bun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: hosts
+      - run: bun run --cwd hosts test:bun

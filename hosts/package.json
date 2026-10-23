@@ -8,7 +8,8 @@
     "pretest:bun": "node ./link_node_modules.mjs",
     "test:node": "cd .. && node --test \"tests_node/**/*.test.mjs\"",
     "test:bun": "cd .. && bun test tests_node/",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:oxlint": "cd .. && node --test tests_node/oxlint_example.mjs"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",

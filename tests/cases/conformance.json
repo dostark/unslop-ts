@@ -1,0 +1,600 @@
+[
+  {
+    "rule": "no-chained-type-assertions",
+    "valid": [
+      "export const value = input as string;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = input as unknown as string;\n",
+        "line": 1,
+        "column": 22,
+        "message": "Chained type assertions discard type evidence. Keep the precise type, or parse the value at its boundary before narrowing."
+      }
+    ]
+  },
+  {
+    "rule": "no-explicit-unknown",
+    "valid": [
+      "export const value: string = \"a\";\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value: unknown = 1;\n",
+        "line": 1,
+        "column": 21,
+        "message": "Explicit 'unknown' discards type evidence. Name the shape with an interface or type alias."
+      }
+    ]
+  },
+  {
+    "rule": "no-unsafe-dictionary",
+    "valid": [
+      "export const map: Record<string, string> = {};\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const map: Record<string, any> = {};\n",
+        "line": 1,
+        "column": 19,
+        "message": "A dictionary with a weak value type loses type evidence. Name a specific value interface instead."
+      }
+    ]
+  },
+  {
+    "rule": "no-typeof-escape",
+    "valid": [
+      "export const value = input as string;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = input as typeof globalThis.fetch;\n",
+        "line": 1,
+        "column": 22,
+        "message": "An 'as typeof' escape discards type evidence. Keep the precise type or parse at the boundary."
+      }
+    ]
+  },
+  {
+    "rule": "no-pass-through-type-alias",
+    "valid": [
+      "export type Value = { a: string };\n"
+    ],
+    "invalid": [
+      {
+        "code": "type B = string;\ntype A = B;\n",
+        "line": 2,
+        "column": 1,
+        "message": "A pass-through type alias adds indirection without evidence. Use the target type directly."
+      }
+    ]
+  },
+  {
+    "rule": "no-object-parameters",
+    "valid": [
+      "export function run(input: { a: string }) { return input; }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run(input: object) { return input; }\n",
+        "line": 1,
+        "column": 8,
+        "message": "An 'object' parameter names no shape. Declare the expected members instead."
+      }
+    ]
+  },
+  {
+    "rule": "require-safety-comment",
+    "valid": [
+      "// SAFETY: checked upstream\nexport const value = input as string;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = input as string;\n",
+        "line": 1,
+        "column": 22,
+        "message": "A type assertion needs a marker comment that states its invariant."
+      }
+    ]
+  },
+  {
+    "rule": "require-optional-wrapper",
+    "valid": [
+      "export function run(input: Opt<string, \"Reason\">) { return input; }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run(input?: string) { return input; }\n",
+        "line": 1,
+        "column": 21,
+        "message": "An optional parameter must use the Opt wrapper instead of a bare '?' or '| undefined'."
+      }
+    ]
+  },
+  {
+    "rule": "no-runtime-typeof",
+    "valid": [
+      "export const isMissing = typeof value === \"undefined\";\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const isText = typeof value === \"string\";\n",
+        "line": 1,
+        "column": 23,
+        "message": "A runtime `typeof` comparison narrows a value by shape. Parse or narrow it with a type guard instead."
+      }
+    ]
+  },
+  {
+    "rule": "no-conditional-empty-object-spread",
+    "valid": [
+      "export const merged = { ...(flag ? { a: 1 } : { b: 2 }) };\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const merged = { ...(flag ? {} : { a: 1 }) };\n",
+        "line": 1,
+        "column": 25,
+        "message": "A conditional spread with an empty object branch hides a missing field. Build the object explicitly."
+      }
+    ]
+  },
+  {
+    "rule": "no-boolean-assert",
+    "valid": [
+      "assertStringIncludes(value, \"x\");\n"
+    ],
+    "invalid": [
+      {
+        "code": "assert(value.includes(\"x\"), true);\n",
+        "line": 1,
+        "column": 1,
+        "message": "A boolean-wrapped `.includes()` assertion hides the failing value."
+      }
+    ]
+  },
+  {
+    "rule": "no-repeated-assert-call",
+    "valid": [
+      "function run() {\n  assertEquals(getValue(), 1);\n  assertEquals(otherValue(), 1);\n}\n"
+    ],
+    "invalid": [
+      {
+        "code": "function run() {\n  assertEquals(getValue(), 1);\n  assertEquals(getValue(), 2);\n}\n",
+        "line": 3,
+        "column": 3,
+        "message": "Two adjacent assertions repeat the same call as their first argument."
+      }
+    ]
+  },
+  {
+    "rule": "no-constant-substring-assert",
+    "valid": [
+      "import { MESSAGE } from \"./constants.ts\";\nassertStringIncludes(text, \"message\");\n"
+    ],
+    "invalid": [
+      {
+        "code": "import { MESSAGE } from \"./constants.ts\";\nassertStringIncludes(MESSAGE, \"message\");\n",
+        "line": 2,
+        "column": 1,
+        "message": "This substring assertion restates an imported constant as a literal."
+      }
+    ]
+  },
+  {
+    "rule": "max-cyclomatic-complexity",
+    "valid": [
+      "export function run(a) { return a; }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run(a) { if (a) { return 1; } return 0; }\n",
+        "options": [
+          {
+            "max": 1
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has cyclomatic complexity 2 (limit 1)."
+      }
+    ]
+  },
+  {
+    "rule": "max-class-size",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export class A { m() { return 1; } n() { return 2; } }\n",
+        "options": [
+          {
+            "minClassLines": 1,
+            "threshold": 1
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Class A score 3 (limit 1; 2 methods, 1 lines)."
+      }
+    ]
+  },
+  {
+    "rule": "max-params",
+    "valid": [
+      "export function run(a, b) { return a + b; }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run(a, b, c, d, e, f, g, h) { return a; }\n",
+        "line": 1,
+        "column": 8,
+        "message": "Methods and functions must not exceed 7 parameters (found 8). Refactor to use a parameter object."
+      }
+    ]
+  },
+  {
+    "rule": "import-inside-statement",
+    "valid": [
+      "export const loaded = import(\"./b.ts\");\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function load() { return import(\"./b.ts\"); }\n",
+        "line": 1,
+        "column": 33,
+        "message": "Use of import() inside other statements (for example in an if, a function, or a loop) is prohibited. All imports must be at the top level."
+      }
+    ]
+  },
+  {
+    "rule": "dynamic-import",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const loaded = import(\"./b.ts\");\n",
+        "line": 1,
+        "column": 23,
+        "message": "Dynamic imports (import(...)) are prohibited without a documented reason."
+      }
+    ]
+  },
+  {
+    "rule": "inline-type-import",
+    "valid": [
+      "export type Value = string;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export type Value = import(\"./a.ts\").Value;\n",
+        "line": 1,
+        "column": 21,
+        "message": "Inline type imports (an import type with a member access inside a type annotation) are prohibited. Declare an explicit `import type` at the top of the file."
+      }
+    ]
+  },
+  {
+    "rule": "re-export-imported",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export { value } from \"./a.ts\";\n",
+        "line": 1,
+        "column": 1,
+        "message": "Re-exporting entities from other modules (for example 'export { ... } from ...' or 'export * from ...') is prohibited. Each module must only export entities it defines."
+      }
+    ]
+  },
+  {
+    "rule": "import-placement",
+    "valid": [
+      "import { a } from \"./a.ts\";\nexport const value = a;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\nimport { a } from \"./a.ts\";\n",
+        "line": 2,
+        "column": 1,
+        "message": "Imports must be at the top, preceding functional code (functional code started at line 1)."
+      }
+    ]
+  },
+  {
+    "rule": "exported-interface-placement",
+    "valid": [
+      "import { a } from \"./a.ts\";\nexport interface IValue { a: string }\nexport const value = a;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run() { return 1; }\nexport interface IValue { a: string }\n",
+        "line": 2,
+        "column": 1,
+        "message": "Exported interfaces must be at the top, preceding functional code (functional code started at line 1)."
+      }
+    ]
+  },
+  {
+    "rule": "exported-interface-naming",
+    "valid": [
+      "export interface IValue { a: string }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export interface Value { a: string }\n",
+        "line": 1,
+        "column": 8,
+        "message": "Exported interface 'Value' must start with a capital 'I' (e.g., IValue)."
+      }
+    ]
+  },
+  {
+    "rule": "no-interface-rename-on-import",
+    "valid": [
+      "import { IValue } from \"./a.ts\";\n"
+    ],
+    "invalid": [
+      {
+        "code": "import { IValue as Value } from \"./a.ts\";\n",
+        "line": 1,
+        "column": 10,
+        "message": "Renaming interface 'IValue' to 'Value' is prohibited. Use the original name."
+      }
+    ]
+  },
+  {
+    "rule": "promise-response-alias",
+    "valid": [
+      "export type Api = { ok: boolean };\n"
+    ],
+    "invalid": [
+      {
+        "code": "export type Api = Promise<Response>;\n",
+        "line": 1,
+        "column": 8,
+        "message": "A type alias that masks 'Promise<Response>' is not allowed; define a specific response type."
+      }
+    ]
+  },
+  {
+    "rule": "promise-response-return",
+    "valid": [
+      "export function load() { return fetch(\"/\"); }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function load(): Promise<Response> { return fetch(\"/\"); }\n",
+        "line": 1,
+        "column": 25,
+        "message": "'Promise<Response>' as a type annotation is too weak; define an interface for the response shape."
+      }
+    ]
+  },
+  {
+    "rule": "ts-suppression-pragmas",
+    "valid": [
+      "// @ts-ignore\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "// @ts-ignore: legacy code\nexport const value = 1;\n",
+        "line": 1,
+        "column": 1,
+        "message": "A TypeScript suppression pragma hides a type error even with a description; fix the error."
+      }
+    ]
+  },
+  {
+    "rule": "magic-union-type",
+    "valid": [
+      "export type State = \"on\" | \"off\";\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const state: \"on\" | \"off\" = \"on\";\n",
+        "line": 1,
+        "column": 21,
+        "message": "Avoid an inline union of string literals; name the union with a type alias or an enum."
+      }
+    ]
+  },
+  {
+    "rule": "long-comment",
+    "valid": [
+      "// Short note.\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\n// one\n// two\n// three\n// four\n",
+        "line": 2,
+        "column": 1,
+        "message": "Comment spans 4 lines, more than the 3-line limit for in-module comments. Shorten it to the one non-obvious fact a reader needs, or move a longer explanation into the module's own documentation."
+      }
+    ]
+  },
+  {
+    "rule": "ephemeral-comment",
+    "valid": [
+      "// Explains the value.\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "// 2024-01-02\nexport const value = 1;\n",
+        "line": 1,
+        "column": 1,
+        "message": "Comment contains a calendar date; time-specific context belongs in version control or project documentation, not code comments that should remain durable."
+      }
+    ]
+  },
+  {
+    "rule": "decorative-comment",
+    "valid": [
+      "export const value = 1;\n// A note.\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\n// ==========================\n",
+        "line": 2,
+        "column": 1,
+        "message": "Comment uses a decorative separator (====, ----, \u2500\u2500\u2500\u2500, or text wrapped in dashes). Drop it and write a plain comment \u2014 the decoration adds characters without adding meaning."
+      }
+    ]
+  },
+  {
+    "rule": "test-inline-multiline-fixture",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "const json = `{\n  \"a\": 1,\n  \"b\": 2,\n  \"c\": 3,\n  \"d\": 4,\n  \"e\": 5,\n  \"f\": 6\n}`;\n",
+        "filename": "src/a_test.ts",
+        "line": 1,
+        "column": 7,
+        "message": "Avoid inline multiline structured text fixtures in test files. Move YAML, markdown, JSON, or other multi-line test inputs into a fixture file and load them from the test file."
+      }
+    ]
+  },
+  {
+    "rule": "require-module-header",
+    "valid": [
+      "/**\n * @module Example\n */\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\n",
+        "line": 1,
+        "column": 1,
+        "message": "Modules should start with a descriptive header comment."
+      }
+    ]
+  },
+  {
+    "rule": "ephemeral-filename",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\n",
+        "filename": "src/phase_228_test.ts",
+        "line": 1,
+        "column": 1,
+        "message": "Test file name embeds a numbered plan-phase reference (\"phase228\") \u2014 this is ephemeral implementation history in the path, same as in a comment. Name the file after the behavior it verifies; the phase-plan doc is the durable record of which phase introduced it."
+      }
+    ]
+  },
+  {
+    "rule": "import-boundaries",
+    "valid": [
+      "import { a } from \"./allowed/a.ts\";\n"
+    ],
+    "invalid": [
+      {
+        "code": "import { a } from \"./forbidden/a.ts\";\n",
+        "options": [
+          {
+            "zones": [
+              {
+                "id": "z",
+                "files": [
+                  "**/*.ts"
+                ],
+                "deny": [
+                  {
+                    "specifier": "^\\./forbidden",
+                    "message": "no"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "line": 1,
+        "column": 1,
+        "message": "Boundary 'z': no"
+      }
+    ]
+  },
+  {
+    "rule": "ignore-needs-reason",
+    "valid": [
+      "// eslint-disable-next-line unslop/no-explicit-unknown -- checked\nexport const value: unknown = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n",
+        "line": 1,
+        "column": 1,
+        "message": "A 'eslint-disable-next-line' for a rule of the 'unslop' plugin needs a reason after '--'.",
+        "options": [
+          {
+            "dialects": [
+              "deno",
+              "eslint",
+              "oxlint"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "no-forbidden-lint-ignore",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n",
+        "options": [
+          {
+            "forbiddenRules": [
+              "unslop/no-explicit-unknown"
+            ],
+            "dialects": [
+              "deno",
+              "eslint",
+              "oxlint"
+            ]
+          }
+        ],
+        "line": 1,
+        "column": 1,
+        "message": "Using '// eslint-disable-next-line unslop/no-explicit-unknown' is not allowed; address the typing issue explicitly."
+      }
+    ]
+  },
+  {
+    "rule": "require-deno-shebang",
+    "valid": [
+      "#!/usr/bin/env -S deno run -A\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\n",
+        "line": 1,
+        "column": 1,
+        "message": "Maintenance scripts must start with '#!/usr/bin/env -S deno run -A'."
+      }
+    ]
+  },
+  {
+    "rule": "require-script-usage",
+    "valid": [
+      "#!/usr/bin/env -S deno run -A\n// Script entry.\n//\n// Usage:\n//   deno run -A script.ts\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "#!/usr/bin/env -S deno run -A\n// Script entry.\nexport const value = 1;\n",
+        "line": 1,
+        "column": 1,
+        "message": "Maintenance scripts must include a 'Usage:' section in the header."
+      }
+    ]
+  }
+]

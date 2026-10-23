@@ -5,7 +5,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +23,9 @@ function normalizeCode(code) {
 export function runOxlintHost(testCase) {
   const dir = mkdtempSync(join(tmpdir(), "unslop-oxlint-host-"));
   try {
-    const sample = join(dir, "sample.ts");
+    const relative = testCase.filename ?? "sample.ts";
+    const sample = join(dir, relative);
+    mkdirSync(dirname(sample), { recursive: true });
     const config = join(dir, "oxlintrc.json");
     writeFileSync(sample, testCase.code);
     writeFileSync(
@@ -31,8 +33,15 @@ export function runOxlintHost(testCase) {
       JSON.stringify({
         plugins: ["typescript"],
         jsPlugins: [PLUGIN],
+        settings: {
+          unslop: {
+            testGlobs: ["**/*_test.ts", "**/tests/**"],
+            fixtureGlobs: ["**/tests/fixtures/**"],
+            ignoreGlobs: ["**/vendor/**"],
+          },
+        },
         rules: {
-          [`unslop/${testCase.rule}`]: testCase.options === undefined ? "error" : ["error", testCase.options],
+          [`unslop/${testCase.rule}`]: testCase.options === undefined ? "error" : ["error", ...testCase.options],
         },
       }),
     );
