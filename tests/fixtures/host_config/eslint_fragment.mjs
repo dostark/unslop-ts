@@ -6,7 +6,7 @@ const unslop = createEslintPlugin([TYPESCRIPT_RULE_PACK, DENO_RULE_PACK], { name
 
 export default [
   {
-    plugins: { unslop },
+    plugins: { "demo": unslop },
     settings: {
       unslop: {
         "testGlobs": [
@@ -95,7 +95,7 @@ export default [
     },
   },
   {
-    plugins: { unslop },
+    plugins: { "demo": unslop },
     ignores: ["**/tests/**","**/*_test.ts","**/tests/fixtures/**"],
     settings: {
       unslop: {

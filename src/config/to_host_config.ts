@@ -31,7 +31,7 @@ export interface IHostConfigSettings {
 
 /** One rule group with the same path restrictions. */
 export interface IHostConfigGroup {
-  readonly files: readonly string[] | null;
+  readonly files: readonly (string | readonly string[])[] | null;
   readonly excludedFiles: readonly string[] | null;
   readonly rules: Readonly<Record<string, HostRuleSetting>>;
 }
@@ -66,10 +66,25 @@ function settingOf(rule: IResolvedRule): HostRuleSetting {
   return [severity, options];
 }
 
-function filesOf(rule: IResolvedRule, config: ICompiledConfig): readonly string[] | null {
+function filesOf(
+  rule: IResolvedRule,
+  config: ICompiledConfig,
+  host: HostId,
+): readonly (string | readonly string[])[] | null {
   if (rule.scope === "test") {
     const globs = config.catalog.scopes.test;
-    return globs.length > 0 ? globs : null;
+    if (globs.length === 0) {
+      throw new HostConfigError(`${rule.id}: ${host} cannot express the test scope without test globs`);
+    }
+    const included = rule.include;
+    if (included === null) return globs;
+    if (included.length === 0) {
+      throw new HostConfigError(`${rule.id}: ${host} cannot express an empty include list`);
+    }
+    if (host === "oxlint") {
+      throw new HostConfigError(`${rule.id}: Oxlint cannot express both test scope and include globs`);
+    }
+    return globs.flatMap((testGlob) => included.map((includeGlob) => [testGlob, includeGlob]));
   }
   return rule.include;
 }
@@ -80,15 +95,19 @@ function excludedFilesOf(rule: IResolvedRule, config: ICompiledConfig): readonly
   return excluded.length > 0 ? excluded : null;
 }
 
-function groupKey(files: readonly string[] | null, excluded: readonly string[] | null): string {
-  return `${files === null ? "" : files.join(",")}|${excluded === null ? "" : excluded.join(",")}`;
+function groupKey(files: IHostConfigGroup["files"], excluded: readonly string[] | null): string {
+  return JSON.stringify([files, excluded]);
 }
 
 /** Maps a compiled configuration onto the host fragment. Throws when a scope is inexpressible. */
 export function toHostConfig(compiled: ICompiledConfig, host: HostId): IHostConfigFragment {
   const groups = new Map<
     string,
-    { files: readonly string[] | null; excludedFiles: readonly string[] | null; rules: Record<string, HostRuleSetting> }
+    {
+      files: IHostConfigGroup["files"];
+      excludedFiles: readonly string[] | null;
+      rules: Record<string, HostRuleSetting>;
+    }
   >();
   const docs: Record<string, string> = {};
   const skipped: string[] = [];
@@ -97,11 +116,8 @@ export function toHostConfig(compiled: ICompiledConfig, host: HostId): IHostConf
       skipped.push(rule.id);
       continue;
     }
-    const files = filesOf(rule, compiled);
+    const files = filesOf(rule, compiled, host);
     const excluded = excludedFilesOf(rule, compiled);
-    if (host === "oxlint" && rule.scope === "test" && files === null) {
-      throw new HostConfigError(`${rule.id}: Oxlint cannot express the test scope without test globs`);
-    }
     const key = groupKey(files, excluded);
     const group = groups.get(key) ?? { files, excludedFiles: excluded, rules: {} };
     group.rules[rule.id] = settingOf(rule);
@@ -136,7 +152,7 @@ export function renderEslintFragment(fragment: IHostConfigFragment, pluginName: 
     const files = group.files === null ? "" : `    files: ${JSON.stringify(group.files)},\n`;
     const excluded = group.excludedFiles === null ? "" : `    ignores: ${JSON.stringify(group.excludedFiles)},\n`;
     return `  {
-    plugins: { unslop },
+    plugins: { ${JSON.stringify(pluginName)}: unslop },
 ${files}${excluded}    settings: {
       unslop: ${settings},
     },
@@ -164,7 +180,7 @@ export function renderOxlintFragment(fragment: IHostConfigFragment): string {
   const rules: Record<string, HostRuleSetting> = {};
   const overrides: {
     files: readonly string[];
-    excludedFiles?: readonly string[];
+    excludeFiles?: readonly string[];
     rules: Record<string, HostRuleSetting>;
   }[] = [];
   for (const group of fragment.groups) {
@@ -172,9 +188,13 @@ export function renderOxlintFragment(fragment: IHostConfigFragment): string {
       Object.assign(rules, group.rules);
       continue;
     }
+    const files = group.files ?? ALL_FILES;
+    if (!files.every((pattern): pattern is string => typeof pattern === "string")) {
+      throw new HostConfigError("Oxlint cannot express intersected file patterns");
+    }
     overrides.push({
-      files: group.files ?? ALL_FILES,
-      ...(group.excludedFiles === null ? {} : { excludedFiles: group.excludedFiles }),
+      files,
+      ...(group.excludedFiles === null ? {} : { excludeFiles: group.excludedFiles }),
       rules: { ...group.rules },
     });
   }

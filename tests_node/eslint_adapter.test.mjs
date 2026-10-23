@@ -86,6 +86,19 @@ test("a plain JavaScript file yields no report and no error from any rule", () =
   assert.deepEqual(verify(source, ALL_RULES, { filename: "src/a.js", useParser: null }), []);
 });
 
+test("a violating JavaScript file stays silent while TypeScript still reports", () => {
+  const source = "export function run(a, b, c, d, e, f, g, h) { return a; }\n";
+  const rules = { "unslop/max-params": "error" };
+  assert.deepEqual(verify(source, rules, { filename: "src/a.js", useParser: null }), []);
+  assert.equal(verify(source, rules, { filename: "src/a.ts" }).length, 1);
+});
+
+test("a bare-key docs override remains available to hand-written configs", () => {
+  const source = "export function run(a, b, c, d, e, f, g, h) { return a; }\n";
+  const settings = { unslop: { ...SETTINGS.unslop, docs: { "max-params": "https://example.test/bare" } } };
+  assert.match(verify(source, { "unslop/max-params": "error" }, { settings })[0].message, /example\.test\/bare/);
+});
+
 test("every range-only reporter yields a located message and no crash", () => {
   const samples = [
     ["require-deno-shebang", "export const value = 1;\n"],

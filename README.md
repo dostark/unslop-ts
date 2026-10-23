@@ -106,6 +106,11 @@ entries never import.
   names each one.
 - ESLint exits 0 when it reports only warnings. Use `--max-warnings 0` in a gate that must fail on
   them.
+- A generated fragment registers the plugin under the configuration's `plugin` name, so its rule ids
+  use that same prefix. A test-scoped rule with `include` runs only where both patterns match; the
+  generator rejects test scope without `paths.test` globs.
+- The adapter reports on TypeScript files. Ordinary `.js`, `.jsx`, `.mjs`, and `.cjs` files parsed by
+  ESLint's default parser produce no unslop findings.
 
 ### Oxlint
 
@@ -117,6 +122,8 @@ entries never import.
   `unslop config export --host=oxlint --out=.oxlintrc.json`, then merge the fragment into your existing
   config. The CLI refuses an existing file unless you pass `--overwrite`, and refuses a symlink.
 - Oxlint warns without failing and fails on an `error` level.
+- Generated `exclude` patterns use Oxlint's `excludeFiles` override field. Test scope with `include`
+  cannot be represented without widening, so export fails with the rule id instead.
 - Oxlint is experimental upstream. The integration pins 1.88.0; treat a version bump as a compatibility
   change that must pass the conformance suite.
 
@@ -333,7 +340,8 @@ Run the CLI from a checkout with `deno task unslop`, or as the package subpath `
 
 Use `deno task unslop` for read commands and dry runs. Use `deno task unslop:write` for a real edit, a
 migration, or any command that locks, stages, and writes files. The read task grants no write access,
-because the CLI imports trusted project code with its own permissions.
+because the CLI imports trusted project code with its own permissions. `deno task cli:write` is the
+equivalent write-enabled CLI alias.
 
 ### Get the `unslop` command
 

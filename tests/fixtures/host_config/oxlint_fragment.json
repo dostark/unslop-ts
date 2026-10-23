@@ -149,7 +149,7 @@
       "files": [
         "**/*"
       ],
-      "excludedFiles": [
+      "excludeFiles": [
         "**/tests/**",
         "**/*_test.ts",
         "**/tests/fixtures/**"

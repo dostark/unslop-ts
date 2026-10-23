@@ -147,8 +147,8 @@ function repoPathOf(context: IEslintContext, settings: IUnslopSettings | null): 
   return relative(root, context.filename).split("\\").join("/");
 }
 
-function codeStyleOf(settings: IUnslopSettings | null, key: string, docs: string): string {
-  const override = settings?.docs?.[key];
+function codeStyleOf(settings: IUnslopSettings | null, pluginName: string, key: string, docs: string): string {
+  const override = settings?.docs?.[`${pluginName}/${key}`] ?? settings?.docs?.[key];
   if (override !== undefined) return override;
   return `${settings?.docsBase ?? ENGINE_DOCS_URL}${docs}`;
 }
@@ -204,6 +204,7 @@ function ruleOf(
       defaultOptions: [schema === undefined ? {} : schema.parse({})],
     },
     create(context) {
+      if (/\.(?:js|jsx|mjs|cjs)$/i.test(context.filename)) return {};
       const settings = unslopSettings(context.settings);
       if (rule.requiresTestGlobs && settings === null) {
         throw new EslintAdapterError(`rule '${key}' needs settings.unslop with testGlobs`);
@@ -222,7 +223,7 @@ function ruleOf(
         options: asJsonRecord(parsed),
         repoPath,
         isTestFile: pathClass === PATH_CLASS.test,
-        codeStyle: codeStyleOf(settings, key, rule.meta.docs),
+        codeStyle: codeStyleOf(settings, options.name, key, rule.meta.docs),
         pluginName: options.name,
         dialects: DEFAULT_DIALECTS,
       });
