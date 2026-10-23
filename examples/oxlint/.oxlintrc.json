@@ -1,0 +1,9 @@
+{
+  "plugins": ["typescript"],
+  "jsPlugins": ["./unslop.plugin.mjs"],
+  "rules": {
+    "unslop/no-explicit-unknown": "error",
+    "unslop/require-safety-comment": "error",
+    "unslop/long-comment": "error"
+  }
+}

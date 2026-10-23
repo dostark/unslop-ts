@@ -13,8 +13,9 @@
   "devDependencies": {
     "@typescript-eslint/parser": "8.72.0",
     "eslint": "10.13.0",
-    "eslint-floor": "npm:eslint@9.0.0",
     "eslint-9": "npm:eslint@9.39.5",
+    "eslint-floor": "npm:eslint@9.0.0",
+    "oxlint": "1.88.0",
     "typescript": "6.0.3",
     "zod": "4.6.5"
   }
