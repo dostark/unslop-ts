@@ -145,6 +145,8 @@ Deno.test("v1_only_project_migrates_without_v2_import", async () => {
     assertEquals(migrated.code, 0, migrated.stderr);
     assertStringIncludes(migrated.stdout, paths.config);
     assertStringIncludes(migrated.stdout, paths.layout);
+    assertEquals(migrated.stdout.includes("deno task cli"), false);
+    assertEquals(migrated.stdout.includes("catalog.json"), false);
     assertEquals(await Deno.readTextFile(paths.catalog), before);
     const config = JSON.parse(await Deno.readTextFile(paths.config)) as { version: number; plugin: string };
     assertEquals(config.version, 2);
