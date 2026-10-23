@@ -7,6 +7,7 @@
  * @related-files [src/rules/comment_rules.ts, src/rules/header_rules.ts, src/engine/module_layout.ts]
  */
 
+import type { IRuleComment, IRuleSourceCode } from "../rules/types.ts";
 import { lineAt, lineStarts } from "./module_layout.ts";
 import { asNode, programOf } from "./type_environment.ts";
 
@@ -21,19 +22,19 @@ export interface ICommentRun {
 }
 
 /** A comment as the lint API reports it. */
-export type LintComment = ReturnType<Deno.lint.SourceCode["getAllComments"]>[number];
+export type LintComment = IRuleComment;
 
 const LINE_BREAK = /\r?\n/;
 
 /** The offset where the first statement starts, or the text length when the file has no statement. */
-export function firstStatementStart(sourceCode: Deno.lint.SourceCode): number {
+export function firstStatementStart(sourceCode: IRuleSourceCode): number {
   const body = asNode(programOf(sourceCode)).body;
   const first = Array.isArray(body) && body.length > 0 ? asNode(body[0]) : undefined;
   return first?.range?.[0] ?? sourceCode.text.length;
 }
 
 /** The first comment above the first statement, or null when the module has none. */
-export function moduleHeaderComment(sourceCode: Deno.lint.SourceCode): LintComment | null {
+export function moduleHeaderComment(sourceCode: IRuleSourceCode): LintComment | null {
   const limit = firstStatementStart(sourceCode);
   const first = sourceCode.getAllComments()[0];
   return first && first.range[1] <= limit ? first : null;
@@ -48,7 +49,7 @@ export function lineOfOffset(text: string, offset: number): number {
  * The comment runs below the module header.
  * A trailing comment that follows code on its line is not part of a run.
  */
-export function commentRuns(sourceCode: Deno.lint.SourceCode): ICommentRun[] {
+export function commentRuns(sourceCode: IRuleSourceCode): ICommentRun[] {
   const text = sourceCode.text;
   const starts = lineStarts(text);
   const lines = text.split(LINE_BREAK);

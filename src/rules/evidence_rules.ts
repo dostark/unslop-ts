@@ -8,8 +8,8 @@
  * @related-files [src/rules/mod.ts, src/rules/type_safety_rules.ts]
  */
 
-import { asNode, type ILintNode, type LintValue, toLintNode, unwrap } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import { asNode, type ILintNode, type LintValue, unwrap } from "../engine/type_environment.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, IRuleSourceCode, LintVisitor } from "./types.ts";
 
 function parentOf(node: ILintNode): ILintNode | undefined {
   const parent = node.parent;
@@ -42,19 +42,14 @@ function rangeEnd(node: ILintNode | null): number {
   return node?.range ? node.range[1] : -1;
 }
 
-interface IComment {
-  readonly value: string;
-  readonly range?: readonly [number, number];
-}
-
 /** True when a marker comment with non-empty text precedes `node` after `boundary`. */
 function hasMarker(
-  sourceCode: Deno.lint.SourceCode,
+  sourceCode: IRuleSourceCode,
   node: LintValue,
   markers: readonly string[],
   boundary: number,
 ): boolean {
-  const comments = sourceCode.getCommentsBefore(toLintNode(node)) as IComment[];
+  const comments = sourceCode.getCommentsBefore(asNode(node));
   for (const comment of comments) {
     if (comment.range && comment.range[0] < boundary) continue;
     const text = comment.value.trim();
@@ -66,11 +61,11 @@ function hasMarker(
   return false;
 }
 
-export function createRequireSafetyComment(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createRequireSafetyComment(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const raw = ctx.options.markers;
   const markers = Array.isArray(raw) ? raw.map(String) : ["SAFETY"];
   const sourceCode = context.sourceCode;
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const annotation = node.typeAnnotation;
     if (isObject(annotation)) {
@@ -132,9 +127,9 @@ function matchTypeofComparison(node: ILintNode): ITypeofComparison | null {
   return { value: other.value };
 }
 
-export function createNoRuntimeTypeof(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoRuntimeTypeof(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const allowInTypeGuards = ctx.options.allowInTypeGuards !== false;
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const comparison = matchTypeofComparison(node);
     if (!comparison) return;
@@ -150,10 +145,10 @@ export function createNoRuntimeTypeof(context: Deno.lint.RuleContext, ctx: IPlug
 }
 
 export function createNoConditionalEmptyObjectSpread(
-  context: Deno.lint.RuleContext,
+  context: IRuleContext,
   _ctx: IPluginRuleContext,
 ): LintVisitor {
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const argument = node.argument;
     if (!isObject(argument)) return;

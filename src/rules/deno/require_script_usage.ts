@@ -8,13 +8,13 @@
  */
 
 import { moduleHeaderComment } from "../../engine/comments.ts";
-import type { IPluginRuleContext, LintVisitor } from "../types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "../types.ts";
 
 const DEFAULT_MARKER = "Usage:";
 const DEFAULT_MAX_HEADER_LINES = 15;
 const LINE_BREAK = /\r?\n/;
 
-export function createRequireScriptUsage(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createRequireScriptUsage(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const marker = typeof ctx.options.marker === "string" ? ctx.options.marker : DEFAULT_MARKER;
   const maxLines = typeof ctx.options.maxHeaderLines === "number"
     ? ctx.options.maxHeaderLines

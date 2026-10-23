@@ -7,10 +7,10 @@
  * @related-files [src/rules/mod.ts, src/rules/deno/ignore_directive.ts]
  */
 
-import type { IPluginRuleContext, LintVisitor } from "../types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "../types.ts";
 import { DEFAULT_REASON_SEPARATOR, parseIgnoreDirective } from "./ignore_directive.ts";
 
-export function createIgnoreNeedsReason(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createIgnoreNeedsReason(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const idPrefix = `${ctx.pluginName}/`;
   const separator = typeof ctx.options.separator === "string" ? ctx.options.separator : DEFAULT_REASON_SEPARATOR;
   for (const comment of context.sourceCode.getAllComments()) {

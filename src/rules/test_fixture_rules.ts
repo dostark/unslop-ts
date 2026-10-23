@@ -8,7 +8,7 @@
  */
 
 import { asNode, type ILintNode } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 interface ITemplateShape {
   readonly lineCount: number;
@@ -46,7 +46,7 @@ function templateOf(init: ILintNode | undefined): { template: ILintNode; tagged:
 }
 
 export function createTestInlineMultilineFixture(
-  context: Deno.lint.RuleContext,
+  context: IRuleContext,
   ctx: IPluginRuleContext,
 ): LintVisitor {
   const minLines = typeof ctx.options.minLines === "number" ? ctx.options.minLines : DEFAULT_MIN_LINES;
@@ -58,7 +58,7 @@ export function createTestInlineMultilineFixture(
     : DEFAULT_DIRECTORY;
   const location = directory === "" ? "a fixture file" : `a package-local fixture under ${directory}`;
   return {
-    VariableDeclarator(rawNode: Deno.lint.Node): void {
+    VariableDeclarator(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       const id = node.id ? asNode(node.id) : undefined;
       if (id?.type !== "Identifier") return;

@@ -15,7 +15,7 @@ import {
   typeReferenceName,
   unwrap,
 } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const WEAK_TYPE = ["Promise", "<Response>"].join("");
 const PROMISE_NAME = "Promise";
@@ -50,9 +50,9 @@ function functionTypeReturn(node: ILintNode): ILintNode | undefined {
   return innerType(asNode(node.returnType));
 }
 
-export function createPromiseResponseAlias(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createPromiseResponseAlias(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   return {
-    TSTypeAliasDeclaration(rawNode: Deno.lint.Node): void {
+    TSTypeAliasDeclaration(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       const body = unwrap(asNode(node.typeAnnotation));
       const returned = functionTypeReturn(body);
@@ -73,9 +73,9 @@ function isAliasedFunctionReturn(annotation: ILintNode): boolean {
   return fn?.type === FUNCTION_TYPE && alias?.type === TYPE_ALIAS;
 }
 
-export function createPromiseResponseReturn(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createPromiseResponseReturn(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   return {
-    TSTypeReference(rawNode: Deno.lint.Node): void {
+    TSTypeReference(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       if (!isWeakResponsePromise(node)) return;
       const annotation = parentOf(node);
@@ -89,7 +89,7 @@ export function createPromiseResponseReturn(context: Deno.lint.RuleContext, ctx:
   };
 }
 
-export function createTsSuppressionPragmas(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createTsSuppressionPragmas(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   return {
     Program(): void {
       for (const comment of context.sourceCode.getAllComments()) {
@@ -119,11 +119,11 @@ function isAliasBody(node: ILintNode): boolean {
   return current?.type === TYPE_ALIAS;
 }
 
-export function createMagicUnionType(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createMagicUnionType(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const configured = ctx.options.hint;
   const hint = typeof configured === "string" ? configured : DEFAULT_UNION_HINT;
   return {
-    TSUnionType(rawNode: Deno.lint.Node): void {
+    TSUnionType(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       const members = Array.isArray(node.types) ? node.types.map(asNode) : [];
       if (members.filter(isStringLiteralType).length < MIN_STRING_MEMBERS || isAliasBody(node)) return;

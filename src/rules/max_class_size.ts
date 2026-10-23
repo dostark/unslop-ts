@@ -9,7 +9,7 @@
  */
 
 import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 /** Class-size indicators, matching the check_god_objects.ts metrics. */
 export interface IClassIndicators {
@@ -116,13 +116,13 @@ function classNameOf(classNode: ILintNode): string {
   return "(anonymous)";
 }
 
-export function createMaxClassSize(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createMaxClassSize(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const minClassLines = typeof ctx.options.minClassLines === "number" ? ctx.options.minClassLines : 200;
   const threshold = typeof ctx.options.threshold === "number" ? ctx.options.threshold : 60;
   const importCount = countImports(programOf(context.sourceCode));
   const text = context.sourceCode.getText();
 
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const indicators = collectClassIndicators(node, text, importCount, minClassLines);
     if (indicators === null) return;

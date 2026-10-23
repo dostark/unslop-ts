@@ -11,7 +11,7 @@ import { dirname, join, normalize } from "@std/path/posix";
 import { matchesAnyGlob } from "../engine/glob.ts";
 import { asNode, type ILintNode } from "../engine/type_environment.ts";
 import { type BoundaryDeny, type BoundaryZone, ImportBoundariesOptions } from "./rule_options.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const DEFAULT_GUIDE = "the import boundary rules";
@@ -40,13 +40,13 @@ function sourceText(source: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-export function createImportBoundaries(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createImportBoundaries(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const zones = ImportBoundariesOptions.parse(ctx.options).zones.filter((zone: BoundaryZone) =>
     matchesAnyGlob(ctx.repoPath, zone.files) && !matchesAnyGlob(ctx.repoPath, zone.except)
   );
   if (zones.length === 0) return {};
   const codeStyle = ctx.codeStyle ?? DEFAULT_GUIDE;
-  const check = (node: Deno.lint.Node, source: unknown): void => {
+  const check = (node: IRuleNode, source: unknown): void => {
     const specifier = sourceText(source);
     if (specifier === null) return;
     const resolved = resolveSpecifier(ctx.repoPath, specifier);
@@ -61,14 +61,15 @@ export function createImportBoundaries(context: Deno.lint.RuleContext, ctx: IPlu
     }
   };
   return {
-    ImportDeclaration(node: Deno.lint.ImportDeclaration): void {
-      check(node, node.source);
+    ImportDeclaration(node: IRuleNode): void {
+      check(node, asNode(node).source);
     },
-    ExportNamedDeclaration(node: Deno.lint.ExportNamedDeclaration): void {
-      if (node.source) check(node, node.source);
+    ExportNamedDeclaration(node: IRuleNode): void {
+      const source = asNode(node).source;
+      if (source) check(node, source);
     },
-    ExportAllDeclaration(node: Deno.lint.ExportAllDeclaration): void {
-      check(node, node.source);
+    ExportAllDeclaration(node: IRuleNode): void {
+      check(node, asNode(node).source);
     },
   };
 }

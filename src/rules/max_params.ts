@@ -8,12 +8,12 @@
  */
 
 import { asNode } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const DEFAULT_MAX_PARAMS = 7;
 const THIS_PARAMETER = "this";
 
-function countedParameters(node: Deno.lint.Node): number {
+function countedParameters(node: IRuleNode): number {
   const params = asNode(node).params;
   if (!Array.isArray(params)) return 0;
   return params.filter((param) => {
@@ -22,9 +22,9 @@ function countedParameters(node: Deno.lint.Node): number {
   }).length;
 }
 
-export function createMaxParams(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createMaxParams(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const max = typeof ctx.options.max === "number" ? ctx.options.max : DEFAULT_MAX_PARAMS;
-  const check = (node: Deno.lint.Node): void => {
+  const check = (node: IRuleNode): void => {
     const found = countedParameters(node);
     if (found <= max) return;
     context.report({

@@ -10,7 +10,7 @@
 import type { JsonValue } from "../engine/catalog.ts";
 import { commentRuns, type ICommentRun } from "../engine/comments.ts";
 import { lineStarts } from "../engine/module_layout.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "./types.ts";
 
 interface IPhrase {
   readonly pattern: string;
@@ -43,7 +43,7 @@ function hintFor(ctx: IPluginRuleContext, fallback: string): string {
   return `See ${ctx.codeStyle ?? fallback}.`;
 }
 
-export function createLongComment(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createLongComment(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const maxLines = typeof ctx.options.maxLines === "number" ? ctx.options.maxLines : DEFAULT_MAX_LINES;
   return {
     Program(): void {
@@ -80,7 +80,7 @@ function firstPhraseHint(run: ICommentRun, phrases: readonly { regex: RegExp; hi
   })?.hint ?? null;
 }
 
-export function createEphemeralComment(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createEphemeralComment(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const phrases = phrasesOf(ctx);
   const checkDates = ctx.options.checkDates !== false;
   return {
@@ -112,7 +112,7 @@ export function createEphemeralComment(context: Deno.lint.RuleContext, ctx: IPlu
   };
 }
 
-export function createDecorativeComment(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createDecorativeComment(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   return {
     Program(): void {
       const text = context.sourceCode.text;

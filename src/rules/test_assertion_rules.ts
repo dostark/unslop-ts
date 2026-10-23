@@ -8,7 +8,7 @@
  */
 
 import { asNode, type LintValue, NODE_IDENTIFIER } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const NODE_CALL_EXPRESSION = "CallExpression";
 const ASSERT_FUNCTION = "assert";
@@ -37,7 +37,7 @@ function isBooleanLiteral(node: LintValue): boolean {
   return value.type === "Literal" && typeof value.value === "boolean";
 }
 
-export function createNoBooleanAssert(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoBooleanAssert(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const rawMethods = ctx.options.methods;
   const methods = Array.isArray(rawMethods) ? rawMethods.map(String) : SUBSTRING_METHODS;
   const rawFunctions = ctx.options.assertFunctions;
@@ -45,7 +45,7 @@ export function createNoBooleanAssert(context: Deno.lint.RuleContext, ctx: IPlug
     ? rawFunctions.map(String)
     : [ASSERT_FUNCTION, "assertEquals", "assertStrictEquals"];
 
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const name = calleeName(node.callee);
     if (!name || !assertFunctions.includes(name)) return;
@@ -64,7 +64,7 @@ export function createNoBooleanAssert(context: Deno.lint.RuleContext, ctx: IPlug
     if (args.length >= 2 && isBooleanLiteral(args[1])) report(rawNode, name, method);
   };
 
-  const report = (rawNode: Deno.lint.Node, name: string, method: string): void => {
+  const report = (rawNode: IRuleNode, name: string, method: string): void => {
     context.report({
       node: rawNode,
       message: `A boolean-wrapped \`.${method}()\` assertion hides the failing value.`,
@@ -95,12 +95,12 @@ function assertionFirstCallArg(statement: LintValue, prefix: string): LintValue 
   return first;
 }
 
-export function createNoRepeatedAssertCall(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoRepeatedAssertCall(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const prefix = typeof ctx.options.assertPrefix === "string" ? ctx.options.assertPrefix : ASSERT_FUNCTION;
   const sourceCode = context.sourceCode;
-  const normalize = (node: LintValue): string => sourceCode.getText(node as Deno.lint.Node).replace(/\s+/g, "");
+  const normalize = (node: LintValue): string => sourceCode.getText(asNode(node)).replace(/\s+/g, "");
 
-  const checkBlock = (rawNode: Deno.lint.Node): void => {
+  const checkBlock = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const body = node.body;
     if (!Array.isArray(body)) return;
@@ -110,7 +110,7 @@ export function createNoRepeatedAssertCall(context: Deno.lint.RuleContext, ctx: 
       if (previous === null || current === null) continue;
       if (normalize(previous) !== normalize(current)) continue;
       context.report({
-        node: body[index] as Deno.lint.Node,
+        node: asNode(body[index]),
         message: "Two adjacent assertions repeat the same call as their first argument.",
         hint: "Assert once on the call result, or assert on the value that differs.",
       });
@@ -129,7 +129,7 @@ function isImportedConstant(node: LintValue, imported: Set<string>, pattern: Reg
 }
 
 /** The named bindings an import declaration introduces. */
-function namedImportBindings(rawNode: Deno.lint.Node): string[] {
+function namedImportBindings(rawNode: IRuleNode): string[] {
   const node = asNode(rawNode);
   const specifiers = node.specifiers;
   if (!Array.isArray(specifiers)) return [];
@@ -167,19 +167,19 @@ function substringAssertSubject(node: LintValue): LintValue | null {
   return isObject(callee) ? asNode(callee).object : null;
 }
 
-export function createNoConstantSubstringAssert(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoConstantSubstringAssert(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const patternSource = typeof ctx.options.constantPattern === "string"
     ? ctx.options.constantPattern
     : "^[A-Z][A-Z0-9_]*$";
   const pattern = new RegExp(patternSource);
   const imported = new Set<string>();
 
-  const collectImports = (rawNode: Deno.lint.Node): void => {
+  const collectImports = (rawNode: IRuleNode): void => {
     for (const name of namedImportBindings(rawNode)) imported.add(name);
   };
 
-  const check = (rawNode: Deno.lint.Node): void => {
-    if (!isImportedConstant(substringAssertSubject(rawNode), imported, pattern)) return;
+  const check = (rawNode: IRuleNode): void => {
+    if (!isImportedConstant(substringAssertSubject(asNode(rawNode)), imported, pattern)) return;
     context.report({
       node: rawNode,
       message: "This substring assertion restates an imported constant as a literal.",

@@ -7,13 +7,13 @@
  * @related-files [src/rules/mod.ts, src/rules/deno/ignore_directive.ts]
  */
 
-import type { IPluginRuleContext, LintVisitor } from "../types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "../types.ts";
 import { DEFAULT_REASON_SEPARATOR, parseIgnoreDirective } from "./ignore_directive.ts";
 
 /** The rules no ignore comment may silence unless the catalog says otherwise. */
 export const DEFAULT_FORBIDDEN_IGNORES: readonly string[] = ["no-explicit-any"];
 
-export function createNoForbiddenLintIgnore(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoForbiddenLintIgnore(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const rawForbidden = ctx.options.forbiddenRules;
   const forbidden = new Set(Array.isArray(rawForbidden) ? rawForbidden.map(String) : DEFAULT_FORBIDDEN_IGNORES);
   const includeFileIgnores = ctx.options.includeFileIgnores !== false;

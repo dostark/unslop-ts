@@ -8,7 +8,7 @@
  */
 
 import { asNode, type ILintNode, isNodeLike, walk } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const FUNCTION_NODES = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
 const DECISION_NODES = new Set([
@@ -56,9 +56,9 @@ function nameOf(node: ILintNode): string {
   return "<anonymous>";
 }
 
-export function createMaxCyclomaticComplexity(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createMaxCyclomaticComplexity(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const max = typeof ctx.options.max === "number" ? ctx.options.max : 15;
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const complexity = complexityOf(node);
     if (complexity <= max) return;

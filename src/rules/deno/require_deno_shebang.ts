@@ -7,12 +7,12 @@
  * @related-files [src/rules/mod.ts, src/rules/rule_options.ts]
  */
 
-import type { IPluginRuleContext, LintVisitor } from "../types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "../types.ts";
 
 /** The shebang a runnable Deno script starts with unless the catalog says otherwise. */
 export const DEFAULT_DENO_SHEBANG = "#!/usr/bin/env -S deno run -A";
 
-export function createRequireDenoShebang(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createRequireDenoShebang(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const shebang = String(ctx.options.shebang ?? DEFAULT_DENO_SHEBANG);
   return {
     Program(): void {

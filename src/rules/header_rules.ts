@@ -8,7 +8,7 @@
  */
 
 import { lineOfOffset, moduleHeaderComment } from "../engine/comments.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "./types.ts";
 
 const DEFAULT_MAX_START_LINE = 5;
 const DEFAULT_FILENAME_PATTERN = "(?:^|[_.-])phase[-_]?(\\d+)(?:[_.-]|$)";
@@ -20,7 +20,7 @@ function firstLineRange(text: string): [number, number] {
   return [0, end === -1 ? text.length : end];
 }
 
-export function createRequireModuleHeader(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createRequireModuleHeader(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const maxStartLine = typeof ctx.options.maxStartLine === "number" ? ctx.options.maxStartLine : DEFAULT_MAX_START_LINE;
   return {
     Program(): void {
@@ -36,7 +36,7 @@ export function createRequireModuleHeader(context: Deno.lint.RuleContext, ctx: I
   };
 }
 
-export function createEphemeralFilename(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createEphemeralFilename(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const pattern = new RegExp(
     typeof ctx.options.pattern === "string" ? ctx.options.pattern : DEFAULT_FILENAME_PATTERN,
     "i",

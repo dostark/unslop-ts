@@ -8,10 +8,11 @@
  * @related-files [src/rules/type_safety_rules.ts, src/rules/types.ts]
  */
 
+import type { IRuleNode, IRuleSourceCode } from "../rules/types.ts";
+
 /** A dynamic ESTree value: a node, a list of values, or a primitive leaf. */
 export type LintValue =
   | ILintNode
-  | Deno.lint.Node
   | readonly LintValue[]
   | string
   | number
@@ -19,10 +20,8 @@ export type LintValue =
   | null
   | undefined;
 
-/** A lint node with the dynamic keys the rules read. */
-export interface ILintNode {
-  readonly type: string;
-  readonly range?: readonly [number, number];
+/** A lint node with the dynamic keys the rules read, narrowed from the host node. */
+export interface ILintNode extends IRuleNode {
   readonly [key: string]: LintValue;
 }
 
@@ -36,7 +35,7 @@ export interface ITypeEnvironment {
 }
 
 /** Reads a lint value as the dynamic node shape. */
-export function asNode(node: LintValue): ILintNode {
+export function asNode(node: unknown): ILintNode {
   return node as ILintNode;
 }
 
@@ -66,15 +65,9 @@ export function walk(node: ILintNode, visit: (node: ILintNode) => boolean | void
   }
 }
 
-/** Reads a lint value as the runtime node type, for the plugin API calls. */
-export function toLintNode(node: LintValue): Deno.lint.Node {
-  return node as Deno.lint.Node;
-}
-
-/** The Program node of a source unit, when the runtime exposes it. */
-export function programOf(sourceCode: Deno.lint.SourceCode): ILintNode {
-  const holder = sourceCode as { ast?: LintValue };
-  return holder.ast ? asNode(holder.ast) : asNode({ type: "Program" });
+/** The Program node of a source unit. */
+export function programOf(sourceCode: IRuleSourceCode): ILintNode {
+  return asNode(sourceCode.ast);
 }
 
 function isObject(value: LintValue): boolean {

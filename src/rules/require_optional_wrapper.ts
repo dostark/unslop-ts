@@ -13,11 +13,10 @@ import {
   innerType,
   isNodeLike,
   type LintValue,
-  toLintNode,
   typeReferenceName,
   unwrap,
 } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const FUNCTION_NODES = [
   "FunctionDeclaration",
@@ -53,9 +52,9 @@ function hasUndefined(annotation: LintValue): boolean {
   return false;
 }
 
-export function createRequireOptionalWrapper(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createRequireOptionalWrapper(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const wrapper = typeof ctx.options.wrapperType === "string" ? ctx.options.wrapperType : "Opt";
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const fn = asNode(rawNode);
     const params = fn.params;
     if (!Array.isArray(params)) return;
@@ -67,7 +66,7 @@ export function createRequireOptionalWrapper(context: Deno.lint.RuleContext, ctx
       const bare = node.optional === true || hasUndefined(annotation);
       if (!bare) continue;
       context.report({
-        node: toLintNode(param),
+        node: asNode(param),
         message: `An optional parameter must use the ${wrapper} wrapper instead of a bare '?' or '| undefined'.`,
         hint: `Declare the parameter as ${wrapper}<T, Reason.*>.`,
       });

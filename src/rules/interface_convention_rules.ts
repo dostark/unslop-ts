@@ -8,7 +8,7 @@
  */
 
 import { asNode, type ILintNode } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 const DEFAULT_PREFIX = "I";
 const DEFAULT_GUIDE = "the interface naming rules";
@@ -24,13 +24,14 @@ function hasInterfacePrefix(name: string, prefix: string): boolean {
   return name.startsWith(prefix) && next === next.toUpperCase();
 }
 
-export function createExportedInterfaceNaming(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createExportedInterfaceNaming(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const prefix = prefixOf(ctx);
   const codeStyle = ctx.codeStyle ?? DEFAULT_GUIDE;
   return {
-    "ExportNamedDeclaration > TSInterfaceDeclaration"(node: Deno.lint.TSInterfaceDeclaration): void {
-      const name = node.id.name;
-      if (hasInterfacePrefix(name, prefix)) return;
+    "ExportNamedDeclaration > TSInterfaceDeclaration"(node: IRuleNode): void {
+      const id = asNode(node).id;
+      const name = id && typeof id === "object" ? asNode(id).name : undefined;
+      if (typeof name !== "string" || hasInterfacePrefix(name, prefix)) return;
       context.report({
         node,
         message: `Exported interface '${name}' must start with a capital '${prefix}' (e.g., ${prefix}${name}).`,
@@ -46,12 +47,12 @@ function nameOf(node: ILintNode | undefined): string | null {
   return typeof node.value === "string" ? node.value : null;
 }
 
-export function createNoInterfaceRenameOnImport(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoInterfaceRenameOnImport(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const prefix = prefixOf(ctx);
   const interfaceName = new RegExp(`^${prefix.replace(REGEX_SPECIALS, "\\$&")}[A-Z]`);
   const codeStyle = ctx.codeStyle ?? DEFAULT_GUIDE;
   return {
-    ImportSpecifier(rawNode: Deno.lint.Node): void {
+    ImportSpecifier(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       const imported = nameOf(node.imported ? asNode(node.imported) : undefined);
       const local = nameOf(node.local ? asNode(node.local) : undefined);

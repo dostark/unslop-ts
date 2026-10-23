@@ -17,18 +17,24 @@ import {
   typeReferenceName,
   unwrap,
 } from "../engine/type_environment.ts";
-import { type IPluginRuleContext, type LintVisitor, TYPE_SAFETY_GUIDE } from "./types.ts";
+import {
+  type IPluginRuleContext,
+  type IRuleContext,
+  type IRuleNode,
+  type LintVisitor,
+  TYPE_SAFETY_GUIDE,
+} from "./types.ts";
 
-type Report = (node: Deno.lint.Node, message: string) => void;
+type Report = (node: IRuleNode, message: string) => void;
 
-function makeReporter(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): Report {
+function makeReporter(context: IRuleContext, ctx: IPluginRuleContext): Report {
   const codeStyle = ctx.codeStyle ?? TYPE_SAFETY_GUIDE;
   return (node, message) => {
     context.report({ node, message, hint: `Keep type evidence. See ${codeStyle}.` });
   };
 }
 
-function envFor(context: Deno.lint.RuleContext): ReturnType<typeof createTypeEnvironment> {
+function envFor(context: IRuleContext): ReturnType<typeof createTypeEnvironment> {
   return createTypeEnvironment(programOf(context.sourceCode));
 }
 
@@ -89,12 +95,12 @@ function isTypeParameterConstraint(node: ILintNode): boolean {
   return false;
 }
 
-export function createNoExplicitUnknown(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoExplicitUnknown(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const allowCatch = ctx.options.allowCatchBinding !== false;
   const allowPredicate = ctx.options.allowTypePredicateSubject !== false;
   const report = makeReporter(context, ctx);
   return {
-    TSUnknownKeyword(rawNode: Deno.lint.Node) {
+    TSUnknownKeyword(rawNode: IRuleNode) {
       const node = asNode(rawNode);
       if (allowCatch && isCatchBinding(node)) return;
       if (allowPredicate && isPredicateSubject(node)) return;
@@ -124,13 +130,13 @@ function isForbiddenValue(
 const DICTIONARY_MESSAGE =
   "A dictionary with a weak value type loses type evidence. Name a specific value interface instead.";
 
-export function createNoUnsafeDictionary(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoUnsafeDictionary(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const raw = ctx.options.forbiddenValueTypes;
   const forbidden = Array.isArray(raw) ? raw.map(String) : ["unknown", "any", "object", "{}"];
   const report = makeReporter(context, ctx);
   const env = envFor(context);
   return {
-    TSTypeReference(rawNode: Deno.lint.Node) {
+    TSTypeReference(rawNode: IRuleNode) {
       const node = asNode(rawNode);
       const name = typeReferenceName(node);
       if (name !== "Record" && name !== "Map") return;
@@ -138,7 +144,7 @@ export function createNoUnsafeDictionary(context: Deno.lint.RuleContext, ctx: IP
       const value = typeArguments(node)[1];
       if (value && isForbiddenValue(value, forbidden, env)) report(rawNode, DICTIONARY_MESSAGE);
     },
-    TSIndexSignature(rawNode: Deno.lint.Node) {
+    TSIndexSignature(rawNode: IRuleNode) {
       const node = asNode(rawNode);
       const annotation = node.typeAnnotation;
       if (annotation && typeof annotation === "object" && isForbiddenValue(asNode(annotation), forbidden, env)) {
@@ -153,13 +159,13 @@ function queryText(node: ILintNode, text: string): string {
   return range ? text.slice(range[0], range[1]) : "";
 }
 
-export function createNoTypeofEscape(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoTypeofEscape(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const raw = ctx.options.allowedTypeofTargets;
   const allowed = new Set(Array.isArray(raw) ? raw.map(String) : ["globalThis.fetch"]);
   const report = makeReporter(context, ctx);
   const message = "An 'as typeof' escape discards type evidence. Keep the precise type or parse at the boundary.";
   const text = context.sourceCode.text;
-  const checkType = (rawNode: Deno.lint.Node): void => {
+  const checkType = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
     const annotation = node.typeAnnotation;
     if (!annotation || typeof annotation !== "object") return;
@@ -174,12 +180,12 @@ export function createNoTypeofEscape(context: Deno.lint.RuleContext, ctx: IPlugi
   };
 }
 
-export function createNoPassThroughTypeAlias(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoPassThroughTypeAlias(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const report = makeReporter(context, ctx);
   const aliases = envFor(context).aliases;
   const message = "A pass-through type alias adds indirection without evidence. Use the target type directly.";
   return {
-    TSTypeAliasDeclaration(rawNode: Deno.lint.Node) {
+    TSTypeAliasDeclaration(rawNode: IRuleNode) {
       const node = asNode(rawNode);
       const annotation = node.typeAnnotation;
       if (!annotation || typeof annotation !== "object") return;
@@ -191,9 +197,9 @@ export function createNoPassThroughTypeAlias(context: Deno.lint.RuleContext, ctx
 
 const OBJECT_MESSAGE = "An 'object' parameter names no shape. Declare the expected members instead.";
 
-export function createNoObjectParameters(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createNoObjectParameters(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const report = makeReporter(context, ctx);
-  const checkFunction = (rawNode: Deno.lint.Node): void => {
+  const checkFunction = (rawNode: IRuleNode): void => {
     const fn = asNode(rawNode);
     const params = fn.params;
     if (!Array.isArray(params)) return;

@@ -10,8 +10,8 @@
 import type { JsonValue } from "../engine/catalog.ts";
 import { matchesAnyGlob } from "../engine/glob.ts";
 import { lineAt, lineStarts } from "../engine/module_layout.ts";
-import { asNode, type ILintNode, isNodeLike, toLintNode } from "../engine/type_environment.ts";
-import type { IPluginRuleContext, LintVisitor } from "./types.ts";
+import { asNode, type ILintNode, isNodeLike } from "../engine/type_environment.ts";
+import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 interface IDynamicAllowance {
   readonly files: readonly string[];
@@ -92,7 +92,7 @@ function isInsideStatement(node: ILintNode): boolean {
 }
 
 function dynamicImportVisitor(
-  context: Deno.lint.RuleContext,
+  context: IRuleContext,
   ctx: IPluginRuleContext,
   shouldReport: (node: ILintNode) => boolean,
   message: string,
@@ -100,7 +100,7 @@ function dynamicImportVisitor(
 ): LintVisitor {
   const allowances = dynamicAllowances(ctx.options.allowDynamicImports);
   return {
-    ImportExpression(rawNode: Deno.lint.Node): void {
+    ImportExpression(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       if (!shouldReport(node)) return;
       if (isAllowedDynamicImport(allowances, ctx.repoPath, specifierOf(nodeOrNull(node.source)))) return;
@@ -109,7 +109,7 @@ function dynamicImportVisitor(
   };
 }
 
-export function createImportInsideStatement(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createImportInsideStatement(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   return dynamicImportVisitor(
     context,
     ctx,
@@ -119,7 +119,7 @@ export function createImportInsideStatement(context: Deno.lint.RuleContext, ctx:
   );
 }
 
-export function createDynamicImport(context: Deno.lint.RuleContext, ctx: IPluginRuleContext): LintVisitor {
+export function createDynamicImport(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   return dynamicImportVisitor(
     context,
     ctx,
@@ -129,9 +129,9 @@ export function createDynamicImport(context: Deno.lint.RuleContext, ctx: IPlugin
   );
 }
 
-export function createInlineTypeImport(context: Deno.lint.RuleContext, _ctx: IPluginRuleContext): LintVisitor {
+export function createInlineTypeImport(context: IRuleContext, _ctx: IPluginRuleContext): LintVisitor {
   return {
-    TSImportType(rawNode: Deno.lint.Node): void {
+    TSImportType(rawNode: IRuleNode): void {
       const node = asNode(rawNode);
       const parent = nodeOrNull(node.parent);
       if (parent !== null && parent.type === "TSTypeQuery") return;
@@ -162,9 +162,9 @@ function importedNames(program: ILintNode, starts: readonly number[]): Map<strin
   return names;
 }
 
-export function createReExportImported(context: Deno.lint.RuleContext, _ctx: IPluginRuleContext): LintVisitor {
+export function createReExportImported(context: IRuleContext, _ctx: IPluginRuleContext): LintVisitor {
   return {
-    Program(rawNode: Deno.lint.Node): void {
+    Program(rawNode: IRuleNode): void {
       const program = asNode(rawNode);
       const starts = lineStarts(context.sourceCode.text);
       const imported = importedNames(program, starts);
@@ -174,7 +174,7 @@ export function createReExportImported(context: Deno.lint.RuleContext, _ctx: IPl
         const source = nodeOrNull(node.source);
         if (node.type === EXPORT_ALL || (node.type === EXPORT_NAMED && source !== null)) {
           context.report({
-            node: toLintNode(node),
+            node,
             message:
               "Re-exporting entities from other modules (for example 'export { ... } from ...' or 'export * from ...') is prohibited. Each module must only export entities it defines.",
             hint: "Export the entity from its origin and import it where it is used.",
@@ -192,7 +192,7 @@ export function createReExportImported(context: Deno.lint.RuleContext, _ctx: IPl
             ? `Improper re-export of '${name}' on the next line after its import. Combine into 'export { ... } from ...' or define it locally.`
             : `Exporting imported entity '${name}' (imported on line ${origin.line}) is prohibited. Define it locally or export it from its origin.`;
           context.report({
-            node: toLintNode(node),
+            node,
             message,
             hint: "Define the entity locally or export it from its origin.",
           });

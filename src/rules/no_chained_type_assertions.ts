@@ -7,7 +7,14 @@
  * @related-files [src/rules/mod.ts, tests/no_chained_type_assertions_test.ts]
  */
 
-import { type IPluginRuleContext, type LintVisitor, TYPE_SAFETY_GUIDE } from "./types.ts";
+import {
+  type IPluginRuleContext,
+  type IRuleContext,
+  type IRuleNode,
+  type IRuleSourceCode,
+  type LintVisitor,
+  TYPE_SAFETY_GUIDE,
+} from "./types.ts";
 
 interface ILintNode {
   readonly type: string;
@@ -19,7 +26,7 @@ interface ILintNode {
   readonly name?: string;
 }
 
-function asLintNode(node: Deno.lint.Node): ILintNode {
+function asLintNode(node: IRuleNode): ILintNode {
   return node as ILintNode;
 }
 
@@ -74,7 +81,7 @@ function collectChain(node: ILintNode): IChain {
 }
 
 /** True for the test-only `x as Partial<T> as T` mock shape (innermost link is Partial<...>). */
-function isPartialMockChain(links: ILintNode[], sourceCode: Deno.lint.SourceCode): boolean {
+function isPartialMockChain(links: ILintNode[], sourceCode: IRuleSourceCode): boolean {
   if (links.length !== 2) return false;
   const inner = links[1];
   if (!inner.typeAnnotation) return false;
@@ -88,12 +95,12 @@ function isNeverAnyMockChain(links: ILintNode[]): boolean {
   return annotation?.type === "TSNeverKeyword" || annotation?.type === "TSAnyKeyword";
 }
 
-function textOf(node: ILintNode, sourceCode: Deno.lint.SourceCode): string {
+function textOf(node: ILintNode, sourceCode: IRuleSourceCode): string {
   return sourceCode.text.slice(node.range[0], node.range[1]);
 }
 
 export function createNoChainedTypeAssertions(
-  context: Deno.lint.RuleContext,
+  context: IRuleContext,
   ctx: IPluginRuleContext,
 ): LintVisitor {
   const allowPartialMock = ctx.options.allowPartialMockInTests !== false;
@@ -101,7 +108,7 @@ export function createNoChainedTypeAssertions(
   const codeStyle = ctx.codeStyle ?? TYPE_SAFETY_GUIDE;
   const sourceCode = context.sourceCode;
 
-  const check = (rawNode: Deno.lint.Node): void => {
+  const check = (rawNode: IRuleNode): void => {
     const node = asLintNode(rawNode);
     if (!isOutermostAssertion(node)) return;
     const chain = collectChain(node);
