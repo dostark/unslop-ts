@@ -200,6 +200,26 @@ Deno.test("config_validate_refuses_a_malformed_descriptor", async () => {
 
 const PACKAGE_ROOT = fromFileUrl(new URL("..", import.meta.url));
 
+/** Symlink creation needs unscoped read and write, which the deploy compatibility check cannot grant. */
+async function symlinksAllowed(): Promise<boolean> {
+  let dir: string | null = null;
+  try {
+    dir = await Deno.makeTempDir({ prefix: "unslop_symlink_probe_" });
+    await Deno.symlink("target", join(dir, "link"));
+    return true;
+  } catch (error) {
+    if (error instanceof Deno.errors.NotCapable) return false;
+    throw error;
+  } finally {
+    if (dir !== null) await Deno.remove(dir, { recursive: true }).catch(() => undefined);
+  }
+}
+
+const SYMLINKS_ALLOWED = await symlinksAllowed();
+if (!SYMLINKS_ALLOWED) {
+  console.warn("config_export_refuses_a_symlinked_output is ignored: symlink creation needs unscoped read and write");
+}
+
 async function runExport(args: readonly string[]): Promise<Deno.CommandOutput> {
   return await new Deno.Command(Deno.execPath(), {
     args: ["run", "--allow-read", "--allow-env", "--allow-write", "src/cli/unslop.ts", "config", "export", ...args],
@@ -224,20 +244,31 @@ Deno.test("config_export_writes_the_golden_and_refuses_unsafe_writes", async () 
     const existing = await runExport(["--host=eslint", `--out=${out}`, "--descriptor=examples/unslop.project.ts"]);
     assertEquals(existing.code, 2);
     assertStringIncludes(new TextDecoder().decode(existing.stderr), "the file exists");
-
-    const target = join(dir, "target.mjs");
-    await Deno.writeTextFile(target, "keep\n");
-    const link = join(dir, "link.mjs");
-    await Deno.symlink(target, link);
-    const symlinked = await runExport([
-      "--host=eslint",
-      `--out=${link}`,
-      "--descriptor=examples/unslop.project.ts",
-      "--overwrite",
-    ]);
-    assertEquals(symlinked.code, 2);
-    assertStringIncludes(new TextDecoder().decode(symlinked.stderr), "symlink");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
+});
+
+Deno.test({
+  name: "config_export_refuses_a_symlinked_output",
+  ignore: !SYMLINKS_ALLOWED,
+  fn: async () => {
+    const dir = await Deno.makeTempDir({ prefix: "unslop_export_" });
+    try {
+      const target = join(dir, "target.mjs");
+      await Deno.writeTextFile(target, "keep\n");
+      const link = join(dir, "link.mjs");
+      await Deno.symlink(target, link);
+      const symlinked = await runExport([
+        "--host=eslint",
+        `--out=${link}`,
+        "--descriptor=examples/unslop.project.ts",
+        "--overwrite",
+      ]);
+      assertEquals(symlinked.code, 2);
+      assertStringIncludes(new TextDecoder().decode(symlinked.stderr), "symlink");
+    } finally {
+      await Deno.remove(dir, { recursive: true });
+    }
+  },
 });
