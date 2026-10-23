@@ -29,7 +29,7 @@ const NOOP_META: IRuleMeta = {
   preset: "opt-in",
   limits: null,
 };
-const NOOP_RULE: IPluginRule = { meta: NOOP_META, create: () => ({}) };
+const NOOP_RULE: IPluginRule = { meta: NOOP_META, requiresTestGlobs: false, create: () => ({}) };
 const NO_OPTIONS = z.object({}).strict();
 
 function pack(name: string, keys: readonly string[]): IRulePack {

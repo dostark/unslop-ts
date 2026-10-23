@@ -70,6 +70,8 @@ export interface IPluginRuleContext {
 export interface IPluginRule {
   /** Description, category, guide anchor, preset, and limits of the rule. */
   readonly meta: IRuleMeta;
+  /** True when the rule reads `ctx.isTestFile`, so a host must supply test globs. */
+  readonly requiresTestGlobs: boolean;
   create(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor;
 }
 

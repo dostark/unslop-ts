@@ -141,3 +141,75 @@ export function join(...paths: string[]): string {
   const joined = paths.filter((path) => path.length > 0).join(SEPARATOR);
   return joined === "" ? "." : normalize(joined);
 }
+
+/** Resolves segments into an absolute path. Without an absolute segment the root anchors the path. */
+export function resolve(...segments: string[]): string {
+  let resolved = "";
+  let absolute = false;
+  for (let i = segments.length - 1; i >= 0 && !absolute; i--) {
+    const segment = segments[i];
+    if (segment.length === 0) continue;
+    resolved = resolved.length === 0 ? segment : `${segment}/${resolved}`;
+    absolute = segment.startsWith(SEPARATOR);
+  }
+  return normalize(`${SEPARATOR}${resolved}`);
+}
+
+/** Returns the relative path from `from` to `to`. Both are resolved from the root first. */
+export function relative(from: string, to: string): string {
+  from = resolve(from);
+  to = resolve(to);
+  if (from === to) return "";
+
+  let fromStart = 1;
+  const fromEnd = from.length;
+  for (; fromStart < fromEnd; ++fromStart) {
+    if (!isPosixPathSeparator(from.charCodeAt(fromStart))) break;
+  }
+  const fromLen = fromEnd - fromStart;
+
+  let toStart = 1;
+  const toEnd = to.length;
+  for (; toStart < toEnd; ++toStart) {
+    if (!isPosixPathSeparator(to.charCodeAt(toStart))) break;
+  }
+  const toLen = toEnd - toStart;
+
+  const length = fromLen < toLen ? fromLen : toLen;
+  let lastCommonSep = -1;
+  let i = 0;
+  for (; i <= length; ++i) {
+    if (i === length) {
+      if (toLen > length) {
+        if (isPosixPathSeparator(to.charCodeAt(toStart + i))) {
+          return to.slice(toStart + i + 1);
+        } else if (i === 0) {
+          return to.slice(toStart + i);
+        }
+      } else if (fromLen > length) {
+        if (isPosixPathSeparator(from.charCodeAt(fromStart + i))) {
+          lastCommonSep = i;
+        } else if (i === 0) {
+          lastCommonSep = 0;
+        }
+      }
+      break;
+    }
+    const fromCode = from.charCodeAt(fromStart + i);
+    const toCode = to.charCodeAt(toStart + i);
+    if (fromCode !== toCode) break;
+    else if (isPosixPathSeparator(fromCode)) lastCommonSep = i;
+  }
+
+  let out = "";
+  for (i = fromStart + lastCommonSep + 1; i <= fromEnd; ++i) {
+    if (i === fromEnd || isPosixPathSeparator(from.charCodeAt(i))) {
+      out += out.length === 0 ? ".." : "/..";
+    }
+  }
+
+  if (out.length > 0) return out + to.slice(toStart + lastCommonSep);
+  toStart += lastCommonSep;
+  if (isPosixPathSeparator(to.charCodeAt(toStart))) ++toStart;
+  return to.slice(toStart);
+}

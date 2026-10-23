@@ -8,8 +8,14 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { dirname as oracleDirname, join as oracleJoin, normalize as oracleNormalize } from "@std/path/posix";
-import { dirname, join, normalize } from "../src/engine/posix_path.ts";
+import {
+  dirname as oracleDirname,
+  join as oracleJoin,
+  normalize as oracleNormalize,
+  relative as oracleRelative,
+  resolve as oracleResolve,
+} from "@std/path/posix";
+import { dirname, join, normalize, relative, resolve } from "../src/engine/posix_path.ts";
 import corpus from "./cases/posix_path_corpus.json" with { type: "json" };
 
 interface IPosixCase {
@@ -24,6 +30,8 @@ function ownCall(entry: IPosixCase): string {
   if (entry.function === "normalize") return normalize(entry.inputs[0]);
   if (entry.function === "dirname") return dirname(entry.inputs[0]);
   if (entry.function === "join") return join(...entry.inputs);
+  if (entry.function === "relative") return relative(entry.inputs[0], entry.inputs[1]);
+  if (entry.function === "resolve") return resolve(...entry.inputs);
   throw new Error(`unknown corpus function: ${entry.function}`);
 }
 
@@ -31,6 +39,8 @@ function oracleCall(entry: IPosixCase): string {
   if (entry.function === "normalize") return oracleNormalize(entry.inputs[0]);
   if (entry.function === "dirname") return oracleDirname(entry.inputs[0]);
   if (entry.function === "join") return oracleJoin(...entry.inputs);
+  if (entry.function === "relative") return oracleRelative(entry.inputs[0], entry.inputs[1]);
+  if (entry.function === "resolve") return oracleResolve(...entry.inputs);
   throw new Error(`unknown corpus function: ${entry.function}`);
 }
 

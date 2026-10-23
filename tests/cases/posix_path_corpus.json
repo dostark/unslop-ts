@@ -323,5 +323,126 @@
       "c"
     ],
     "expected": "a/b/c"
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a/b",
+      "/a/b"
+    ],
+    "expected": ""
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a/b",
+      "/a/c"
+    ],
+    "expected": "../c"
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a/b/c",
+      "/a/d"
+    ],
+    "expected": "../../d"
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/",
+      "/a"
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a",
+      "/"
+    ],
+    "expected": ".."
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a/b",
+      "/a/b/c"
+    ],
+    "expected": "c"
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a/b/c",
+      "/a/b"
+    ],
+    "expected": ".."
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/a/./b",
+      "/a/c/../d"
+    ],
+    "expected": "../d"
+  },
+  {
+    "function": "relative",
+    "inputs": [
+      "/foo/bar/baz",
+      "/foo/bar/qux"
+    ],
+    "expected": "../qux"
+  },
+  {
+    "function": "resolve",
+    "inputs": [
+      "/a/b",
+      "../c"
+    ],
+    "expected": "/a/c"
+  },
+  {
+    "function": "resolve",
+    "inputs": [
+      "/a",
+      "b",
+      "c"
+    ],
+    "expected": "/a/b/c"
+  },
+  {
+    "function": "resolve",
+    "inputs": [
+      "/a/./b",
+      "/c"
+    ],
+    "expected": "/c"
+  },
+  {
+    "function": "resolve",
+    "inputs": [
+      "/",
+      "a"
+    ],
+    "expected": "/a"
+  },
+  {
+    "function": "resolve",
+    "inputs": [
+      "/a/b",
+      "/c/d"
+    ],
+    "expected": "/c/d"
+  },
+  {
+    "function": "resolve",
+    "inputs": [
+      "/a//b",
+      "c"
+    ],
+    "expected": "/a/b/c"
   }
 ]

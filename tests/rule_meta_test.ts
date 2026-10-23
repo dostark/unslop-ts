@@ -19,6 +19,7 @@ import {
   TYPESCRIPT_RULE_PACK,
   WHOLE_TREE_CHECKS,
 } from "../mod.ts";
+import { ESLINT_RULE_TYPE } from "../eslint.ts";
 import table from "./cases/rule_meta_table.json" with { type: "json" };
 
 interface IDescriptor {
@@ -115,4 +116,18 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
   assertEquals(WHOLE_TREE_CHECKS["unused-exports"].controls.hostModes["--strict"], "error");
   assertEquals(WHOLE_TREE_CHECKS["optional-params"].controls.hostModes["--fail"], "error");
   assertEquals(WHOLE_TREE_CHECKS["optional-params"].controls.hostModes["--staged"], "error");
+});
+
+Deno.test("every plugin rule declares requiresTestGlobs and only the test-aware rules set it", () => {
+  const testAware = new Set(["no-chained-type-assertions", "no-typeof-escape", "require-module-header"]);
+  for (const pack of [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK]) {
+    for (const [key, rule] of Object.entries(pack.rules)) {
+      assertEquals(typeof rule.requiresTestGlobs, "boolean", key);
+      assertEquals(rule.requiresTestGlobs, testAware.has(key), key);
+    }
+  }
+});
+
+Deno.test("the ESLint type map covers every rule category", () => {
+  assertEquals(Object.keys(ESLINT_RULE_TYPE).sort(), [...RULE_CATEGORIES].sort());
 });

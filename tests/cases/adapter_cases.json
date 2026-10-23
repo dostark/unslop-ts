@@ -1,0 +1,432 @@
+[
+  {
+    "rule": "no-chained-type-assertions",
+    "valid": [
+      "export const value = input as string;\n"
+    ],
+    "invalid": [
+      "export const value = input as unknown as string;\n"
+    ]
+  },
+  {
+    "rule": "no-explicit-unknown",
+    "valid": [
+      "export const value: string = \"a\";\n"
+    ],
+    "invalid": [
+      "export const value: unknown = 1;\n"
+    ]
+  },
+  {
+    "rule": "no-unsafe-dictionary",
+    "valid": [
+      "export const map: Record<string, string> = {};\n"
+    ],
+    "invalid": [
+      "export const map: Record<string, any> = {};\n"
+    ]
+  },
+  {
+    "rule": "no-typeof-escape",
+    "valid": [
+      "export const value = input as string;\n"
+    ],
+    "invalid": [
+      "export const value = input as typeof globalThis.fetch;\n"
+    ]
+  },
+  {
+    "rule": "no-pass-through-type-alias",
+    "valid": [
+      "export type Value = { a: string };\n"
+    ],
+    "invalid": [
+      "type B = string;\ntype A = B;\n"
+    ]
+  },
+  {
+    "rule": "no-object-parameters",
+    "valid": [
+      "export function run(input: { a: string }) { return input; }\n"
+    ],
+    "invalid": [
+      "export function run(input: object) { return input; }\n"
+    ]
+  },
+  {
+    "rule": "require-safety-comment",
+    "valid": [
+      "// SAFETY: checked upstream\nexport const value = input as string;\n"
+    ],
+    "invalid": [
+      "export const value = input as string;\n"
+    ]
+  },
+  {
+    "rule": "require-optional-wrapper",
+    "valid": [
+      "export function run(input: Opt<string, \"Reason\">) { return input; }\n"
+    ],
+    "invalid": [
+      "export function run(input?: string) { return input; }\n"
+    ]
+  },
+  {
+    "rule": "no-runtime-typeof",
+    "valid": [
+      "export const isMissing = typeof value === \"undefined\";\n"
+    ],
+    "invalid": [
+      "export const isText = typeof value === \"string\";\n"
+    ]
+  },
+  {
+    "rule": "no-conditional-empty-object-spread",
+    "valid": [
+      "export const merged = { ...(flag ? { a: 1 } : { b: 2 }) };\n"
+    ],
+    "invalid": [
+      "export const merged = { ...(flag ? {} : { a: 1 }) };\n"
+    ]
+  },
+  {
+    "rule": "no-boolean-assert",
+    "valid": [
+      "assertStringIncludes(value, \"x\");\n"
+    ],
+    "invalid": [
+      "assert(value.includes(\"x\"), true);\n"
+    ]
+  },
+  {
+    "rule": "no-repeated-assert-call",
+    "valid": [
+      "function run() {\n  assertEquals(getValue(), 1);\n  assertEquals(otherValue(), 1);\n}\n"
+    ],
+    "invalid": [
+      "function run() {\n  assertEquals(getValue(), 1);\n  assertEquals(getValue(), 2);\n}\n"
+    ]
+  },
+  {
+    "rule": "no-constant-substring-assert",
+    "valid": [
+      "import { MESSAGE } from \"./constants.ts\";\nassertStringIncludes(text, \"message\");\n"
+    ],
+    "invalid": [
+      "import { MESSAGE } from \"./constants.ts\";\nassertStringIncludes(MESSAGE, \"message\");\n"
+    ]
+  },
+  {
+    "rule": "max-cyclomatic-complexity",
+    "valid": [
+      {
+        "code": "export function run(a) { return a; }\n",
+        "options": [
+          {
+            "max": 1
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "code": "export function run(a) { if (a) { return 1; } return 0; }\n",
+        "options": [
+          {
+            "max": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "max-class-size",
+    "valid": [
+      {
+        "code": "export const value = 1;\n",
+        "options": [
+          {
+            "minClassLines": 1,
+            "threshold": 1
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "code": "export class A { m() { return 1; } n() { return 2; } }\n",
+        "options": [
+          {
+            "minClassLines": 1,
+            "threshold": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "max-params",
+    "valid": [
+      "export function run(a, b) { return a + b; }\n"
+    ],
+    "invalid": [
+      "export function run(a, b, c, d, e, f, g, h) { return a; }\n"
+    ]
+  },
+  {
+    "rule": "import-inside-statement",
+    "valid": [
+      "export const loaded = import(\"./b.ts\");\n"
+    ],
+    "invalid": [
+      "export function load() { return import(\"./b.ts\"); }\n"
+    ]
+  },
+  {
+    "rule": "dynamic-import",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      "export const loaded = import(\"./b.ts\");\n"
+    ]
+  },
+  {
+    "rule": "inline-type-import",
+    "valid": [
+      "export type Value = string;\n"
+    ],
+    "invalid": [
+      "export type Value = import(\"./a.ts\").Value;\n"
+    ]
+  },
+  {
+    "rule": "re-export-imported",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      "export { value } from \"./a.ts\";\n"
+    ]
+  },
+  {
+    "rule": "import-placement",
+    "valid": [
+      "import { a } from \"./a.ts\";\nexport const value = a;\n"
+    ],
+    "invalid": [
+      "export const value = 1;\nimport { a } from \"./a.ts\";\n"
+    ]
+  },
+  {
+    "rule": "exported-interface-placement",
+    "valid": [
+      "import { a } from \"./a.ts\";\nexport interface IValue { a: string }\nexport const value = a;\n"
+    ],
+    "invalid": [
+      "export function run() { return 1; }\nexport interface IValue { a: string }\n"
+    ]
+  },
+  {
+    "rule": "exported-interface-naming",
+    "valid": [
+      "export interface IValue { a: string }\n"
+    ],
+    "invalid": [
+      "export interface Value { a: string }\n"
+    ]
+  },
+  {
+    "rule": "no-interface-rename-on-import",
+    "valid": [
+      "import { IValue } from \"./a.ts\";\n"
+    ],
+    "invalid": [
+      "import { IValue as Value } from \"./a.ts\";\n"
+    ]
+  },
+  {
+    "rule": "promise-response-alias",
+    "valid": [
+      "export type Api = { ok: boolean };\n"
+    ],
+    "invalid": [
+      "export type Api = Promise<Response>;\n"
+    ]
+  },
+  {
+    "rule": "promise-response-return",
+    "valid": [
+      "export function load() { return fetch(\"/\"); }\n"
+    ],
+    "invalid": [
+      "export function load(): Promise<Response> { return fetch(\"/\"); }\n"
+    ]
+  },
+  {
+    "rule": "ts-suppression-pragmas",
+    "valid": [
+      "// @ts-ignore\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      "// @ts-ignore: legacy code\nexport const value = 1;\n"
+    ]
+  },
+  {
+    "rule": "magic-union-type",
+    "valid": [
+      "export type State = \"on\" | \"off\";\n"
+    ],
+    "invalid": [
+      "export const state: \"on\" | \"off\" = \"on\";\n"
+    ]
+  },
+  {
+    "rule": "long-comment",
+    "valid": [
+      "// Short note.\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      "export const value = 1;\n// one\n// two\n// three\n// four\n"
+    ]
+  },
+  {
+    "rule": "ephemeral-comment",
+    "valid": [
+      "// Explains the value.\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      "// 2024-01-02\nexport const value = 1;\n"
+    ]
+  },
+  {
+    "rule": "decorative-comment",
+    "valid": [
+      "export const value = 1;\n// A note.\n"
+    ],
+    "invalid": [
+      "export const value = 1;\n// ==========================\n"
+    ]
+  },
+  {
+    "rule": "test-inline-multiline-fixture",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "const json = `{\n  \"a\": 1,\n  \"b\": 2,\n  \"c\": 3,\n  \"d\": 4,\n  \"e\": 5,\n  \"f\": 6\n}`;\n",
+        "filename": "src/a_test.ts"
+      }
+    ]
+  },
+  {
+    "rule": "require-module-header",
+    "valid": [
+      "/**\n * @module Example\n */\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      "export const value = 1;\n"
+    ]
+  },
+  {
+    "rule": "ephemeral-filename",
+    "valid": [
+      {
+        "code": "export const value = 1;\n",
+        "filename": "src/helpers.ts"
+      }
+    ],
+    "invalid": [
+      {
+        "code": "export const value = 1;\n",
+        "filename": "src/phase_228_test.ts"
+      }
+    ]
+  },
+  {
+    "rule": "import-boundaries",
+    "valid": [
+      {
+        "code": "import { a } from \"./allowed/a.ts\";\n",
+        "options": [
+          {
+            "zones": [
+              {
+                "id": "z",
+                "files": [
+                  "**/*.ts"
+                ],
+                "deny": [
+                  {
+                    "specifier": "^\\./forbidden",
+                    "message": "no"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "code": "import { a } from \"./forbidden/a.ts\";\n",
+        "options": [
+          {
+            "zones": [
+              {
+                "id": "z",
+                "files": [
+                  "**/*.ts"
+                ],
+                "deny": [
+                  {
+                    "specifier": "^\\./forbidden",
+                    "message": "no"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "rule": "ignore-needs-reason",
+    "valid": [
+      "// deno-lint-ignore unslop/no-explicit-unknown -- explained\nexport const value: unknown = 1;\n"
+    ],
+    "invalid": [
+      "// deno-lint-ignore unslop/no-explicit-unknown\nexport const value: unknown = 1;\n"
+    ]
+  },
+  {
+    "rule": "no-forbidden-lint-ignore",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      "// deno-lint-ignore no-explicit-any\nexport const value = 1;\n"
+    ]
+  },
+  {
+    "rule": "require-deno-shebang",
+    "valid": [
+      "#!/usr/bin/env -S deno run -A\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      "export const value = 1;\n"
+    ]
+  },
+  {
+    "rule": "require-script-usage",
+    "valid": [
+      "#!/usr/bin/env -S deno run -A\n// Script entry.\n//\n// Usage:\n//   deno run -A script.ts\nexport const value = 1;\n"
+    ],
+    "invalid": [
+      "#!/usr/bin/env -S deno run -A\n// Script entry.\nexport const value = 1;\n"
+    ]
+  }
+]

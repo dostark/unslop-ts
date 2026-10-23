@@ -8,5 +8,8 @@
     "strict": true,
     "target": "es2022"
   },
-  "include": ["../mod.ts"]
+  "include": [
+    "../mod.ts",
+    "../eslint.ts"
+  ]
 }

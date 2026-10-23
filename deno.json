@@ -25,7 +25,7 @@
   "tasks": {
     "test": "deno test --allow-all",
     "lint": "deno lint --config=deno.json",
-    "check": "deno check mod.ts deno.ts src/report/mod.ts src/ tests/ examples/",
+    "check": "deno check mod.ts deno.ts eslint.ts src/report/mod.ts src/ tests/ examples/lint_plugin.ts examples/unslop.project.ts examples/eslint/sample.ts",
     "fmt": "deno fmt",
     "cli": "deno run --allow-read --allow-env src/cli/unslop.ts",
     "cli:write": "deno run --allow-read --allow-write --allow-env src/cli/unslop.ts",

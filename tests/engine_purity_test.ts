@@ -223,3 +223,13 @@ Deno.test("consumer_snapshot_stays_out_of_engine", async () => {
   const snapshotImport = `import catalog from "../../${consumerPath}/tests/fixtures/catalog_v1.json";\n`;
   assert(purityViolations([{ path: "tests/fixture.ts", text: snapshotImport }]).length > 0);
 });
+
+Deno.test("the import closure of the eslint entry imports only zod", async () => {
+  assertEquals(closureViolations(closureOf("eslint.ts", await packageFileMap())), []);
+});
+
+Deno.test("the closure check rejects a seeded eslint import in the eslint entry", () => {
+  assertEquals(closureViolations([{ path: "eslint.ts", text: 'import { RuleTester } from "eslint";\n' }]), [
+    "eslint.ts: imports 'eslint'",
+  ]);
+});

@@ -14,7 +14,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const HOSTS = JSON.parse(readFileSync(join(ROOT, "hosts", "package.json"), "utf8"));
 const DENO = JSON.parse(readFileSync(join(ROOT, "deno.json"), "utf8"));
 const LOCK = JSON.parse(readFileSync(join(ROOT, "deno.lock"), "utf8"));
-const EXACT = /^\d+\.\d+\.\d+$/;
+const EXACT = /^(?:npm:[a-z0-9-]+@)?\d+\.\d+\.\d+$/;
 const HOST_TOOLING = [
   "hosts/",
   "node_modules/",
