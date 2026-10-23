@@ -1,15 +1,20 @@
-# @dostark/unslop-ts
+# unslop-ts
 
-A Deno lint plugin engine for TypeScript projects. It turns a validated version 2 **configuration**
-into a `Deno.lint.Plugin` that runs inside `deno lint`, so the same diagnostics appear in the editor,
-on the command line, and in a pre-commit gate. A small CLI lists and explains rules, edits supported
-settings, and migrates a version 1 catalog.
+A TypeScript lint rule engine that runs the same rules under `deno lint`, ESLint 9 and later, and
+Oxlint, on Deno, Node.js, and Bun. The rule set, the messages, and the suppression model are shared,
+so a finding means the same thing in every host.
+
+For `deno lint`, the engine compiles a validated version 2 configuration into a `Deno.lint.Plugin`
+that runs inside `deno lint`. For ESLint and Oxlint, it exports a flat-config plugin and presets that
+add the same rules to an existing configuration without changing a foreign diagnostic. A small CLI
+lists and explains rules, edits supported settings, migrates a version 1 catalog, and exports a host
+fragment.
 
 The engine ships two rule packs. `TYPESCRIPT_RULE_PACK` holds 35 rules for type evidence, imports,
 module layout, comments, interface conventions, test assertions, and size limits. `DENO_RULE_PACK`
 holds 4 rules about `deno-lint-ignore` comments and Deno script headers. Every rule declares its
-description, category, guide anchor, preset membership, and limits in code. A project can add its own
-rule packs and script checks, so project-specific rules stay in the project.
+description, category, guide anchor, preset membership, and overlaps in code. A project can add its
+own rule packs and script checks, so project-specific rules stay in the project.
 
 ## Use in a Deno project
 
