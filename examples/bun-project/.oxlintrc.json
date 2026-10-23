@@ -1,0 +1,24 @@
+{
+  "plugins": [
+    "typescript"
+  ],
+  "jsPlugins": [
+    "./unslop.plugin.mjs"
+  ],
+  "rules": {
+    "unslop/no-chained-type-assertions": "warn",
+    "unslop/no-explicit-unknown": "warn"
+  },
+  "settings": {
+    "unslop": {
+      "testGlobs": [
+        "**/*_test.ts",
+        "**/tests/**"
+      ],
+      "fixtureGlobs": [
+        "**/tests/fixtures/**"
+      ],
+      "ignoreGlobs": []
+    }
+  }
+}

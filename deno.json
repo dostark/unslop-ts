@@ -8,7 +8,8 @@
     "./whole-tree": "./src/rules/whole_tree/mod.ts",
     "./cli": "./src/cli/unslop.ts",
     "./deno": "./deno.ts",
-    "./report": "./src/report/mod.ts"
+    "./report": "./src/report/mod.ts",
+    "./eslint": "./eslint.ts"
   },
   "imports": {
     "@dostark/unslop-ts": "./mod.ts",
@@ -25,14 +26,15 @@
   "tasks": {
     "test": "deno test --allow-all",
     "lint": "deno lint --config=deno.json",
-    "check": "deno check mod.ts deno.ts eslint.ts src/report/mod.ts src/ tests/ examples/lint_plugin.ts examples/unslop.project.ts examples/eslint/sample.ts",
+    "check": "deno check mod.ts deno.ts eslint.ts src/report/mod.ts src/ src/bundle/engine.ts tests/ examples/lint_plugin.ts examples/unslop.project.ts examples/eslint/sample.ts scripts/bundle.ts examples/node-project/sample.ts examples/bun-project/sample.ts",
     "fmt": "deno fmt",
     "cli": "deno run --allow-read --allow-env src/cli/unslop.ts",
     "cli:write": "deno run --allow-read --allow-write --allow-env src/cli/unslop.ts",
     "unslop": "deno run --allow-read --allow-env src/cli/unslop.ts",
     "unslop:write": "deno run --allow-read --allow-write --allow-env src/cli/unslop.ts",
     "cli:report": "deno run --allow-read --allow-env --allow-run=deno src/cli/unslop.ts",
-    "cli:report:write": "deno run --allow-read --allow-write --allow-env --allow-run=deno src/cli/unslop.ts"
+    "cli:report:write": "deno run --allow-read --allow-write --allow-env --allow-run=deno src/cli/unslop.ts",
+    "bundle": "deno run --allow-read --allow-write --allow-env --allow-run=deno scripts/bundle.ts"
   },
   "compilerOptions": {
     "lib": [
