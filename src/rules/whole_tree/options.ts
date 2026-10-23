@@ -25,7 +25,124 @@ const DEFAULT_HTTP_STATUS_MIN = 100;
 const DEFAULT_HTTP_STATUS_MAX = 599;
 const DEFAULT_TEST_SCAFFOLD_PATTERN = "^(test|mock|fake|dummy)[-_]";
 
-const MagicThresholdsSchema = z.object({
+/** The magic-literal thresholds. */
+export interface IMagicThresholds {
+  localString: number;
+  globalString: number;
+  localNumber: number;
+  globalNumber: number;
+}
+
+/** The magic-literal thresholds before defaults apply. */
+export interface IMagicThresholdsInput {
+  localString?: number;
+  globalString?: number;
+  localNumber?: number;
+  globalNumber?: number;
+}
+
+/** Options of the magic-literal detector. */
+export interface IMagicLiteralOptions {
+  checkNumbers: boolean;
+  thresholds: IMagicThresholds;
+  additionalStrings: string[];
+  minStringLength: number;
+  minNumber: number;
+  roundNumberStep: number;
+  roundNumberMax: number;
+  httpStatusRange: [number, number];
+  metadataProperties: string[];
+  structuralArrayProperties: string[];
+  statusLiterals: string[];
+  definitionFileSuffixes: string[];
+  testScaffoldPattern: string;
+}
+
+/** Magic-literal options before defaults apply. */
+export interface IMagicLiteralOptionsInput {
+  checkNumbers?: boolean;
+  thresholds?: IMagicThresholdsInput;
+  additionalStrings?: string[];
+  minStringLength?: number;
+  minNumber?: number;
+  roundNumberStep?: number;
+  roundNumberMax?: number;
+  httpStatusRange?: [number, number];
+  metadataProperties?: string[];
+  structuralArrayProperties?: string[];
+  statusLiterals?: string[];
+  definitionFileSuffixes?: string[];
+  testScaffoldPattern?: string;
+}
+
+/** Options of the optional-parameter check. */
+export interface IOptionalParamsSettings {
+  wrapperType: string;
+  wrapperImport: string;
+  reasonExamples: string[];
+  testSegments: string[];
+  testSuffixes: string[];
+  skipSegments: string[];
+  walkSkipSegments: string[];
+  pluginRuleId: string;
+}
+
+/** Options of the unused-exports check. */
+export interface IUnusedExportsSettings {
+  productionRoots: string[];
+  testSegments: string[];
+  testSuffixes: string[];
+  entrypointSuffixes: string[];
+  mainEntrypointSuffixes: string[];
+  scriptRoot: string;
+  walkSkipPatterns: string[];
+  strictSkipPrefixes: string[];
+  strictSkipSegments: string[];
+}
+
+/** Settings for the constant-restatement rule. */
+export interface IConstantRestatementSettings {
+  constantModules: string[];
+  testRoots: string[];
+  minRestatedElements: number;
+}
+
+/** The catalog `wholeTree` section before defaults apply. */
+export interface IWholeTreeSettingsInput {
+  optionalParams?: IOptionalParamsSettings;
+  unusedExports?: IUnusedExportsSettings;
+  constantRestatement?: IConstantRestatementSettings;
+  magicLiterals?: IMagicLiteralOptionsInput;
+}
+
+/** The catalog `wholeTree` section. */
+export interface IWholeTreeSettings {
+  optionalParams?: IOptionalParamsSettings;
+  unusedExports?: IUnusedExportsSettings;
+  constantRestatement?: IConstantRestatementSettings;
+  magicLiterals?: IMagicLiteralOptions;
+}
+
+/** One allow entry as the schema yields it. */
+export interface IDuplicateAllow {
+  name: string;
+  files: string[];
+  reason: string;
+}
+
+/** Duplicate-type options after defaults apply. */
+export interface IDuplicateType {
+  minProperties: number;
+  allow: IDuplicateAllow[];
+}
+
+/** Duplicate-constant options after defaults apply. */
+export interface IDuplicateConstant {
+  namePattern: string;
+  allow: IDuplicateAllow[];
+}
+
+const MagicThresholdsSchema: z.ZodType<IMagicThresholds, IMagicThresholdsInput> = z.object({
   localString: z.number().int().nonnegative().default(DEFAULT_LOCAL_STRING_THRESHOLD),
   globalString: z.number().int().nonnegative().default(DEFAULT_GLOBAL_STRING_THRESHOLD),
   localNumber: z.number().int().nonnegative().default(DEFAULT_LOCAL_NUMBER_THRESHOLD),
@@ -33,7 +150,7 @@ const MagicThresholdsSchema = z.object({
 }).strict();
 
 /** Options of the magic-literal detector. Every list that names a project vocabulary is an option. */
-export const MagicLiteralOptionsSchema = z.object({
+export const MagicLiteralOptionsSchema: z.ZodType<IMagicLiteralOptions, IMagicLiteralOptionsInput> = z.object({
   checkNumbers: z.boolean().default(true),
   thresholds: MagicThresholdsSchema.default(() => MagicThresholdsSchema.parse({})),
   /** Strings that never count, on top of the built-in structural words. */
@@ -59,7 +176,7 @@ export const MagicLiteralOptionsSchema = z.object({
 export type IMagicLiteralInput = z.input<typeof MagicLiteralOptionsSchema>;
 
 /** Options of the optional-parameter check. Every field is project-specific, so none has a default. */
-export const OptionalParamsSettingsSchema = z.object({
+export const OptionalParamsSettingsSchema: z.ZodType<IOptionalParamsSettings, IOptionalParamsSettings> = z.object({
   wrapperType: z.string(),
   wrapperImport: z.string(),
   reasonExamples: z.array(z.string()),
@@ -72,7 +189,7 @@ export const OptionalParamsSettingsSchema = z.object({
 }).strict();
 
 /** Options of the unused-exports check. Every field is project-specific, so none has a default. */
-export const UnusedExportsSettingsSchema = z.object({
+export const UnusedExportsSettingsSchema: z.ZodType<IUnusedExportsSettings, IUnusedExportsSettings> = z.object({
   productionRoots: z.array(z.string()),
   testSegments: z.array(z.string()),
   testSuffixes: z.array(z.string()),
@@ -85,21 +202,22 @@ export const UnusedExportsSettingsSchema = z.object({
 }).strict();
 
 /** Options of the constant-restatement check. Every field is project-specific, so none has a default. */
-export const ConstantRestatementSettingsSchema = z.object({
-  constantModules: z.array(z.string()),
-  testRoots: z.array(z.string()),
-  minRestatedElements: z.number().int().positive(),
-}).strict();
+export const ConstantRestatementSettingsSchema: z.ZodType<IConstantRestatementSettings, IConstantRestatementSettings> =
+  z.object({
+    constantModules: z.array(z.string()),
+    testRoots: z.array(z.string()),
+    minRestatedElements: z.number().int().positive(),
+  }).strict();
 
 /** Schema of the catalog `wholeTree` section. Each section is optional, and an unknown key is rejected. */
-const WholeTreeSettingsSchema = z.object({
+const WholeTreeSettingsSchema: z.ZodType<IWholeTreeSettings, IWholeTreeSettingsInput> = z.object({
   optionalParams: OptionalParamsSettingsSchema,
   unusedExports: UnusedExportsSettingsSchema,
   constantRestatement: ConstantRestatementSettingsSchema,
   magicLiterals: MagicLiteralOptionsSchema,
 }).partial().strict();
 
-const DuplicateAllowEntrySchema = z.object({
+const DuplicateAllowEntrySchema: z.ZodType<IDuplicateAllow, IDuplicateAllow> = z.object({
   name: z.string(),
   files: z.array(z.string()),
   reason: z.string(),
@@ -109,13 +227,13 @@ const DEFAULT_MIN_PROPERTIES = 2;
 const DEFAULT_CONSTANT_NAME_PATTERN = "^[A-Z][A-Z0-9_]*$";
 
 /** Options of the duplicate-type check, as a catalog rule entry states them. */
-export const DuplicateTypeOptionsSchema = z.object({
+export const DuplicateTypeOptionsSchema: z.ZodType<IDuplicateType, IDuplicateTypeInput> = z.object({
   minProperties: z.number().int().positive().default(DEFAULT_MIN_PROPERTIES),
   allow: z.array(DuplicateAllowEntrySchema).default([]),
 }).strict();
 
 /** Options of the duplicate-constant check, as a catalog rule entry states them. */
-export const DuplicateConstantOptionsSchema = z.object({
+export const DuplicateConstantOptionsSchema: z.ZodType<IDuplicateConstant, IDuplicateConstantInput> = z.object({
   namePattern: z.string().default(DEFAULT_CONSTANT_NAME_PATTERN),
   allow: z.array(DuplicateAllowEntrySchema).default([]),
 }).strict();
@@ -138,18 +256,6 @@ export interface IDuplicateConstantInput {
   readonly namePattern?: string;
   readonly allow?: readonly IDuplicateAllowInput[];
 }
-
-/** The catalog `wholeTree` section. */
-export type IWholeTreeSettings = z.infer<typeof WholeTreeSettingsSchema>;
-
-/** Settings for the constant-restatement rule. */
-export type IConstantRestatementSettings = NonNullable<IWholeTreeSettings["constantRestatement"]>;
-
-/** Settings for the unused-exports rule. */
-export type IUnusedExportsSettings = NonNullable<IWholeTreeSettings["unusedExports"]>;
-
-/** Settings for the optional-parameter rule. */
-export type IOptionalParamsSettings = NonNullable<IWholeTreeSettings["optionalParams"]>;
 
 const CatalogSettingsSchema = z.object({ [WHOLE_TREE_KEY]: WholeTreeSettingsSchema.optional() }).loose();
 

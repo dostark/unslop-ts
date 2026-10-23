@@ -20,11 +20,11 @@ export function compilesAsRegex(source: string, flags = ""): boolean {
 }
 
 /** A string that is a valid regular expression source. */
-export const RegexSourceSchema = z.string().refine((value) => compilesAsRegex(value), {
+export const RegexSourceSchema: z.ZodType<string, string> = z.string().refine((value) => compilesAsRegex(value), {
   message: "is not a valid regular expression",
 });
 
 /** A string of valid, non-repeated regular expression flags. */
-export const RegexFlagsSchema = z.string().refine((value) => compilesAsRegex("", value), {
+export const RegexFlagsSchema: z.ZodType<string, string> = z.string().refine((value) => compilesAsRegex("", value), {
   message: "holds an invalid or repeated regular expression flag",
 });

@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 2
+    },
+    "plugin": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "extends": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "unslop:recommended",
+          "unslop:strict"
+        ]
+      }
+    },
+    "docsBase": {
+      "default": "",
+      "type": "string"
+    },
+    "paths": {
+      "default": {
+        "test": [],
+        "fixture": [],
+        "ignore": []
+      },
+      "type": "object",
+      "properties": {
+        "test": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixture": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignore": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "glob": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "glob",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requiresScope": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "prod",
+                "test",
+                "all"
+              ]
+            }
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rules": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "error",
+              "warn",
+              "off"
+            ]
+          },
+          {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warn",
+                  "off"
+                ]
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warn",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "prod",
+                  "test",
+                  "all"
+                ]
+              },
+              "include": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "optIn": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "docs": {
+                "type": "string"
+              },
+              "limits": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "exclusionCodes": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "level"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "profiles": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "required": [
+    "version",
+    "plugin"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      ]
+    }
+  }
+}

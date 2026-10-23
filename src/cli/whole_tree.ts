@@ -18,7 +18,7 @@
 import { fromFileUrl, relative } from "@std/path";
 import { CliError } from "./error.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
-import { CatalogError, type JsonValue } from "../engine/catalog.ts";
+import { asJsonValue, CatalogError, type JsonValue } from "../engine/catalog.ts";
 import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
 import {
@@ -325,7 +325,7 @@ async function loadCatalog(args: readonly string[]): Promise<JsonValue> {
   try {
     const descriptor = await loadConfigDescriptor(Deno.cwd(), descriptorArg, pluginArg);
     const compiled = await readAndCompile(descriptor);
-    return structuredClone(compiled.catalog) as JsonValue;
+    return asJsonValue(structuredClone(compiled.catalog));
   } catch (error) {
     if (error instanceof CliError) return exitWithUsage(error.message);
     throw error;

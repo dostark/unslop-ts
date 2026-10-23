@@ -16,6 +16,7 @@ import {
   type RuleScope,
   type RuleSeverity,
 } from "../engine/catalog.ts";
+import { asJsonRecord, asJsonValue } from "../engine/catalog.ts";
 import { createRuleRegistry } from "../engine/registry.ts";
 import { CATEGORY_DESCRIPTIONS, RULE_CATEGORIES, type RuleCategory } from "../rules/meta.ts";
 import type { IRuleMeta, RuleEngine } from "../rules/meta.ts";
@@ -275,7 +276,7 @@ export function migrateCatalog(v1: JsonValue, descriptor: IProjectDescriptor): I
     if (!section) continue;
     const owner = owners.get(check.id);
     if (!owner) throw new ConfigError(`rules.${check.id}`, "no whole-tree check descriptor owns this id");
-    rules[check.id] = { level: hostBaseLevel(owner.controls), options: section as JsonValue };
+    rules[check.id] = { level: hostBaseLevel(owner.controls), options: asJsonValue(section) };
   }
 
   const config: Record<string, JsonValue> = { version: 2, plugin: descriptor.pluginName };
@@ -373,7 +374,7 @@ export function semanticCatalogProjection(
     if (settingsCheck) {
       const section = wholeTree[settingsCheck.section];
       if (!section) throw new ConfigError(`rules.${id}`, "the version 1 catalog does not configure this check");
-      rules[id] = projectRule(id, undefined, owner, docsBase, section as Record<string, JsonValue>);
+      rules[id] = projectRule(id, undefined, owner, docsBase, asJsonRecord(section));
       continue;
     }
     const entry = catalog.rules[id];

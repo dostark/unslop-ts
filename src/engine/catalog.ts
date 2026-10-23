@@ -25,6 +25,16 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+/** Widens a validated model to a JSON value; the caller owns the shape guarantee. */
+export function asJsonValue(value: unknown): JsonValue {
+  return value as JsonValue;
+}
+
+/** Widens a validated model to a JSON record; the caller owns the shape guarantee. */
+export function asJsonRecord(value: unknown): Record<string, JsonValue> {
+  return value as Record<string, JsonValue>;
+}
+
 /** Per-rule option schemas for script-engine rules, owned by the script that implements them. */
 export type ScriptRuleSchemas = Record<string, z.ZodTypeAny>;
 
@@ -60,21 +70,75 @@ export class CatalogError extends Error {
   }
 }
 
+/** The `scopes` section of a catalog. */
+export type ICatalogScopes = {
+  test: string[];
+  fixture: string[];
+};
+
+/** One tag of the catalog vocabulary. */
+export type ITagEntry = {
+  description: string;
+  requiresScope?: RuleScope[];
+};
+
+/** One rule entry of a catalog. */
+export type ICatalogRuleEntry = {
+  engine: "script" | "plugin";
+  severity: RuleSeverity;
+  scope: RuleScope;
+  include?: string[];
+  exclude?: string[];
+  codeStyle?: string;
+  optIn?: boolean;
+  reason?: string;
+  options?: Record<string, unknown>;
+  exclusionCodes?: Record<string, string>;
+  tags: string[];
+  limits?: string;
+};
+
+/** One ignore entry of a catalog. */
+export type ICatalogIgnore = {
+  glob: string;
+  reason: string;
+};
+
+/** One value of a catalog `layout` section. */
+export type CatalogLayoutValue = string | string[] | { path: string; reason: string }[];
+
+/** The `layout` section of a catalog. */
+export type ICatalogLayout = Record<string, CatalogLayoutValue>;
+
+/** The opaque `wholeTree` section of a catalog. */
+export type ICatalogWholeTree = Record<string, unknown>;
+
+/** The validated catalog model. */
+export type ICatalog = {
+  version: string;
+  scopes: ICatalogScopes;
+  layout?: ICatalogLayout;
+  wholeTree?: ICatalogWholeTree;
+  tagVocabulary: Record<string, ITagEntry>;
+  rules: Record<string, ICatalogRuleEntry>;
+  ignore?: ICatalogIgnore[];
+};
+
 const ScopeSchema = z.enum(["prod", "test", "all"]);
 const SeveritySchema = z.enum(["error", "warn", "off"]);
 const EngineSchema = z.enum(["script", "plugin"]);
 
-const ScopesSchema = z.object({
+const ScopesSchema: z.ZodType<ICatalogScopes> = z.object({
   test: z.array(z.string()),
   fixture: z.array(z.string()),
 }).strict();
 
-const TagEntrySchema = z.object({
+const TagEntrySchema: z.ZodType<ITagEntry> = z.object({
   description: z.string(),
   requiresScope: z.array(ScopeSchema).optional(),
 }).strict();
 
-const RuleEntrySchema = z.object({
+const RuleEntrySchema: z.ZodType<ICatalogRuleEntry> = z.object({
   engine: EngineSchema,
   severity: SeveritySchema,
   scope: ScopeSchema,
@@ -89,9 +153,9 @@ const RuleEntrySchema = z.object({
   limits: z.string().optional(),
 }).strict();
 
-const IgnoreSchema = z.object({ glob: z.string(), reason: z.string() }).strict();
+const IgnoreSchema: z.ZodType<ICatalogIgnore> = z.object({ glob: z.string(), reason: z.string() }).strict();
 
-const LayoutSchema = z.record(
+const LayoutSchema: z.ZodType<ICatalogLayout> = z.record(
   z.string(),
   z.union([
     z.string(),
@@ -100,9 +164,9 @@ const LayoutSchema = z.record(
   ]),
 );
 
-const WholeTreeSchema = z.record(z.string(), z.unknown());
+const WholeTreeSchema: z.ZodType<ICatalogWholeTree> = z.record(z.string(), z.unknown());
 
-const CatalogSchema = z.object({
+const CatalogSchema: z.ZodType<ICatalog> = z.object({
   version: z.string(),
   scopes: ScopesSchema,
   layout: LayoutSchema.optional(),
@@ -112,9 +176,7 @@ const CatalogSchema = z.object({
   ignore: z.array(IgnoreSchema).optional(),
 }).strict();
 
-export type ICatalog = z.infer<typeof CatalogSchema>;
-export type ICatalogScopes = z.infer<typeof ScopesSchema>;
-type IRuleEntry = z.infer<typeof RuleEntrySchema>;
+type IRuleEntry = ICatalogRuleEntry;
 
 function issuePath(error: z.ZodError, fallback: string): string {
   const issue = error.issues[0];

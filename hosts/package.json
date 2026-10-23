@@ -1,0 +1,17 @@
+{
+  "name": "@dostark/unslop-ts-hosts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest:node": "node ./link_node_modules.mjs",
+    "pretest:bun": "node ./link_node_modules.mjs",
+    "test:node": "cd .. && node --test \"tests_node/**/*.test.mjs\"",
+    "test:bun": "cd .. && bun test tests_node/",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "zod": "4.6.5"
+  }
+}

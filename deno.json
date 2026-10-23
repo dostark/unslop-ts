@@ -25,7 +25,7 @@
   "tasks": {
     "test": "deno test --allow-all",
     "lint": "deno lint --config=deno.json",
-    "check": "deno check mod.ts src/ tests/ examples/",
+    "check": "deno check mod.ts deno.ts src/report/mod.ts src/ tests/ examples/",
     "fmt": "deno fmt",
     "cli": "deno run --allow-read --allow-env src/cli/unslop.ts",
     "cli:write": "deno run --allow-read --allow-write --allow-env src/cli/unslop.ts",
@@ -57,9 +57,23 @@
   },
   "lint": {
     "rules": {
-      "exclude": [
-        "no-slow-types"
-      ]
+      "exclude": []
     }
+  },
+  "test": {
+    "exclude": [
+      "tests_node/",
+      "hosts/"
+    ]
+  },
+  "publish": {
+    "exclude": [
+      "hosts/",
+      "node_modules/",
+      "tests_node/",
+      "examples/node-project/",
+      "examples/bun-project/",
+      "dist/"
+    ]
   }
 }

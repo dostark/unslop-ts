@@ -66,3 +66,10 @@ Deno.test("limits_schema_accepts_strings_and_rejects_other_values", () => {
   const schema = configJsonSchema() as { properties?: { rules?: unknown } };
   assert(schema.properties?.rules);
 });
+
+Deno.test("configJsonSchema equals the recorded golden", async () => {
+  const golden: unknown = JSON.parse(
+    await Deno.readTextFile(new URL("./fixtures/config_v2_schema.golden.json", import.meta.url)),
+  );
+  assertEquals(configJsonSchema(), golden);
+});
