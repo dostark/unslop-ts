@@ -34,7 +34,9 @@
     "unslop:write": "deno run --allow-read --allow-write --allow-env src/cli/unslop.ts",
     "cli:report": "deno run --allow-read --allow-env --allow-run=deno src/cli/unslop.ts",
     "cli:report:write": "deno run --allow-read --allow-write --allow-env --allow-run=deno src/cli/unslop.ts",
-    "bundle": "deno run --allow-read --allow-write --allow-env --allow-run=deno scripts/bundle.ts"
+    "bundle": "deno run --allow-read --allow-write --allow-env --allow-run=deno scripts/bundle.ts",
+    "unslop:report": "deno run --allow-read --allow-env --allow-run=deno src/cli/unslop.ts",
+    "unslop:report:write": "deno run --allow-read --allow-write --allow-env --allow-run=deno src/cli/unslop.ts"
   },
   "compilerOptions": {
     "lib": [

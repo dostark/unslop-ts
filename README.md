@@ -213,7 +213,7 @@ file.
 
 ## Command line
 
-Run the CLI from a checkout with `deno task cli`, or as the package subpath `@dostark/unslop-ts/cli`.
+Run the CLI from a checkout with `deno task unslop`, or as the package subpath `@dostark/unslop-ts/cli`.
 
 | Command                                                                        | Effect                                                                            |
 | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
@@ -230,9 +230,21 @@ Run the CLI from a checkout with `deno task cli`, or as the package subpath `@do
 | `unslop config schema`                                                         | The generated structural JSON Schema.                                             |
 | `unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=]` | Migrate a version 1 catalog without overwriting an input or existing destination. |
 
-Use `deno task cli` for read commands and dry runs. Use `deno task cli:write` for a real edit, a
+Use `deno task unslop` for read commands and dry runs. Use `deno task unslop:write` for a real edit, a
 migration, or any command that locks, stages, and writes files. The read task grants no write access,
 because the CLI imports trusted project code with its own permissions.
+
+### Get the `unslop` command
+
+The package publishes a module, not a binary. Install the command with Deno:
+
+```sh
+deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop-ts/cli
+```
+
+Add `--allow-write` for edits and `--allow-run=deno` for `unslop report`. Then run
+`unslop rules list`. In a checkout, `deno task unslop` and `deno task unslop:write` run the same
+entry with the same permissions.
 
 ### Command examples
 
@@ -241,23 +253,23 @@ needs. The `migrate` example assumes a version 1 project and writes a separate o
 clobber a live version 2 file.
 
 ```sh
-deno task cli rules list --format=json
-deno task cli rules show demo/max-params --format=json
-deno task cli rules enable demo/no-boolean-assert --dry-run
-deno task cli rules disable demo/no-chained-type-assertions --reason=unused --dry-run
-deno task cli rules set demo/max-params max=4 --dry-run
-deno task cli rules unset demo/max-params max --dry-run
-deno task cli presets list --format=json
-deno task cli presets show unslop:strict --format=json
-deno task cli config validate
-deno task cli config print
-deno task cli config schema
-deno task cli:write rules set demo/max-params max=3
-deno task cli:write migrate --descriptor=examples/unslop.project.ts --from=catalog.json --out=unslop.migrated.config.json --layout-out=layout.json
-deno task cli:report report --format=json src
-deno task cli:report report --format=markdown src
-deno task cli:report report --format=sarif src
-deno task cli:report:write report --format=json --out=report.json src
+deno task unslop rules list --format=json
+deno task unslop rules show demo/max-params --format=json
+deno task unslop rules enable demo/no-boolean-assert --dry-run
+deno task unslop rules disable demo/no-chained-type-assertions --reason=unused --dry-run
+deno task unslop rules set demo/max-params max=4 --dry-run
+deno task unslop rules unset demo/max-params max --dry-run
+deno task unslop presets list --format=json
+deno task unslop presets show unslop:strict --format=json
+deno task unslop config validate
+deno task unslop config print
+deno task unslop config schema
+deno task unslop:write rules set demo/max-params max=3
+deno task unslop:write migrate --descriptor=examples/unslop.project.ts --from=catalog.json --out=unslop.migrated.config.json --layout-out=layout.json
+deno task unslop:report report --format=json src
+deno task unslop:report report --format=markdown src
+deno task unslop:report report --format=sarif src
+deno task unslop:report:write report --format=json --out=report.json src
 ```
 
 Query and edit routes accept `--plugin=<entry>` to select a local plugin entry. Without it, discovery
@@ -314,7 +326,7 @@ Until Phase 232 Step 5 adds the version 2 adapter, a whole-tree host still reads
 running:
 
 ```sh
-deno task cli config print > catalog.json
+deno task unslop config print > catalog.json
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-exports
 ```
 
