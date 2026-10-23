@@ -1,0 +1,414 @@
+[
+  {
+    "rule": "no-chained-type-assertions",
+    "source": "export const value = input as unknown as string;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-explicit-unknown",
+    "source": "export const value: unknown = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-unsafe-dictionary",
+    "source": "export const map: Record<string, any> = {};\n",
+    "expected": {
+      "deno": {
+        "no-explicit-any": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-explicit-any": "related"
+      },
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-typeof-escape",
+    "source": "export const value = input as typeof globalThis.fetch;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-pass-through-type-alias",
+    "source": "type B = string;\ntype A = B;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "no-object-parameters",
+    "source": "export function run(input: object) { return input; }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "require-safety-comment",
+    "source": "export const value = input as string;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "require-optional-wrapper",
+    "source": "export function run(input?: string) { return input; }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-runtime-typeof",
+    "source": "export const isText = typeof value === \"string\";\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-conditional-empty-object-spread",
+    "source": "export const merged = { ...(flag ? {} : { a: 1 }) };\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-boolean-assert",
+    "source": "assert(value.includes(\"x\"), true);\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-repeated-assert-call",
+    "source": "function run() {\n  assertEquals(getValue(), 1);\n  assertEquals(getValue(), 2);\n}\n",
+    "expected": {
+      "deno": {
+        "no-unused-vars": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "no-constant-substring-assert",
+    "source": "import { MESSAGE } from \"./constants.ts\";\nassertStringIncludes(MESSAGE, \"message\");\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "max-cyclomatic-complexity",
+    "source": "export function run(a) { if (a) { return 1; } return 0; }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "max-class-size",
+    "source": "export class A { m() { return 1; } n() { return 2; } }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "max-params",
+    "source": "export function run(a, b, c, d, e, f, g, h) { return a; }\n",
+    "expected": {
+      "deno": {
+        "no-unused-vars": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "import-inside-statement",
+    "source": "export function load() { return import(\"./b.ts\"); }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "dynamic-import",
+    "source": "export const loaded = import(\"./b.ts\");\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "inline-type-import",
+    "source": "export type Value = import(\"./a.ts\").Value;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "re-export-imported",
+    "source": "export { value } from \"./a.ts\";\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "import-placement",
+    "source": "export const value = 1;\nimport { a } from \"./a.ts\";\n",
+    "expected": {
+      "deno": {
+        "no-unused-vars": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "exported-interface-placement",
+    "source": "export function run() { return 1; }\nexport interface IValue { a: string }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "exported-interface-naming",
+    "source": "export interface Value { a: string }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-interface-rename-on-import",
+    "source": "import { IValue as Value } from \"./a.ts\";\n",
+    "expected": {
+      "deno": {
+        "no-unused-vars": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "promise-response-alias",
+    "source": "export type Api = Promise<Response>;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "promise-response-return",
+    "source": "export function load(): Promise<Response> { return fetch(\"/\"); }\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "ts-suppression-pragmas",
+    "source": "// @ts-ignore: legacy code\nexport const value = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {
+        "@typescript-eslint/ban-ts-comment": "related"
+      },
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "magic-union-type",
+    "source": "export const state: \"on\" | \"off\" = \"on\";\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "long-comment",
+    "source": "export const value = 1;\n// one\n// two\n// three\n// four\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "ephemeral-comment",
+    "source": "// 2024-01-02\nexport const value = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "decorative-comment",
+    "source": "export const value = 1;\n// ==========================\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "test-inline-multiline-fixture",
+    "source": "const json = `{\n  \"a\": 1,\n  \"b\": 2,\n  \"c\": 3,\n  \"d\": 4,\n  \"e\": 5,\n  \"f\": 6\n}`;\n",
+    "expected": {
+      "deno": {
+        "no-unused-vars": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "require-module-header",
+    "source": "export const value = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "ephemeral-filename",
+    "source": "export const value = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "import-boundaries",
+    "source": "import { a } from \"./forbidden/a.ts\";\n",
+    "expected": {
+      "deno": {
+        "no-unused-vars": "incidental"
+      },
+      "eslint": {
+        "@typescript-eslint/no-unused-vars": "incidental"
+      },
+      "oxlint": {
+        "eslint(no-unused-vars)": "incidental"
+      }
+    }
+  },
+  {
+    "rule": "ignore-needs-reason",
+    "source": "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {
+        "@eslint-community/eslint-comments/require-description": "incidental"
+      },
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "no-forbidden-lint-ignore",
+    "source": "// eslint-disable-next-line unslop/no-explicit-unknown\nexport const value: unknown = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {
+        "@eslint-community/eslint-comments/require-description": "incidental"
+      },
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "require-deno-shebang",
+    "source": "export const value = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "require-script-usage",
+    "source": "#!/usr/bin/env -S deno run -A\n// Script entry.\nexport const value = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
+    "rule": "ignore-needs-reason",
+    "source": "// eslint-disable-next-line @typescript-eslint/no-explicit-any\nexport const value: unknown = 1;\n",
+    "expected": {
+      "deno": {},
+      "eslint": {
+        "@eslint-community/eslint-comments/require-description": "duplicate"
+      },
+      "oxlint": {}
+    }
+  }
+]

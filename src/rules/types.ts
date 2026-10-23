@@ -72,11 +72,23 @@ export interface IPluginRuleContext {
   readonly dialects?: readonly SuppressionDialect[];
 }
 
+/** A linter whose rule overlaps an engine rule. */
+export type OverlapEcosystem = "deno" | "eslint" | "typescript-eslint" | "oxlint" | "biome" | "eslint-comments";
+
+/** One overlap of an engine rule with another linter's rule. */
+export interface IRuleOverlap {
+  readonly ecosystem: OverlapEcosystem;
+  readonly rule: string;
+  readonly kind: "duplicate" | "related";
+}
+
 export interface IPluginRule {
   /** Description, category, guide anchor, preset, and limits of the rule. */
   readonly meta: IRuleMeta;
   /** True when the rule reads `ctx.isTestFile`, so a host must supply test globs. */
   readonly requiresTestGlobs: boolean;
+  /** How this rule relates to rules of other linters, per ecosystem. */
+  readonly overlaps: readonly IRuleOverlap[];
   create(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor;
 }
 

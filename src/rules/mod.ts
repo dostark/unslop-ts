@@ -59,6 +59,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
   name: "typescript",
   rules: {
     "no-chained-type-assertions": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "no-unnecessary-type-assertion", kind: "related" }],
       requiresTestGlobs: true,
       meta: {
         description: "Two or more type assertions in one chain.",
@@ -70,6 +71,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoChainedTypeAssertions,
     },
     "no-explicit-unknown": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "no-explicit-any", kind: "related" }],
       meta: {
         description: "An unknown type outside a catch binding, a type-predicate subject, or a generic parameter.",
         category: "type-safety",
@@ -81,6 +83,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoExplicitUnknown,
     },
     "no-unsafe-dictionary": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "no-explicit-any", kind: "related" }],
       meta: {
         description: "A Record, Map, or index signature whose value type is weak.",
         category: "type-safety",
@@ -93,6 +96,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoUnsafeDictionary,
     },
     "no-typeof-escape": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "no-explicit-any", kind: "related" }],
       requiresTestGlobs: true,
       meta: {
         description: "An as typeof assertion outside the allowed targets.",
@@ -105,6 +109,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoTypeofEscape,
     },
     "no-pass-through-type-alias": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "no-unnecessary-type-assertion", kind: "related" }],
       meta: {
         description: "An alias that names another top-level alias of the same file.",
         category: "type-safety",
@@ -116,6 +121,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoPassThroughTypeAlias,
     },
     "no-object-parameters": {
+      overlaps: [],
       meta: {
         description: "A parameter typed object.",
         category: "type-safety",
@@ -128,6 +134,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoObjectParameters,
     },
     "require-safety-comment": {
+      overlaps: [],
       meta: {
         description: "A non-const type assertion that has no safety comment.",
         category: "type-safety",
@@ -139,6 +146,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createRequireSafetyComment,
     },
     "no-runtime-typeof": {
+      overlaps: [{ ecosystem: "eslint", rule: "valid-typeof", kind: "related" }],
       meta: {
         description: "A typeof comparison that narrows a value at run time.",
         category: "type-safety",
@@ -150,6 +158,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoRuntimeTypeof,
     },
     "no-conditional-empty-object-spread": {
+      overlaps: [],
       meta: {
         description: "A spread of a conditional with an empty-object branch.",
         category: "type-safety",
@@ -161,6 +170,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoConditionalEmptyObjectSpread,
     },
     "no-boolean-assert": {
+      overlaps: [],
       meta: {
         description: "A string or array check wrapped in a boolean assertion.",
         category: "test-quality",
@@ -172,6 +182,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoBooleanAssert,
     },
     "no-repeated-assert-call": {
+      overlaps: [],
       meta: {
         description: "Two adjacent assertions that take the same call as their first argument.",
         category: "test-quality",
@@ -183,6 +194,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoRepeatedAssertCall,
     },
     "no-constant-substring-assert": {
+      overlaps: [],
       meta: {
         description: "A substring assertion that restates an imported constant as a literal.",
         category: "test-quality",
@@ -194,6 +206,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoConstantSubstringAssert,
     },
     "max-cyclomatic-complexity": {
+      overlaps: [{ ecosystem: "eslint", rule: "complexity", kind: "related" }],
       meta: {
         description: "A function whose cyclomatic complexity exceeds the limit.",
         category: "complexity",
@@ -206,6 +219,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createMaxCyclomaticComplexity,
     },
     "max-class-size": {
+      overlaps: [{ ecosystem: "eslint", rule: "max-classes-per-file", kind: "related" }],
       meta: {
         description: "A class whose size score reaches the threshold.",
         category: "complexity",
@@ -217,6 +231,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createMaxClassSize,
     },
     "require-optional-wrapper": {
+      overlaps: [],
       meta: {
         description: "An optional parameter that the wrapper convention does not declare.",
         category: "optional-parameters",
@@ -228,6 +243,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createRequireOptionalWrapper,
     },
     "import-inside-statement": {
+      overlaps: [],
       meta: {
         description: "An import call nested in a function, a block, or a loop.",
         category: "imports",
@@ -239,6 +255,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createImportInsideStatement,
     },
     "dynamic-import": {
+      overlaps: [],
       meta: {
         description: "A dynamic import with no catalog allowance.",
         category: "imports",
@@ -250,6 +267,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createDynamicImport,
     },
     "inline-type-import": {
+      overlaps: [],
       meta: {
         description: "An import() type with a member access inside a type annotation.",
         category: "imports",
@@ -261,6 +279,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createInlineTypeImport,
     },
     "re-export-imported": {
+      overlaps: [],
       meta: {
         description: "An export that forwards a name another module defines.",
         category: "imports",
@@ -272,6 +291,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createReExportImported,
     },
     "import-placement": {
+      overlaps: [],
       meta: {
         description: "A type definition above the last import, or an import below code.",
         category: "imports",
@@ -283,6 +303,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createImportPlacement,
     },
     "exported-interface-placement": {
+      overlaps: [],
       meta: {
         description: "An exported interface below functional code.",
         category: "interfaces",
@@ -294,6 +315,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createExportedInterfacePlacement,
     },
     "promise-response-alias": {
+      overlaps: [],
       meta: {
         description: "A type alias that masks Promise<Response>.",
         category: "type-safety",
@@ -305,6 +327,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createPromiseResponseAlias,
     },
     "promise-response-return": {
+      overlaps: [],
       meta: {
         description: "A Promise<Response> type annotation.",
         category: "type-safety",
@@ -316,6 +339,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createPromiseResponseReturn,
     },
     "ts-suppression-pragmas": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "ban-ts-comment", kind: "related" }],
       meta: {
         description: "A @ts-ignore, @ts-expect-error, or @ts-nocheck comment with a description.",
         category: "type-safety",
@@ -327,6 +351,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createTsSuppressionPragmas,
     },
     "magic-union-type": {
+      overlaps: [],
       meta: {
         description: "An inline union of string literals outside a named type alias.",
         category: "magic-values",
@@ -338,6 +363,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createMagicUnionType,
     },
     "long-comment": {
+      overlaps: [],
       meta: {
         description: "A comment block longer than the line limit, after the module header.",
         category: "comments",
@@ -349,6 +375,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createLongComment,
     },
     "ephemeral-comment": {
+      overlaps: [],
       meta: {
         description: "A comment with a calendar date or a configured prior-attempt phrase.",
         category: "comments",
@@ -360,6 +387,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createEphemeralComment,
     },
     "decorative-comment": {
+      overlaps: [],
       meta: {
         description: "A comment line with a repeated-punctuation banner separator.",
         category: "comments",
@@ -371,6 +399,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createDecorativeComment,
     },
     "max-params": {
+      overlaps: [{ ecosystem: "eslint", rule: "max-params", kind: "related" }],
       meta: {
         description: "A function, method, or constructor with more parameters than the limit.",
         category: "complexity",
@@ -382,6 +411,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createMaxParams,
     },
     "test-inline-multiline-fixture": {
+      overlaps: [],
       meta: {
         description: "A multi-line structured input written as an inline template in a test.",
         category: "test-quality",
@@ -393,6 +423,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createTestInlineMultilineFixture,
     },
     "require-module-header": {
+      overlaps: [],
       requiresTestGlobs: true,
       meta: {
         description: "A module that does not start with a header comment.",
@@ -404,6 +435,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createRequireModuleHeader,
     },
     "ephemeral-filename": {
+      overlaps: [],
       meta: {
         description: "A test file name that contains a numbered plan phase.",
         category: "comments",
@@ -415,6 +447,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createEphemeralFilename,
     },
     "exported-interface-naming": {
+      overlaps: [{ ecosystem: "typescript-eslint", rule: "naming-convention", kind: "related" }],
       meta: {
         description: "An exported interface that does not use the configured prefix.",
         category: "interfaces",
@@ -426,6 +459,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createExportedInterfaceNaming,
     },
     "no-interface-rename-on-import": {
+      overlaps: [],
       meta: {
         description: "An import that renames a prefixed interface.",
         category: "interfaces",
@@ -437,6 +471,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       create: createNoInterfaceRenameOnImport,
     },
     "import-boundaries": {
+      overlaps: [],
       meta: {
         description: "An import that a configured zone denies.",
         category: "boundaries",
@@ -456,6 +491,7 @@ export const DENO_RULE_PACK: IRulePack = {
   name: "deno",
   rules: {
     "ignore-needs-reason": {
+      overlaps: [{ ecosystem: "eslint-comments", rule: "require-description", kind: "duplicate" }],
       meta: {
         description: "A deno-lint-ignore comment for a plugin rule with no reason.",
         category: "type-safety",
@@ -467,6 +503,7 @@ export const DENO_RULE_PACK: IRulePack = {
       create: createIgnoreNeedsReason,
     },
     "no-forbidden-lint-ignore": {
+      overlaps: [{ ecosystem: "eslint-comments", rule: "no-unlimited-disable", kind: "related" }],
       meta: {
         description: "A deno-lint-ignore comment for a forbidden rule.",
         category: "type-safety",
@@ -478,6 +515,7 @@ export const DENO_RULE_PACK: IRulePack = {
       create: createNoForbiddenLintIgnore,
     },
     "require-deno-shebang": {
+      overlaps: [],
       meta: {
         description: "A file whose first line is not the Deno shebang.",
         category: "scripts",
@@ -489,6 +527,7 @@ export const DENO_RULE_PACK: IRulePack = {
       create: createRequireDenoShebang,
     },
     "require-script-usage": {
+      overlaps: [],
       meta: {
         description: "A script header without a Usage section and an example command.",
         category: "scripts",

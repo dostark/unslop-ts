@@ -206,6 +206,7 @@ Deno.test("trace_all_off_host_excluded_and_cached_runs", async () => {
 
   const programRule = {
     meta: TYPESCRIPT_RULE_PACK.rules["no-runtime-typeof"].meta,
+    overlaps: [],
     requiresTestGlobs: false,
     create(context: Deno.lint.RuleContext) {
       return {
@@ -382,6 +383,7 @@ Deno.test("reserved_observer_key_collision_is_refused", () => {
     name: "reserved",
     rules: {
       "internal-coverage": {
+        overlaps: [],
         requiresTestGlobs: false,
         meta: TYPESCRIPT_RULE_PACK.rules["no-runtime-typeof"].meta,
         create: () => ({}),
