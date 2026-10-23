@@ -1,0 +1,327 @@
+[
+  {
+    "function": "normalize",
+    "inputs": [
+      ""
+    ],
+    "expected": "."
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "."
+    ],
+    "expected": "."
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "./"
+    ],
+    "expected": "./"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      ".."
+    ],
+    "expected": ".."
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "../"
+    ],
+    "expected": "../"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "a/b/../c"
+    ],
+    "expected": "a/c"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "a//b"
+    ],
+    "expected": "a/b"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "/a//b/../c/"
+    ],
+    "expected": "/a/c/"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "/"
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "//a"
+    ],
+    "expected": "/a"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "a/./b"
+    ],
+    "expected": "a/b"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "a/b/.."
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "../../a"
+    ],
+    "expected": "../../a"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "a/../../b"
+    ],
+    "expected": "../b"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "/.."
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "/../a"
+    ],
+    "expected": "/a"
+  },
+  {
+    "function": "normalize",
+    "inputs": [
+      "a/b/c"
+    ],
+    "expected": "a/b/c"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      ""
+    ],
+    "expected": "."
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "."
+    ],
+    "expected": "."
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      ".."
+    ],
+    "expected": "."
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "/"
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "//"
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "/a"
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "/a/b"
+    ],
+    "expected": "/a"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "a"
+    ],
+    "expected": "."
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "a/b"
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "a/b/"
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "a//b"
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "/a/b/"
+    ],
+    "expected": "/a"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "///a"
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "dirname",
+    "inputs": [
+      "a/.."
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "join",
+    "inputs": [],
+    "expected": "."
+  },
+  {
+    "function": "join",
+    "inputs": [
+      ""
+    ],
+    "expected": "."
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a"
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a",
+      "b"
+    ],
+    "expected": "a/b"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a",
+      ""
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a",
+      ".."
+    ],
+    "expected": "."
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "/a",
+      ".."
+    ],
+    "expected": "/"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a/",
+      "/b"
+    ],
+    "expected": "a/b"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a//b",
+      "c"
+    ],
+    "expected": "a/b/c"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      ".",
+      "a"
+    ],
+    "expected": "a"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "..",
+      "a"
+    ],
+    "expected": "../a"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "/",
+      "a"
+    ],
+    "expected": "/a"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "/a",
+      "../b"
+    ],
+    "expected": "/b"
+  },
+  {
+    "function": "join",
+    "inputs": [
+      "a",
+      "b",
+      "c"
+    ],
+    "expected": "a/b/c"
+  }
+]

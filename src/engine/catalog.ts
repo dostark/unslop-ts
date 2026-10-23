@@ -3,11 +3,11 @@
  * @path src/engine/catalog.ts
  * @description Loads and validates the style-rule catalog, classifies repo paths, and resolves rule settings.
  * @architectural-layer Shared
- * @dependencies [@std/path, zod]
+ * @dependencies [zod]
  * @related-files [mod.ts, src/engine/registry.ts]
  */
 
-import { globToRegExp } from "@std/path";
+import { globToRegExp } from "./glob.ts";
 import { z } from "zod";
 import type { IRuleRegistry } from "./registry.ts";
 
@@ -198,7 +198,7 @@ const compiledGlobs = new Map<string, RegExp>();
 function globRegex(glob: string): RegExp {
   let regex = compiledGlobs.get(glob);
   if (!regex) {
-    regex = globToRegExp(glob, { extended: true, globstar: true });
+    regex = globToRegExp(glob);
     compiledGlobs.set(glob, regex);
   }
   return regex;

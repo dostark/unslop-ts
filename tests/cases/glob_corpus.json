@@ -1,0 +1,3512 @@
+[
+  {
+    "glob": "**/*.ts",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "../outside.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "*.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/deep/nested/b.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/a.tsx",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/fixtures/",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/fixtures",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**",
+    "path": "src/a/b/c.tsx",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/deep/nested/b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "tests/fixtures/x.json",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "vendor/lib.js",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/a.tsx",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/fixtures/",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/fixtures",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "../outside.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "**",
+    "path": "src/a/b/c.tsx",
+    "expected": true
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "a?c.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "[abc].ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "[!abc].ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "[a-z]*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "{a,b}/c.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/{a,b}/**/*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "+(foo|bar).ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "@(foo|bar).ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "?(foo|bar).ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "*(foo|bar).ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "!(foo|bar).ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/*_test.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "tests/fixtures/x.json",
+    "expected": true
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "tests/fixtures/**",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "vendor/lib.js",
+    "expected": true
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "**/vendor/**",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/deep/nested/b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/a.tsx",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "../outside.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/*.{ts,tsx}",
+    "path": "src/a/b/c.tsx",
+    "expected": true
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/**/mod.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "a\\*b.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "[[:digit:]]*.ts",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/fixtures/",
+    "expected": true
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/fixtures",
+    "expected": true
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "src/fixtures/",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  },
+  {
+    "glob": "**/",
+    "path": "src/a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/deep/nested/b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "a.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "b.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/a_test.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "tests/fixtures/x.json",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "vendor/lib.js",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/vendor/lib.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/a.tsx",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "a*c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "a?c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "abc.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "1.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "foofoo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/foo.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/bar.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/a/b/c.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/fixtures/",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/fixtures",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/a/b/mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "mod.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "../outside.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src//double.ts",
+    "expected": true
+  },
+  {
+    "glob": "**/",
+    "path": "src/a/b/c.tsx",
+    "expected": true
+  },
+  {
+    "glob": "",
+    "path": "src/a.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/deep/nested/b.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "a.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "b.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/a_test.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "tests/fixtures/x.json",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "vendor/lib.js",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/vendor/lib.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/a.tsx",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "a*c.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "a?c.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "abc.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "1.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "foofoo.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/foo.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/bar.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/a/b/c.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/fixtures/",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/fixtures",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/a/b/mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "mod.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "../outside.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src//double.ts",
+    "expected": false
+  },
+  {
+    "glob": "",
+    "path": "src/a/b/c.tsx",
+    "expected": false
+  }
+]

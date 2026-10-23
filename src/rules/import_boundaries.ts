@@ -3,11 +3,11 @@
  * @path src/rules/import_boundaries.ts
  * @description Reports an import that a boundary zone denies: files in a zone may not import a specifier or a resolved path.
  * @architectural-layer Shared
- * @dependencies [@std/path]
+ * @dependencies []
  * @related-files [src/rules/mod.ts, src/rules/rule_options.ts, src/engine/glob.ts]
  */
 
-import { dirname, join, normalize } from "@std/path/posix";
+import { dirname, join, normalize } from "../engine/posix_path.ts";
 import { matchesAnyGlob } from "../engine/glob.ts";
 import { asNode, type ILintNode } from "../engine/type_environment.ts";
 import { type BoundaryDeny, type BoundaryZone, ImportBoundariesOptions } from "./rule_options.ts";
