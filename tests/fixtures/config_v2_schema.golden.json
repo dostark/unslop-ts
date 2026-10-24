@@ -144,10 +144,7 @@
                   "$ref": "#/$defs/__schema0"
                 }
               }
-            ],
-            "items": false,
-            "minItems": 2,
-            "maxItems": 2
+            ]
           },
           {
             "type": "object",
