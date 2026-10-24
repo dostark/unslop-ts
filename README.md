@@ -144,10 +144,10 @@ never change a foreign diagnostic; the additivity suite checks that on all three
 The invariants hold for every host:
 
 1. Adding the plugin leaves every foreign diagnostic unchanged.
-2. The plugin reports only `unslop/...` ids.
-3. A preset sets no parser and no foreign rule.
-4. Plugin rules are `error` or `off`; `warn` becomes `error` in `deno lint`.
-5. Suppression follows the dialect the host understands.
+1. The plugin reports only `unslop/...` ids.
+1. A preset sets no parser and no foreign rule.
+1. Plugin rules are `error` or `off`; `warn` becomes `error` in `deno lint`.
+1. Suppression follows the dialect the host understands.
 
 ### Current limits
 
@@ -233,6 +233,20 @@ sha256sum -c dist/deno_plugin.js.sha256
 ```
 
 Both bundles and both checksum files attach to a release. `deno task bundle` rebuilds them.
+
+### Bundling for an embedded lint check
+
+A host that runs the plugin in a restricted child process can carry a verified copy instead of the
+source tree:
+
+- `unslop_engine.js` is the engine bundle. Its `.sha256` file is written by `deno task bundle` and
+  checked before the bundle is used.
+- The host compiles its own version 2 catalogs and records each file's size and SHA-256 hash in a
+  `manifest.json` beside the bundle. A consumer verifies that manifest before it loads anything.
+- The child runs offline: a host that starts it with `--deny-import` and a proxy-free environment
+  must ship every module it needs, because remote imports cannot resolve.
+- A redeploy to another directory verifies and copies the existing asset set instead of rebuilding,
+  because the engine source may be absent. Rebuild only from a source checkout.
 
 ## Configuration (version 2)
 
