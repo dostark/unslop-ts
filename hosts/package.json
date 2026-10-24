@@ -21,6 +21,6 @@
     "oxlint": "1.88.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
-    "zod": "4.6.5"
+    "zod": "4.4.3"
   }
 }

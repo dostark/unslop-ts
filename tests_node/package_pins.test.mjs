@@ -32,7 +32,7 @@ test("every host dependency is exact and none is a standard or JSR package", () 
 });
 
 test("the host pins equal the versions deno.lock resolves", () => {
-  assert.equal(HOSTS.devDependencies.zod, LOCK.specifiers["npm:zod@^4.4.3"]);
+  assert.equal(HOSTS.devDependencies.zod, LOCK.specifiers[DENO.imports.zod]);
   assert.equal(HOSTS.devDependencies.typescript, LOCK.specifiers["npm:typescript@6.0.3"]);
 });
 
