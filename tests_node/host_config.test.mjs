@@ -1,3 +1,4 @@
+// deno-lint-ignore-file -- generated configurations are imported at test time
 /**
  * @module HostConfigTest
  * @path tests_node/host_config.test.mjs
@@ -50,7 +51,6 @@ async function generatedEslint(compiled) {
     .replace('"@dostark/unslop-ts"', JSON.stringify(pathToFileURL(join(ROOT, "mod.ts")).href));
   const path = join(dir, "fragment.mjs");
   await writeFile(path, source);
-  // deno-lint-ignore exaix/dynamic-import exaix/import-inside-statement self/import-inside-statement -- generated config is imported at test time
   const module = await import(pathToFileURL(path).href);
   return {
     verify: (filename, code = MANY_PARAMS) =>
@@ -167,7 +167,6 @@ test("the generated ESLint fragment loads on a baseline config", async () => {
       );
     const fragment = join(dir, "fragment.mjs");
     await writeFile(fragment, text);
-    // deno-lint-ignore exaix/dynamic-import exaix/import-inside-statement self/import-inside-statement -- the fragment is generated at test time
     const module = await import(pathToFileURL(fragment).href);
     assert.equal(Array.isArray(module.default), true);
     assert.equal(typeof module.default[0].plugins.demo.create, "undefined");
