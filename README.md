@@ -36,11 +36,11 @@ own rule packs and script checks, so project-specific rules stay in the project.
 
 ## Hosts
 
-| Host                             | Entry                                                                 | Runtime      | Status       |
-| -------------------------------- | --------------------------------------------------------------------- | ------------ | ------------ |
-| `deno lint`                      | `@dostark/unslop-ts/deno` in `lint.plugins`, or `dist/deno_plugin.js` | Deno         | supported    |
-| ESLint 9.0.0 and later, below 11 | `@dostark/unslop-ts/eslint` as a plugin                               | Node.js, Bun | supported    |
-| Oxlint 1.88                      | the same ESLint plugin through `jsPlugins`                            | Node.js      | experimental |
+| Host                             | Entry                                                                     | Runtime      | Status       |
+| -------------------------------- | ------------------------------------------------------------------------- | ------------ | ------------ |
+| `deno lint`                      | `@dostark/unslop-ts/deno` in `lint.plugins`, or the release plugin bundle | Deno         | supported    |
+| ESLint 9.0.0 and later, below 11 | `@dostark/unslop-ts/eslint` as a plugin                                   | Node.js, Bun | supported    |
+| Oxlint 1.88                      | the same ESLint plugin through `jsPlugins`                                | Node.js      | experimental |
 
 The same rule modules run on every host. The conformance suite drives one case table
 (`tests/cases/conformance.json`) through `deno lint`, ESLint on Node.js, ESLint on Bun, and Oxlint on
