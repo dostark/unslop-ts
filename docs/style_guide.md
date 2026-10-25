@@ -108,6 +108,11 @@ a value type of `any`, `unknown`, `object`, or `{}`. Each one lets every propert
 | `no-forbidden-lint-ignore`           | A `deno-lint-ignore` comment for a forbidden rule. `no-explicit-any` is forbidden by default. |
 | `ignore-needs-reason`                | A `deno-lint-ignore` comment for a project rule that has no reason                            |
 
+An entry in `forbiddenRules` that ends with `/*`, such as `demo/*`, forbids every rule whose id starts
+with the text before the star, including `no-forbidden-lint-ignore` itself. A file-wide
+`deno-lint-ignore-file` comment is reported only for the rules it names, and Deno applies it before
+any plugin rule runs. A host that must not allow file-wide suppression rejects that comment itself.
+
 ## Imports {#imports}
 
 Imports show where code comes from. Keep them static, explicit, and at the top of the file.

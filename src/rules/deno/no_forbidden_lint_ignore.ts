@@ -13,9 +13,17 @@ import { DEFAULT_REASON_SEPARATOR, parseIgnoreDirective, resolveDialects } from 
 /** The rules no ignore comment may silence unless the catalog says otherwise. */
 export const DEFAULT_FORBIDDEN_IGNORES: readonly string[] = ["no-explicit-any"];
 
+/** A forbidden entry that ends with this suffix covers every rule id that starts with the text before the star. */
+const WILDCARD_SUFFIX = "/*";
+
 export function createNoForbiddenLintIgnore(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const rawForbidden = ctx.options.forbiddenRules;
   const forbidden = new Set(Array.isArray(rawForbidden) ? rawForbidden.map(String) : DEFAULT_FORBIDDEN_IGNORES);
+  const forbiddenPrefixes = [...forbidden].filter((entry) => entry.endsWith(WILDCARD_SUFFIX)).map((entry) =>
+    entry.slice(0, -1)
+  );
+  const isForbidden = (id: string): boolean =>
+    forbidden.has(id) || forbiddenPrefixes.some((prefix) => id.startsWith(prefix));
   const includeFileIgnores = ctx.options.includeFileIgnores !== false;
   const dialects = resolveDialects(ctx.options.dialects, ctx.dialects);
   return {
@@ -26,7 +34,7 @@ export function createNoForbiddenLintIgnore(context: IRuleContext, ctx: IPluginR
         if (directive?.dialect === "deno" && comment.type !== "Line") continue;
         if (!directive || (directive.isFileDirective && !includeFileIgnores)) continue;
         for (const id of directive.ids) {
-          if (!forbidden.has(id)) continue;
+          if (!isForbidden(id)) continue;
           context.report({
             range: comment.range,
             message: `Using '// ${directive.directive} ${id}' is not allowed; address the typing issue explicitly.`,

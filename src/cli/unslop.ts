@@ -14,6 +14,7 @@
  *   deno run --allow-read --allow-env src/cli/unslop.ts rules show <id> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts presets list|show <name> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts config validate|print [--resolved]|schema [--descriptor=]
+ *   deno run --allow-read --allow-write --allow-env --allow-run=deno,git src/cli/unslop.ts deno-policy --config= --out= [--packs=]
  *
  * Exit codes: 0 success, 1 invalid file content, 2 usage or unsupported operation.
  */
@@ -25,6 +26,7 @@ import { writeGeneratedFile } from "./safe_write.ts";
 import { renderEslintFragment, renderOxlintFragment, toHostConfig } from "../config/to_host_config.ts";
 import { parseFormat, parseReportFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
+import { buildDenoPolicy, DenoPolicyError } from "./commands/deno_policy.ts";
 import { runMigrate } from "./commands/migrate.ts";
 import { renderReport, reportExitCode, runReport } from "./commands/report.ts";
 import { type IRuleEditRequest, runRuleEdit } from "./commands/rules_write.ts";
@@ -53,6 +55,7 @@ const USAGE = [
   "  unslop config schema",
   "  unslop config export --host=eslint|oxlint --out=<path> [--overwrite] [--descriptor=<entry>]",
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
+  "  unslop deno-policy --config=<file> --out=<dir> [--packs=typescript[,deno]]",
   "  unslop report [--format=table|json|markdown|sarif] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
@@ -242,6 +245,24 @@ async function migrateCommand(args: readonly string[]): Promise<number> {
   return 0;
 }
 
+async function denoPolicyCommand(args: readonly string[]): Promise<number> {
+  const parsed = parseArgs(args, ["config", "packs", "out"], []);
+  requirePositionals(parsed, 0, "deno-policy");
+  const config = option(parsed, "config");
+  const out = option(parsed, "out");
+  if (config === undefined || out === undefined) {
+    throw new CliError(USAGE_EXIT, `deno-policy needs --config and --out\n${USAGE}`);
+  }
+  try {
+    const report = await buildDenoPolicy({ config, out, packs: (option(parsed, "packs") ?? "typescript").split(",") });
+    print(`wrote ${report.out}\n`);
+    return 0;
+  } catch (error) {
+    if (error instanceof DenoPolicyError) throw new CliError(error.usage ? USAGE_EXIT : FAILURE_EXIT, error.message);
+    throw error;
+  }
+}
+
 async function reportCommand(args: readonly string[]): Promise<number> {
   const terminator = args.indexOf("--");
   const optionArgs = terminator === -1 ? args : args.slice(0, terminator);
@@ -351,6 +372,7 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "presets") return await presetsCommand(rest);
     if (command === "config") return await configCommand(rest);
     if (command === "migrate") return await migrateCommand(rest);
+    if (command === "deno-policy") return await denoPolicyCommand(rest);
     if (command === "report") return await reportCommand(rest);
     throw new CliError(USAGE_EXIT, `${command === undefined ? "" : `unknown command '${command}'\n`}${USAGE}`);
   } catch (error) {

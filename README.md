@@ -241,8 +241,13 @@ source tree:
 
 - `unslop_engine.js` is the engine bundle. Its `.sha256` file is written by `deno task bundle` and
   checked before the bundle is used.
-- The host compiles its own version 2 catalogs and records each file's size and SHA-256 hash in a
-  `manifest.json` beside the bundle. A consumer verifies that manifest before it loads anything.
+- `unslop deno-policy --config=<file> --out=<dir>` builds the whole directory from one version 2
+  configuration: the engine bundle, `catalog.json`, a `plugin.ts` entry, a `deno.json` that loads it,
+  and a `manifest.json` with each file's size and SHA-256 hash. The command needs read, write, env,
+  and `--allow-run=deno,git` permissions. The git permission only records the engine commit. The
+  directory replaces an empty directory or a previous build, and never another directory. A consumer
+  verifies that manifest before it loads anything, then runs
+  `deno lint --deny-import --config <dir>/deno.json --rules-tags= --json <files>`.
 - The child runs offline: a host that starts it with `--deny-import` and a proxy-free environment
   must ship every module it needs, because remote imports cannot resolve.
 - A redeploy to another directory verifies and copies the existing asset set instead of rebuilding,
@@ -351,6 +356,7 @@ Run the CLI from a checkout with `deno task unslop`, or as the package subpath `
 | `unslop config print [--resolved] [--descriptor=<entry>]`                      | The emitted catalog, or the catalog plus the resolved index with `--resolved`.    |
 | `unslop config schema`                                                         | The generated structural JSON Schema.                                             |
 | `unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=]` | Migrate a version 1 catalog without overwriting an input or existing destination. |
+| `unslop deno-policy --config=<file> --out=<dir> [--packs=typescript[,deno]]`   | Build an offline Deno lint policy directory from a version 2 configuration.       |
 
 Use `deno task unslop` for read commands and dry runs. Use `deno task unslop:write` for a real edit, a
 migration, or any command that locks, stages, and writes files. The read task grants no write access,
@@ -465,6 +471,10 @@ adapter, so the separate catalog is temporary.
   pack rule key equals a built-in code or a built-in fires on a case that the test does not declare.
   `no-typeof-escape` reports only an `as typeof` cast, and the built-in `no-explicit-any` reports `any`.
   `ban-ts-comment` covers `@ts-ignore` pragmas.
+- **A file ignore hides everything.** `// deno-lint-ignore-file` suppresses every diagnostic of the
+  file before any plugin rule runs, so no rule can report it, including a file ignore that names the
+  rules that guard against ignores. A host that grades code it does not trust must reject
+  `deno-lint-ignore-file` comments itself, before it runs the linter.
 - **Deno's suppression is the only suppression.** Use `// deno-lint-ignore <plugin>/<rule> -- <reason>`.
   The built-in `ban-unused-ignore` reports a stale ignore. Rules that read ignore comments report at the
   comment.

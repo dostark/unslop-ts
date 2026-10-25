@@ -19,9 +19,11 @@ interface ISourceFile {
 }
 
 const PACKAGE_ROOT = fromFileUrl(new URL("..", import.meta.url));
-const SCANNED = ["src", "tests", "docs", "examples"];
+const SCANNED = ["src", "tests", "docs", "examples", "scripts"];
 const SCANNED_FILES = ["mod.ts", "README.md", "deno.json"];
-const SCANNED_EXTENSIONS = [".ts", ".md", ".json"];
+const SCANNED_EXTENSIONS = [".ts", ".md", ".json", ".mjs", ".js"];
+/** Source extensions whose imports are checked against the allowed packages. */
+const IMPORT_CHECKED_EXTENSIONS = [".ts", ".mjs", ".js"];
 const ALLOWED_PACKAGES = ["@std/", "zod", "typescript", "@dostark/unslop-ts"];
 /** Host tools that a host-specific example may import. */
 const EXAMPLE_HOST_PACKAGES = [
@@ -61,7 +63,7 @@ function purityViolations(files: readonly ISourceFile[]): string[] {
     for (const word of FORBIDDEN_WORDS) {
       if (lower.includes(word)) violations.push(`${file.path}: names '${word}'`);
     }
-    if (!file.path.endsWith(".ts")) continue;
+    if (!IMPORT_CHECKED_EXTENSIONS.some((extension) => file.path.endsWith(extension))) continue;
     for (const match of file.text.matchAll(IMPORT_PATTERN)) {
       const specifier = match[1] ?? match[2];
       if (!isAllowedImport(specifier, file.path)) violations.push(`${file.path}: imports '${specifier}'`);
@@ -70,15 +72,20 @@ function purityViolations(files: readonly ISourceFile[]): string[] {
   return violations;
 }
 
-async function enginePackageFiles(): Promise<ISourceFile[]> {
-  const paths = SCANNED_FILES.map((file) => `${PACKAGE_ROOT}${file}`);
+/** Reads every scanned engine file under `root`; a missing directory or root file is skipped. */
+async function enginePackageFiles(root: string = PACKAGE_ROOT): Promise<ISourceFile[]> {
+  const paths: string[] = [];
+  for (const file of SCANNED_FILES) {
+    if (await Deno.stat(`${root}${file}`).then(() => true, () => false)) paths.push(`${root}${file}`);
+  }
   for (const dir of SCANNED) {
-    for await (const entry of walk(`${PACKAGE_ROOT}${dir}`, { exts: SCANNED_EXTENSIONS, includeDirs: false })) {
+    if (!(await Deno.stat(`${root}${dir}`).then(() => true, () => false))) continue;
+    for await (const entry of walk(`${root}${dir}`, { exts: SCANNED_EXTENSIONS, includeDirs: false })) {
       paths.push(entry.path);
     }
   }
   return await Promise.all(
-    paths.map(async (path) => ({ path: relative(PACKAGE_ROOT, path), text: await Deno.readTextFile(path) })),
+    paths.map(async (path) => ({ path: relative(root, path), text: await Deno.readTextFile(path) })),
   );
 }
 
@@ -157,6 +164,31 @@ Deno.test("the purity check allows a validator only in the test suite", () => {
     "src/fixture.ts: imports 'ajv/dist/2020.js'",
   ]);
   assertEquals(purityViolations([{ path: "tests/fixture.ts", text: validatorImport }]), []);
+});
+
+Deno.test("engine-purity-covers-scripts: the scan walks scripts and node script files", async () => {
+  const paths = (await enginePackageFiles()).map((file) => file.path);
+  assert(paths.includes("scripts/bundle.ts"), "scripts/bundle.ts is scanned");
+  assert(paths.includes("scripts/to_host_config.mjs"), "scripts/to_host_config.mjs is scanned");
+});
+
+Deno.test("engine-purity-covers-scripts: a consumer name seeded in a script .mjs file is reported", async () => {
+  const root = await Deno.makeTempDir({ prefix: "engine-purity-" });
+  try {
+    await Deno.mkdir(`${root}/scripts`);
+    const seeded = `// disables ${["ex", "aix"].join("")}/some-rule\nexport {};\n`;
+    await Deno.writeTextFile(`${root}/scripts/seeded.mjs`, seeded);
+    await Deno.writeTextFile(`${root}/scripts/clean.js`, "export {};\n");
+    const violations = purityViolations(await enginePackageFiles(`${root}/`));
+    assertEquals(violations, [`scripts/seeded.mjs: names '${["ex", "aix"].join("")}'`]);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("engine-purity-covers-scripts: a foreign import in a script .mjs file is reported", () => {
+  const violations = purityViolations([{ path: "scripts/seeded.mjs", text: 'import x from "left-pad";\n' }]);
+  assertEquals(violations, ["scripts/seeded.mjs: imports 'left-pad'"]);
 });
 
 Deno.test("the purity check rejects a consumer style-guide name in a seeded engine file", () => {

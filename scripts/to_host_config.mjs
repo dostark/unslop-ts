@@ -31,7 +31,7 @@ function parseArgs(argv) {
 }
 
 async function descriptorOf(path) {
-  // deno-lint-ignore exaix/dynamic-import exaix/import-inside-statement self/import-inside-statement -- the descriptor path is a runtime argument
+  // deno-lint-ignore self/dynamic-import self/import-inside-statement -- the descriptor path is a runtime argument
   const module = await import(pathToFileURL(resolve(path)).href);
   const descriptor = module.descriptor ?? module.default;
   if (descriptor === undefined || typeof descriptor !== "object") {

@@ -4,11 +4,12 @@
  * @description Builds the Deno engine bundle and the plugin entry, with SHA-256 checksums.
  * @architectural-layer Tooling
  * @dependencies [@dostark/unslop-ts]
- * @related-files [src/bundle/engine.ts, deno.json]
+ * @related-files [src/bundle/engine.ts, src/cli/bundle_engine.ts, deno.json]
  */
 
 import { basename, fromFileUrl, join } from "@std/path";
 import { compileConfig } from "../mod.ts";
+import { bundleEngine } from "../src/cli/bundle_engine.ts";
 import { descriptor } from "../examples/unslop.project.ts";
 import config from "../examples/unslop.config.json" with { type: "json" };
 
@@ -16,18 +17,6 @@ const ROOT = fromFileUrl(new URL("..", import.meta.url));
 const DIST = join(ROOT, "dist");
 const ENGINE = join(DIST, "unslop_engine.js");
 const PLUGIN = join(DIST, "deno_plugin.js");
-
-async function buildEngine(): Promise<void> {
-  Deno.env.delete("LD_LIBRARY_PATH");
-  const result = await new Deno.Command("deno", {
-    args: ["bundle", "--platform=deno", `--output=${ENGINE}`, join(ROOT, "src/bundle/engine.ts")],
-    cwd: ROOT,
-    env: { PATH: Deno.env.get("PATH") ?? "" },
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  if (result.code !== 0) throw new Error(new TextDecoder().decode(result.stderr));
-}
 
 /** The plugin entry, written to import the shared engine bundle rather than bundling it again. */
 function pluginSource(): string {
@@ -52,7 +41,7 @@ async function checksum(path: string): Promise<void> {
 }
 
 await Deno.mkdir(DIST, { recursive: true });
-await buildEngine();
+await bundleEngine(ROOT, ENGINE);
 await Deno.writeTextFile(PLUGIN, pluginSource());
 await checksum(ENGINE);
 await checksum(PLUGIN);

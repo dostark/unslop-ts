@@ -139,3 +139,28 @@ Deno.test("require-deno-shebang applies only to the paths the catalog includes",
   assertEquals(linesFor(shebangCatalog({}), source, PROD), []);
   assertEquals(linesFor(shebangCatalog({}), source, "tests/scenario_framework/scripts/x.ts"), []);
 });
+
+Deno.test("forbid-plugin-wildcard: a demo/* entry forbids every rule of the plugin, including the guard rules", () => {
+  const catalog = ignoreCatalog({ forbiddenRules: ["demo/*"] });
+  const invalid: readonly (readonly [string, string, number[]])[] = [
+    ["the guard rule itself", `export const a = 1;\n// deno-lint-ignore ${FORBIDDEN_RULE}\n`, [2]],
+    ["another plugin rule", `export const a = 1;\n// deno-lint-ignore demo/no-chained-type-assertions\n`, [2]],
+    ["two plugin rules in one comment", `export const a = 1;\n// deno-lint-ignore demo/a demo/b -- reason\n`, [2, 2]],
+    ["a file ignore", `// deno-lint-ignore-file demo/no-chained-type-assertions\nexport const a = 1;\n`, [1]],
+  ];
+  for (const [name, source, lines] of invalid) {
+    assertEquals(linesFor(catalog, source, PROD), lines, name);
+  }
+  const valid: readonly (readonly [string, string])[] = [
+    ["a built-in rule", "// deno-lint-ignore no-console\nexport const a = 1;\n"],
+    ["a rule of another plugin", "// deno-lint-ignore other/some-rule\nexport const a = 1;\n"],
+    ["a name that only starts with the plugin name", "// deno-lint-ignore demonstration/x\nexport const a = 1;\n"],
+  ];
+  for (const [name, source] of valid) {
+    assertEquals(linesFor(catalog, source, PROD), [], name);
+  }
+  assertEquals(
+    linesFor(ignoreCatalog({ forbiddenRules: ["demo/*"], includeFileIgnores: false }), invalid[3][1], PROD),
+    [],
+  );
+});
