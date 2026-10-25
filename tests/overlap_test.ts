@@ -11,6 +11,7 @@ import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { DENO_RULE_PACK, TYPESCRIPT_RULE_PACK } from "../mod.ts";
 import table from "./cases/overlap_expectations.json" with { type: "json" };
+import { canWriteTo } from "./helpers/permissions.ts";
 
 interface IExpectation {
   readonly rule: string;
@@ -83,7 +84,9 @@ Deno.test("every pack rule declares an overlaps list", () => {
   }
 });
 
-Deno.test("every Deno built-in code on a case is declared, and every declared code fires", async () => {
+Deno.test("every Deno built-in code on a case is declared, and every declared code fires", {
+  ignore: !canWriteTo(ROOT),
+}, async () => {
   const collected = await collect();
   const problems = CASES.flatMap((entry, index) => {
     const expected = entry.expected[HOST] ?? {};
@@ -97,7 +100,7 @@ Deno.test("every Deno built-in code on a case is declared, and every declared co
   assertEquals(problems, []);
 });
 
-Deno.test("an undeclared built-in code fails the check", async () => {
+Deno.test("an undeclared built-in code fails the check", { ignore: !canWriteTo(ROOT) }, async () => {
   const seeded = "export const value: any = 1;\n";
   const dir = await Deno.makeTempDir({ prefix: "unslop_overlap_seed_", dir: ROOT });
   try {

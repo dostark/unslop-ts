@@ -9,6 +9,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { canWriteTo } from "./helpers/permissions.ts";
 
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
 const TARGETS = ["mod.ts", "deno.ts", "eslint.ts", "src/"];
@@ -35,7 +36,7 @@ Deno.test("the engine passes its own recommended preset", async () => {
   assertEquals(diagnostics.filter((diagnostic) => SELF_RULES.test(diagnostic.code ?? "")), []);
 });
 
-Deno.test("a seeded recommended violation fails the check", async () => {
+Deno.test("a seeded recommended violation fails the check", { ignore: !canWriteTo(ROOT) }, async () => {
   const seeded = join(ROOT, "lint", "seeded_violation.ts");
   await Deno.writeTextFile(
     seeded,
