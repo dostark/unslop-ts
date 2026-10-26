@@ -150,3 +150,16 @@ Deno.test("a star re-export alone does not hide an unused interface", async () =
     assert(report.findings.some((entry) => entry.name === "IStarOnly"));
   });
 });
+
+Deno.test("an interface imported only by a test file is not reported", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/types.ts", "export interface ITestOnly {\n  a: string;\n}\n");
+    await write(
+      root,
+      "packages/p/tests/usage_test.ts",
+      'import type { ITestOnly } from "../src/types.ts";\nexport const sample: ITestOnly = { a: "x" };\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "ITestOnly"));
+  });
+});

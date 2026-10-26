@@ -188,8 +188,6 @@ async function collectProductionFiles(
     const entry of walk(repoRoot, { includeDirs: false, exts: [".ts"], followSymlinks: false, skip })
   ) {
     const repoPath = entry.path.startsWith(repoRoot + "/") ? entry.path.slice(repoRoot.length + 1) : entry.path;
-    if (isTestFilePath(repoPath, settings)) continue;
-    if (!isProductionRoot(repoPath, settings)) continue;
     files.push(repoPath);
     cache.set(repoPath, { text: await Deno.readTextFile(entry.path), sourceFile: null });
   }
@@ -445,7 +443,9 @@ export async function checkRepository(
     const sourceFile = ts.createSourceFile(repoPath, cache.get(repoPath)!.text, ts.ScriptTarget.Latest, true);
     cache.get(repoPath)!.sourceFile = sourceFile;
     parseImports(sourceFile, repoPath, importMap);
-    parseExports(sourceFile, repoPath, exportMap, settings);
+    if (!isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings)) {
+      parseExports(sourceFile, repoPath, exportMap, settings);
+    }
   }
   resolveBarrelReExports(files, cache, exportMap, settings);
   const publicFiles = collectPublicFiles(files, cache);
