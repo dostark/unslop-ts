@@ -119,3 +119,34 @@ Deno.test("an exported type alias stays out of the interface warning", async () 
     assert(!report.findings.some((entry) => entry.name === "Kind"));
   });
 });
+
+Deno.test("an interface imported with an inline type modifier is not reported", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/types.ts", "export interface IInlineUsed {\n  a: string;\n}\n");
+    await write(
+      root,
+      "packages/p/src/use.ts",
+      'import { type IInlineUsed } from "./types.ts";\nexport const read = (value: IInlineUsed): string => value.a;\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "IInlineUsed"));
+  });
+});
+
+Deno.test("an interface re-exported by name is not reported at its declaration", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/types.ts", "export interface IReExported {\n  a: string;\n}\n");
+    await write(root, "packages/p/src/barrel.ts", 'export type { IReExported } from "./types.ts";\n');
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "IReExported"));
+  });
+});
+
+Deno.test("a star re-export alone does not hide an unused interface", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/types.ts", "export interface IStarOnly {\n  a: string;\n}\n");
+    await write(root, "packages/p/src/barrel.ts", 'export * from "./types.ts";\n');
+    const report = await checkRepository(root, true, settings([]));
+    assert(report.findings.some((entry) => entry.name === "IStarOnly"));
+  });
+});

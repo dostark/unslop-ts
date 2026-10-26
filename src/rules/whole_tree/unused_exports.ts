@@ -204,16 +204,27 @@ function recordImport(name: string, repoPath: string, importMap: Map<string, Set
 
 function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Map<string, Set<string>>): void {
   ts.forEachChild(sourceFile, (node) => {
-    if (!ts.isImportDeclaration(node) || !node.importClause) return;
-    const clause = node.importClause;
-    if (clause.name) recordImport(clause.name.text, repoPath, importMap);
-    if (!clause.namedBindings) return;
-    if (ts.isNamespaceImport(clause.namedBindings)) {
-      recordImport(clause.namedBindings.name.text, repoPath, importMap);
+    if (ts.isImportDeclaration(node) && node.importClause) {
+      const clause = node.importClause;
+      if (clause.name) recordImport(clause.name.text, repoPath, importMap);
+      if (!clause.namedBindings) return;
+      if (ts.isNamespaceImport(clause.namedBindings)) {
+        recordImport(clause.namedBindings.name.text, repoPath, importMap);
+        return;
+      }
+      for (const el of clause.namedBindings.elements) {
+        recordImport(el.propertyName?.text ?? el.name.text, repoPath, importMap);
+      }
       return;
     }
-    for (const el of clause.namedBindings.elements) {
-      if (!el.isTypeOnly) recordImport(el.name.text, repoPath, importMap);
+    // A named re-export forwards a symbol from its source module, so the source export is used.
+    if (
+      ts.isExportDeclaration(node) && node.moduleSpecifier && node.exportClause &&
+      ts.isNamedExports(node.exportClause)
+    ) {
+      for (const el of node.exportClause.elements) {
+        recordImport(el.propertyName?.text ?? el.name.text, repoPath, importMap);
+      }
     }
   });
 }
