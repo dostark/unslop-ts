@@ -12,6 +12,7 @@ import {
   buildJscpdArgs,
   checkRepository,
   JSCPD_REPORT_FILE,
+  selectGroups,
   type TJscpdRunner,
 } from "../src/rules/whole_tree/duplicate_code.ts";
 import {
@@ -138,6 +139,36 @@ Deno.test("absolute clone paths are reported relative to the repository root", a
   const result = await checkRepository("/repo", settings([group({})]), absolute);
   assertEquals(result.groups[0]?.clones[0]?.first.file, "packages/a.ts");
   assertEquals(result.groups[0]?.clones[0]?.second.file, "packages/b.ts");
+});
+
+Deno.test("clones are listed largest first, with ties ordered by file", async () => {
+  const range = (name: string) => ({ name, start: 1, end: 5 });
+  const clone = (lines: number, a: string, b: string) => ({ lines, firstFile: range(a), secondFile: range(b) });
+  const unsorted: TJscpdRunner = (_args, outputDir) =>
+    Deno.writeTextFile(
+      join(outputDir, JSCPD_REPORT_FILE),
+      JSON.stringify({
+        statistics: { total: { percentage: 1, duplicatedLines: 30, sources: 4 } },
+        duplicates: [clone(6, "b.ts", "c.ts"), clone(20, "z.ts", "y.ts"), clone(6, "a.ts", "c.ts")],
+      }),
+    );
+  const result = await checkRepository("/repo", settings([group({})]), unsorted);
+  assertEquals(result.groups[0]?.clones.map((entry) => [entry.lines, entry.first.file]), [
+    [20, "z.ts"],
+    [6, "a.ts"],
+    [6, "b.ts"],
+  ]);
+});
+
+Deno.test("selectGroups keeps the named groups in settings order and rejects an unknown name", () => {
+  const all = settings([group({ name: "source" }), group({ name: "tests" }), group({ name: "integration" })]);
+  assertEquals(selectGroups(all, []).groups.map((entry) => entry.name), ["source", "tests", "integration"]);
+  assertEquals(selectGroups(all, ["integration", "source"]).groups.map((entry) => entry.name), [
+    "source",
+    "integration",
+  ]);
+  const error = assertThrows(() => selectGroups(all, ["nope"]));
+  assert(error instanceof Error && error.message.includes("nope") && error.message.includes("source, tests"));
 });
 
 Deno.test("the settings schema applies the jscpd defaults and group defaults", () => {

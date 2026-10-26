@@ -133,6 +133,11 @@ async function readReport(outputDir: string, groupName: string): Promise<IRawRep
   return parseReport(text, groupName);
 }
 
+function compareClones(left: IClone, right: IClone): number {
+  return right.lines - left.lines || left.first.file.localeCompare(right.first.file) ||
+    left.first.start - right.first.start;
+}
+
 function toClone(repoRoot: string, raw: IRawClone): IClone {
   const range = (side: IRawRange): ICloneRange => ({
     file: toRepoPath(repoRoot, side.name),
@@ -159,7 +164,7 @@ async function measureGroup(
       threshold: group.threshold,
       passed: percentage <= group.threshold,
       duplicatedLines,
-      clones: report.duplicates.map((raw) => toClone(repoRoot, raw)),
+      clones: report.duplicates.map((raw) => toClone(repoRoot, raw)).sort(compareClones),
     };
   } finally {
     await Deno.remove(outputDir, { recursive: true });
@@ -175,4 +180,15 @@ export async function checkRepository(
   const groups: IDuplicateCodeGroupResult[] = [];
   for (const group of settings.groups) groups.push(await measureGroup(repoRoot, settings, group, run));
   return { groups };
+}
+
+/** Narrows the settings to the named scan groups, keeping the settings order. No names keeps every group. */
+export function selectGroups(settings: IDuplicateCodeSettings, names: readonly string[]): IDuplicateCodeSettings {
+  if (names.length === 0) return settings;
+  const known = settings.groups.map((group) => group.name);
+  const unknown = names.filter((name) => !known.includes(name));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown scan group '${unknown.join("', '")}'. Known groups: ${known.join(", ")}.`);
+  }
+  return { ...settings, groups: settings.groups.filter((group) => names.includes(group.name)) };
 }

@@ -490,7 +490,8 @@ or a warm npm cache. It reads the `wholeTree.duplicateCode` section:
 without `ignore` or `pattern` scans everything under its `paths`. A group that scans no files is an
 error, so a wrong glob never passes at zero percent. Run it with
 `deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=duplicate-code`;
-`--verbose` lists every clone.
+`--verbose` lists every clone, largest first. `--group=<name>` (repeatable) runs only the named scan
+groups, and `--top=<n>` caps the clones listed per group.
 
 ## Working with deno lint
 
