@@ -28,7 +28,7 @@ interface IDescriptor {
   readonly controls: IRuleControls;
 }
 
-const PACK_RULE_COUNT = 39;
+const PACK_RULE_COUNT = 40;
 const WHOLE_TREE_CHECK_COUNT = 7;
 const DESCRIPTOR_COUNT = PACK_RULE_COUNT + WHOLE_TREE_CHECK_COUNT;
 const GUIDE_ANCHOR = /^#[a-z0-9-]+$/;
@@ -120,7 +120,12 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
 });
 
 Deno.test("every plugin rule declares requiresTestGlobs and only the test-aware rules set it", () => {
-  const testAware = new Set(["no-chained-type-assertions", "no-typeof-escape", "require-module-header"]);
+  const testAware = new Set([
+    "barrel-only-reexports",
+    "no-chained-type-assertions",
+    "no-typeof-escape",
+    "require-module-header",
+  ]);
   for (const pack of [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK]) {
     for (const [key, rule] of Object.entries(pack.rules)) {
       assertEquals(typeof rule.requiresTestGlobs, "boolean", key);

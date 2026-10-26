@@ -275,6 +275,12 @@
       "category": "comments",
       "preset": "recommended",
       "docs": "#comment-discipline"
+    },
+    {
+      "id": "barrel-only-reexports",
+      "category": "module-structure",
+      "preset": "opt-in",
+      "docs": "#barrel-only-reexports"
     }
   ]
 }

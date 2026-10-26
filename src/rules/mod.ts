@@ -50,6 +50,7 @@ import { createEphemeralFilename, createRequireModuleHeader } from "./header_rul
 import { createMaxParams } from "./max_params.ts";
 import { createImportBoundaries } from "./import_boundaries.ts";
 import { createExportedInterfaceNaming, createNoInterfaceRenameOnImport } from "./interface_convention_rules.ts";
+import { createBarrelOnlyReExports } from "./reexport_rules.ts";
 import { createTestInlineMultilineFixture } from "./test_fixture_rules.ts";
 import type { IRulePack } from "../engine/registry.ts";
 import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
@@ -58,6 +59,19 @@ import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.t
 export const TYPESCRIPT_RULE_PACK: IRulePack = {
   name: "typescript",
   rules: {
+    "barrel-only-reexports": {
+      overlaps: [],
+      requiresTestGlobs: true,
+      meta: {
+        description: "A module re-export outside a barrel file.",
+        category: "module-structure",
+        docs: "#barrel-only-reexports",
+        preset: "opt-in",
+        limits:
+          "Matches the file name against the configured barrel suffixes; test files and configured allow paths are exempt.",
+      },
+      create: createBarrelOnlyReExports,
+    },
     "no-chained-type-assertions": {
       overlaps: [{ ecosystem: "typescript-eslint", rule: "no-unnecessary-type-assertion", kind: "related" }],
       requiresTestGlobs: true,

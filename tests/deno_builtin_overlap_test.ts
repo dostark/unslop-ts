@@ -47,6 +47,12 @@ const FAST_OR_SLOW = ['"fast"', '"slow"'].join(" | ");
 
 const CASES: readonly IOverlapCase[] = [
   {
+    rule: "barrel-only-reexports",
+    name: "a named re-export outside a barrel",
+    source: 'export { join } from "@std/path";\n',
+    expectedBuiltins: {},
+  },
+  {
     rule: "no-chained-type-assertions",
     name: "an as unknown as chain",
     source: `${DECLARATIONS}export const value = input as unknown as number;\n`,

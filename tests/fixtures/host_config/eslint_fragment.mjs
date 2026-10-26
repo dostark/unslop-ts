@@ -19,6 +19,7 @@ export default [
         "ignoreGlobs": [],
         "docsBase": "https://github.com/dostark/unslop-ts/blob/main/docs/style_guide.md",
         "docs": {
+          "demo/barrel-only-reexports": "docs/style_guide.md#barrel-only-reexports",
           "demo/no-chained-type-assertions": "docs/style_guide.md#strict-type-safety",
           "demo/no-explicit-unknown": "docs/style_guide.md#strict-type-safety",
           "demo/no-unsafe-dictionary": "docs/style_guide.md#strict-type-safety",
@@ -58,6 +59,7 @@ export default [
       },
     },
     rules: {
+      "demo/barrel-only-reexports": "off",
       "demo/no-chained-type-assertions": ["error",{"allowPartialMockInTests":true,"allowNeverAnyMockInTests":true}],
       "demo/no-explicit-unknown": "off",
       "demo/no-unsafe-dictionary": "off",
@@ -109,6 +111,7 @@ export default [
         "ignoreGlobs": [],
         "docsBase": "https://github.com/dostark/unslop-ts/blob/main/docs/style_guide.md",
         "docs": {
+          "demo/barrel-only-reexports": "docs/style_guide.md#barrel-only-reexports",
           "demo/no-chained-type-assertions": "docs/style_guide.md#strict-type-safety",
           "demo/no-explicit-unknown": "docs/style_guide.md#strict-type-safety",
           "demo/no-unsafe-dictionary": "docs/style_guide.md#strict-type-safety",

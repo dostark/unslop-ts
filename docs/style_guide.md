@@ -499,3 +499,19 @@ Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these
    that declaration; no host gets a hand-written schema.
 8. A rule does not branch on the host. The host entry normalizes settings, options, and paths before
    the rule runs, and the conformance suite holds that normalization to one result.
+
+## Re-export Placement {#barrel-only-reexports}
+
+A module re-export (`export … from "…"`) belongs in a barrel file: a module whose name ends with a
+configured suffix, by default `/mod.ts` or `/index.ts`. An ordinary module states its own surface and
+imports what it uses; forwarding another module's symbols from it hides where those symbols live and
+adds a second public path that the barrel cannot police. The `barrel-only-reexports` check reports
+that placement.
+
+| Option           | Default                    | Meaning                                       |
+| ---------------- | -------------------------- | --------------------------------------------- |
+| `barrelSuffixes` | `["/mod.ts", "/index.ts"]` | File-name suffixes that mark a barrel         |
+| `allowPaths`     | `[]`                       | Repository path prefixes exempt from the rule |
+
+Test files are exempt, so a test helper may forward test support. A star export and a named export,
+including `export type { … } from`, are both module re-exports.

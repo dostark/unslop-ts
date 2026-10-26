@@ -32,8 +32,8 @@ const NOT_ENABLED = "Not enabled by the configuration.";
 const PLUGIN_PREFIX = "demo/";
 const BOTH_PACK_COUNTS = { recommended: 13, strict: 34 };
 const TYPESCRIPT_PACK_COUNTS = { recommended: 11, strict: 32 };
-const PLUGIN_RULE_COUNT = 39;
-const DESCRIPTOR_RULE_COUNT = 46;
+const PLUGIN_RULE_COUNT = 40;
+const DESCRIPTOR_RULE_COUNT = 47;
 const OPTIONAL_PARAMS_OPTIONS = {
   wrapperType: "Opt",
   wrapperImport: "@demo/types",

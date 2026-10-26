@@ -33,6 +33,11 @@ const NoTypeofEscapeOptions = z.object({
 
 const NoOptions = z.object({}).strict();
 
+export const BarrelOnlyReExportsOptions = z.object({
+  barrelSuffixes: z.array(z.string()).default(["/mod.ts", "/index.ts"]),
+  allowPaths: z.array(z.string()).default([]),
+}).strict();
+
 const RequireSafetyCommentOptions = z.object({
   markers: z.array(z.string()).default(["SAFETY"]),
 }).strict();
@@ -199,6 +204,7 @@ export type BoundaryDeny = z.infer<typeof BoundaryDenySchema>;
 
 /** Option schemas of the TypeScript rule pack, keyed by bare rule key. */
 export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  "barrel-only-reexports": BarrelOnlyReExportsOptions,
   "no-chained-type-assertions": NoChainedTypeAssertionsOptions,
   "no-explicit-unknown": NoExplicitUnknownOptions,
   "no-unsafe-dictionary": NoUnsafeDictionaryOptions,
