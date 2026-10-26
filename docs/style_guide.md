@@ -516,3 +516,7 @@ that placement.
 
 Test files are exempt, so a test helper may forward test support. A star export and a named export,
 including `export type { … } from`, are both module re-exports.
+
+The unused-export analysis reports an interface or a type alias as a warning when no file imports it.
+Put `// unslop-ignore-next-line unused-type` above the declaration when it is intentional API; the
+older `unused-interface` spelling stays accepted for interfaces.
