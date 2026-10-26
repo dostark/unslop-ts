@@ -8,7 +8,7 @@
 
 import { assertEquals } from "@std/assert";
 import type { IClone } from "../src/rules/whole_tree/duplicate_code.ts";
-import { collapseBlocks, parseView, rankFiles } from "../src/rules/whole_tree/duplicate_views.ts";
+import { atLeastLines, collapseBlocks, parseView, rankFiles } from "../src/rules/whole_tree/duplicate_views.ts";
 
 function clone(a: string, aStart: number, aEnd: number, b: string, bStart: number, bEnd: number): IClone {
   return {
@@ -81,4 +81,23 @@ Deno.test("parseView accepts pair, file, and block and rejects anything else", (
   assertEquals(parseView("file"), "file");
   assertEquals(parseView("block"), "block");
   assertEquals(parseView("group"), null);
+});
+
+Deno.test("atLeastLines drops clones shorter than the limit and keeps the order", () => {
+  const clones = [
+    clone("a.ts", 1, 30, "b.ts", 1, 30),
+    clone("c.ts", 1, 12, "d.ts", 1, 12),
+    clone("e.ts", 1, 6, "f.ts", 1, 6),
+  ];
+  assertEquals(atLeastLines(clones, 12).map((entry) => entry.lines), [30, 12]);
+  assertEquals(atLeastLines(clones, 1).length, 3);
+  assertEquals(atLeastLines(clones, 31), []);
+});
+
+Deno.test("a file ranking built from filtered clones counts only the long clones", () => {
+  const clones = [clone("a.ts", 1, 30, "b.ts", 1, 30), clone("a.ts", 40, 45, "c.ts", 1, 6)];
+  assertEquals(rankFiles(atLeastLines(clones, 10)).map((row) => [row.file, row.duplicatedLines]), [
+    ["a.ts", 30],
+    ["b.ts", 30],
+  ]);
 });

@@ -494,7 +494,8 @@ error, so a wrong glob never passes at zero percent. Run it with
 groups, and `--top=<n>` caps the rows listed per group. `--by=file` ranks files by the lines that clones
 cover, and `--by=block` collapses clone pairs that share a region into blocks with a copy count, the longest copy, and every
 location.
-The default `--by=pair` lists each clone pair.
+The default `--by=pair` lists each clone pair. `--min-lines=<n>` drops clones shorter than `n` lines from
+the listing in every view. It changes only what is listed, never the percentage or the threshold check.
 
 ## Working with deno lint
 

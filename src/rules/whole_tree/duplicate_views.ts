@@ -38,6 +38,11 @@ export function parseView(value: string | undefined): DuplicateView | null {
   return VIEWS.find((view) => view === value) ?? null;
 }
 
+/** Keeps the clones of at least `minLines` lines, in their order. Only the listing uses it, never the gate. */
+export function atLeastLines(clones: readonly IClone[], minLines: number): IClone[] {
+  return clones.filter((clone) => clone.lines >= minLines);
+}
+
 /** Ranks files by the union of the lines that clones cover, most first, ties by path. */
 export function rankFiles(clones: readonly IClone[]): IFileDuplication[] {
   const lines = new Map<string, Set<number>>();
