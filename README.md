@@ -440,7 +440,7 @@ diff before any lock or temporary file exists.
 
 `unslop migrate` reads a version 1 catalog through the descriptor, so it works before any version 2
 file exists. It moves `scopes`, `ignore`, and `tagVocabulary` to their version 2 fields, keeps explicit
-applicability, options, docs, and tags, and maps the five whole-tree setting sections to their rule ids.
+applicability, options, docs, and tags, and maps the six whole-tree setting sections to their rule ids.
 The layout moves to a separate file and requires `--layout-out` when the input has one. An engine limit
 that differs from the rule metadata is refused instead of discarded.
 
@@ -465,6 +465,32 @@ deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --r
 
 The same hint prints after a migration. Phase 232 Step 5 replaces this bridge with a compiled-settings
 adapter, so the separate catalog is temporary.
+
+### Duplicate code
+
+`duplicate-code` measures token-level duplication with [jscpd](https://github.com/kucherenko/jscpd) and
+fails a scan group whose duplicated-token percentage exceeds its threshold. Token comparison finds a
+clone even when the names differ, which the declaration checks `duplicate-type` and `duplicate-constant`
+cannot. The check starts the pinned jscpd release through `npx`, so it needs Node.js and the npm registry
+or a warm npm cache. It reads the `wholeTree.duplicateCode` section:
+
+```json
+{
+  "jscpdVersion": "5.4.2",
+  "minLines": 5,
+  "minTokens": 50,
+  "groups": [
+    { "name": "source", "paths": ["src/"], "ignore": ["**/*.d.ts", "**/tests/**"], "threshold": 2 },
+    { "name": "tests", "paths": ["src/"], "pattern": "**/tests/**/*.ts", "threshold": 5 }
+  ]
+}
+```
+
+`jscpdVersion`, `minLines`, and `minTokens` are optional and default to the values shown. A group
+without `ignore` or `pattern` scans everything under its `paths`. A group that scans no files is an
+error, so a wrong glob never passes at zero percent. Run it with
+`deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=duplicate-code`;
+`--verbose` lists every clone.
 
 ## Working with deno lint
 
@@ -497,10 +523,10 @@ adapter, so the separate catalog is temporary.
   test runner helper.
 - `src/rules/` — rule implementations, option schemas, metadata, and the two packs. `src/rules/deno/`
   holds the Deno pack. Every pack entry carries the rule's `meta`.
-- `src/rules/whole_tree/` — the seven whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
+- `src/rules/whole_tree/` — the eight whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
   descriptors (metadata, controls, host command). The Deno-only entry `@dostark/unslop-ts/whole-tree`
-  exports the duplicate, constant-restatement, optional-parameter, unused-export, and magic-literal
-  checkers so a host script can call them in-process.
+  exports the duplicate, duplicate-code, constant-restatement, optional-parameter, unused-export, and
+  magic-literal checkers so a host script can call them in-process.
 - `src/config/` — the version 2 schema, descriptor contracts, pure compiler and presets, JSON Schema,
   migration and projection, project factory, and the pure edit functions.
 - `src/cli/` — the CLI dispatcher, local module loader, selection, read and write routes, migration

@@ -21,6 +21,7 @@ const SETTINGS_SECTIONS = [
   ["unusedExports", "unused-exports"],
   ["unusedFiles", "unused-files"],
   ["optionalParams", "optional-params"],
+  ["duplicateCode", "duplicate-code"],
 ] as const;
 
 async function readFixture(url: URL): Promise<JsonValue> {

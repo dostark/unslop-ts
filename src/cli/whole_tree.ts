@@ -12,6 +12,7 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-code [--verbose]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
@@ -30,11 +31,16 @@ import {
 } from "../rules/whole_tree/optional_params.ts";
 import { checkRepository as checkUnusedExports, type IUnwiredExport } from "../rules/whole_tree/unused_exports.ts";
 import { checkRepository as checkUnusedFiles } from "../rules/whole_tree/unused_files.ts";
+import {
+  checkRepository as checkDuplicateCode,
+  type IDuplicateCodeGroupResult,
+} from "../rules/whole_tree/duplicate_code.ts";
 import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
 import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
 import {
   type IConstantRestatementSettings,
+  type IDuplicateCodeSettings,
   type IOptionalParamsSettings,
   type IUnusedExportsSettings,
   type IUnusedFilesSettings,
@@ -48,6 +54,7 @@ const RULES: readonly string[] = [
   "unused-exports",
   "unused-files",
   "optional-params",
+  "duplicate-code",
   MAGIC_RULE,
   ...DUPLICATE_RULES,
 ];
@@ -176,6 +183,31 @@ async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings): Pr
   }
   console.log(`\n⚠️  ${report.findings.length} unreachable file(s) found.`);
   console.log("  Add `--fail` to the host command to make these findings fail the run.");
+}
+
+function printDuplicateGroup(group: IDuplicateCodeGroupResult, verbose: boolean): void {
+  const status = group.passed ? "✅" : "❌";
+  console.log(
+    `${status} ${group.name}: ${group.percentage.toFixed(2)}% duplicated (threshold ${group.threshold}%, ${group.clones.length} clone(s), ${group.duplicatedLines} line(s))`,
+  );
+  if (!verbose) return;
+  for (const clone of group.clones) {
+    console.log(
+      `    ${clone.first.file}:${clone.first.start}-${clone.first.end} ~ ${clone.second.file}:${clone.second.start}-${clone.second.end} (${clone.lines} lines)`,
+    );
+  }
+}
+
+async function runDuplicateCode(settings: IDuplicateCodeSettings, verbose: boolean): Promise<void> {
+  const report = await checkDuplicateCode(Deno.cwd(), settings);
+  for (const group of report.groups) printDuplicateGroup(group, verbose);
+  const failed = report.groups.filter((group) => !group.passed);
+  if (failed.length === 0) return;
+  console.error(
+    `\n❌ ${failed.length} scan group(s) exceed the duplication threshold: ${failed.map((g) => g.name).join(", ")}`,
+  );
+  if (!verbose) console.error("  Add `--verbose` to list every clone.");
+  Deno.exit(1);
 }
 
 const OPTIONAL_SECTIONS: ReadonlyArray<readonly [TOptionalViolationKind, string, boolean]> = [
@@ -459,8 +491,10 @@ async function main(): Promise<void> {
   const catalog = await loadCatalog(Deno.args);
   if (isDuplicateRule(rule)) return await runDuplicates(rule, catalog);
   if (rule === MAGIC_RULE) return await runMagicLiterals(catalog, Deno.args.includes("--include-tests"));
-  const settings = loadSettings(catalog);
-  const args = Deno.args;
+  await runSettingsRule(rule, loadSettings(catalog), Deno.args);
+}
+
+async function runSettingsRule(rule: string, settings: IWholeTreeSettings, args: readonly string[]): Promise<void> {
   if (rule === "constant-restatement") {
     if (!settings.constantRestatement) exitWithUsage("The catalog has no wholeTree.constantRestatement section.");
     await runConstantRestatement(settings.constantRestatement);
@@ -469,6 +503,10 @@ async function main(): Promise<void> {
   if (rule === "unused-files") {
     if (!settings.unusedFiles) exitWithUsage("The catalog has no wholeTree.unusedFiles section.");
     await runUnusedFiles(args.includes("--fail") || args.includes("--strict"), settings.unusedFiles);
+  }
+  if (rule === "duplicate-code") {
+    if (!settings.duplicateCode) exitWithUsage("The catalog has no wholeTree.duplicateCode section.");
+    await runDuplicateCode(settings.duplicateCode, args.includes("--verbose"));
   }
   if (rule === "optional-params") {
     if (!settings.optionalParams) exitWithUsage("The catalog has no wholeTree.optionalParams section.");

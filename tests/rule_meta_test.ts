@@ -29,7 +29,7 @@ interface IDescriptor {
 }
 
 const PACK_RULE_COUNT = 41;
-const WHOLE_TREE_CHECK_COUNT = 7;
+const WHOLE_TREE_CHECK_COUNT = 8;
 const DESCRIPTOR_COUNT = PACK_RULE_COUNT + WHOLE_TREE_CHECK_COUNT;
 const GUIDE_ANCHOR = /^#[a-z0-9-]+$/;
 const EMPTY = 0;
@@ -102,6 +102,7 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
     "unused-exports": null,
     "unused-files": null,
     "optional-params": null,
+    "duplicate-code": "error",
   };
   for (const [id, check] of Object.entries(WHOLE_TREE_CHECKS)) {
     assertEquals(check.controls.editable, ["options"], `${id} must allow option edits only`);

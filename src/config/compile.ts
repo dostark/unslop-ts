@@ -33,13 +33,14 @@ const OFF: RuleSeverity = "off";
 const PLUGIN_ENGINE = "plugin";
 const SCRIPT_ENGINE = "script";
 
-/** The `wholeTree` section that holds each settings-based check. The duplication checks use catalog rules. */
+/** The `wholeTree` section that holds each settings-based check. duplicate-type and duplicate-constant use catalog rules. */
 const WHOLE_TREE_SECTIONS: Readonly<Record<string, string>> = {
   "magic-literals": "magicLiterals",
   "optional-params": "optionalParams",
   "unused-exports": "unusedExports",
   "unused-files": "unusedFiles",
   "constant-restatement": "constantRestatement",
+  "duplicate-code": "duplicateCode",
 };
 
 type IRawSetting = z.infer<typeof RuleSettingSchema>;

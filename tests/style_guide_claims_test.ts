@@ -17,7 +17,13 @@ import {
 } from "../mod.ts";
 
 const GUIDE = await Deno.readTextFile(new URL("../docs/style_guide.md", import.meta.url));
-const WHOLE_TREE_CHECKS = ["magic-literals", "duplicate-constant", "duplicate-type", "optional-params"];
+const WHOLE_TREE_CHECKS = [
+  "magic-literals",
+  "duplicate-constant",
+  "duplicate-type",
+  "duplicate-code",
+  "optional-params",
+];
 const TABLE_RULE_ROW = /^\| `([a-z][a-z-]*)`/gm;
 const BACKTICKED = /`([a-z][a-z-]*)`/g;
 

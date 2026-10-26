@@ -19,6 +19,12 @@
       "docs": "#comment-discipline"
     },
     {
+      "id": "duplicate-code",
+      "category": "magic-values",
+      "preset": "opt-in",
+      "docs": "#no-magic-values"
+    },
+    {
       "id": "duplicate-constant",
       "category": "magic-values",
       "preset": "recommended",

@@ -394,3 +394,13 @@ Deno.test("whole_tree_accepts_a_file_url_catalog", async () => {
     assertEquals(result.code, 0, result.stderr);
   });
 });
+
+Deno.test("duplicate-code without a wholeTree.duplicateCode section is a usage error", async () => {
+  await withCliProject(async (dir) => {
+    await writeWholeTreeConfig(dir);
+    await compiledCatalog(dir);
+    const result = await runDeno(["run", "-A", CLI, "--rule=duplicate-code", "--catalog=catalog.json"], dir);
+    assertEquals(result.code, 2);
+    assertStringIncludes(result.stderr, "duplicateCode");
+  });
+});

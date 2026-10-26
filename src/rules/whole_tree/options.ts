@@ -24,6 +24,11 @@ const DEFAULT_ROUND_NUMBER_MAX = 1000;
 const DEFAULT_HTTP_STATUS_MIN = 100;
 const DEFAULT_HTTP_STATUS_MAX = 599;
 const DEFAULT_TEST_SCAFFOLD_PATTERN = "^(test|mock|fake|dummy)[-_]";
+const DEFAULT_MIN_CLONE_LINES = 5;
+const DEFAULT_MIN_CLONE_TOKENS = 50;
+
+/** The jscpd release that a duplicate-code run installs when the settings name none. */
+export const DEFAULT_JSCPD_VERSION = "5.4.2";
 
 /** The magic-literal thresholds. */
 export interface IMagicThresholds {
@@ -128,6 +133,42 @@ export interface IUnusedFilesSettings {
   skipSegments: string[];
 }
 
+/** One scan group of the duplicate-code check: a set of roots, its filters, and the duplication it may carry. */
+export interface IDuplicateCodeGroup {
+  name: string;
+  paths: string[];
+  ignore: string[];
+  /** A jscpd glob that narrows the scan to the matching files, or null to scan every file under the paths. */
+  pattern: string | null;
+  /** The highest duplicated-token percentage that still passes. */
+  threshold: number;
+}
+
+/** A scan group as the catalog states it, before defaults apply. */
+export interface IDuplicateCodeGroupInput {
+  name: string;
+  paths: string[];
+  ignore?: string[];
+  pattern?: string | null;
+  threshold: number;
+}
+
+/** Options of the duplicate-code check after defaults apply. */
+export interface IDuplicateCodeSettings {
+  jscpdVersion: string;
+  minLines: number;
+  minTokens: number;
+  groups: IDuplicateCodeGroup[];
+}
+
+/** Options of the duplicate-code check before defaults apply. */
+export interface IDuplicateCodeSettingsInput {
+  jscpdVersion?: string;
+  minLines?: number;
+  minTokens?: number;
+  groups: IDuplicateCodeGroupInput[];
+}
+
 /** Settings for the constant-restatement rule. */
 export interface IConstantRestatementSettings {
   constantModules: string[];
@@ -142,6 +183,7 @@ export interface IWholeTreeSettingsInput {
   unusedFiles?: IUnusedFilesSettings;
   constantRestatement?: IConstantRestatementSettings;
   magicLiterals?: IMagicLiteralOptionsInput;
+  duplicateCode?: IDuplicateCodeSettingsInput;
 }
 
 /** The catalog `wholeTree` section. */
@@ -151,6 +193,7 @@ export interface IWholeTreeSettings {
   unusedFiles?: IUnusedFilesSettings;
   constantRestatement?: IConstantRestatementSettings;
   magicLiterals?: IMagicLiteralOptions;
+  duplicateCode?: IDuplicateCodeSettings;
 }
 
 /** One allow entry as the schema yields it. */
@@ -264,6 +307,25 @@ export const ConstantRestatementSettingsSchema: z.ZodType<IConstantRestatementSe
     minRestatedElements: z.number().int().positive(),
   }).strict();
 
+const DuplicateCodeGroupSchema: z.ZodType<IDuplicateCodeGroup, IDuplicateCodeGroupInput> = z.object({
+  name: z.string().min(1),
+  paths: z.array(z.string().min(1)).min(1),
+  ignore: z.array(z.string()).default([]),
+  pattern: z.string().min(1).nullable().default(null),
+  threshold: z.number().nonnegative(),
+}).strict();
+
+/** Options of the duplicate-code check. The scan groups are project-specific; the jscpd limits default to its own. */
+export const DuplicateCodeSettingsSchema: z.ZodType<IDuplicateCodeSettings, IDuplicateCodeSettingsInput> = z.object({
+  jscpdVersion: z.string().min(1).default(DEFAULT_JSCPD_VERSION),
+  minLines: z.number().int().positive().default(DEFAULT_MIN_CLONE_LINES),
+  minTokens: z.number().int().positive().default(DEFAULT_MIN_CLONE_TOKENS),
+  groups: z.array(DuplicateCodeGroupSchema).min(1).refine(
+    (groups) => new Set(groups.map((group) => group.name)).size === groups.length,
+    { message: "Scan group names must be unique." },
+  ),
+}).strict();
+
 /** Schema of the catalog `wholeTree` section. Each section is optional, and an unknown key is rejected. */
 const WholeTreeSettingsSchema: z.ZodType<IWholeTreeSettings, IWholeTreeSettingsInput> = z.object({
   optionalParams: OptionalParamsSettingsSchema,
@@ -271,6 +333,7 @@ const WholeTreeSettingsSchema: z.ZodType<IWholeTreeSettings, IWholeTreeSettingsI
   unusedFiles: UnusedFilesSettingsSchema,
   constantRestatement: ConstantRestatementSettingsSchema,
   magicLiterals: MagicLiteralOptionsSchema,
+  duplicateCode: DuplicateCodeSettingsSchema,
 }).partial().strict();
 
 const DuplicateAllowEntrySchema: z.ZodType<IDuplicateAllow, IDuplicateAllow> = z.object({

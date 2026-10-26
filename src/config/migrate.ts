@@ -26,13 +26,14 @@ import type { ICompiledConfig, IProjectDescriptor, IRuleControls } from "./descr
 import { hostBaseLevel, PLUGIN_RULE_CONTROLS } from "./descriptor.ts";
 import { ConfigError } from "./schema.ts";
 
-/** The five whole-tree checks that a version 2 configuration enables through rule entries. */
+/** The six whole-tree checks that a version 2 configuration enables through rule entries. */
 const SETTINGS_CHECKS = [
   { id: "magic-literals", section: "magicLiterals" },
   { id: "constant-restatement", section: "constantRestatement" },
   { id: "unused-exports", section: "unusedExports" },
   { id: "unused-files", section: "unusedFiles" },
   { id: "optional-params", section: "optionalParams" },
+  { id: "duplicate-code", section: "duplicateCode" },
 ] as const;
 
 type SettingsCheckId = (typeof SETTINGS_CHECKS)[number]["id"];

@@ -33,7 +33,7 @@ const PLUGIN_PREFIX = "demo/";
 const BOTH_PACK_COUNTS = { recommended: 13, strict: 34 };
 const TYPESCRIPT_PACK_COUNTS = { recommended: 11, strict: 32 };
 const PLUGIN_RULE_COUNT = 41;
-const DESCRIPTOR_RULE_COUNT = 48;
+const DESCRIPTOR_RULE_COUNT = 49;
 const OPTIONAL_PARAMS_OPTIONS = {
   wrapperType: "Opt",
   wrapperImport: "@demo/types",

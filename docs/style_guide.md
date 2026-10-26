@@ -217,6 +217,9 @@ A value that carries meaning needs a name.
 - Keep one owner for a constant. A constant with the same name and the same value in two files is a duplicate.
 - Keep one owner for a type. An interface or object type with the same name and members in two files is a
   duplicate.
+- Keep one owner for logic. A block of code that is copied to another place is a clone, even when the names
+  differ. The `duplicate-code` check compares token streams and holds each scan group below its percentage
+  threshold.
 
 ### How the detector counts
 
@@ -251,6 +254,7 @@ These are the defaults. The catalog changes them. The detector skips these value
 | `magic-union-type`   | An inline union of string literals outside a named type alias (opt-in)  |
 | `duplicate-constant` | A top-level constant with the same name and static value in two files   |
 | `duplicate-type`     | An interface or object type with the same name and members in two files |
+| `duplicate-code`     | Duplicated token blocks above a scan group's percentage threshold       |
 
 ## Interface Conventions {#interface-conventions}
 

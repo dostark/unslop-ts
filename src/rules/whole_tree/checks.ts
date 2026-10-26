@@ -1,7 +1,7 @@
 /**
  * @module WholeTreeChecks
  * @path src/rules/whole_tree/checks.ts
- * @description Engine descriptors of the seven whole-tree checks: metadata, option schema, controls, and host command.
+ * @description Engine descriptors of the eight whole-tree checks: metadata, option schema, controls, and host command.
  * @architectural-layer Shared
  * @dependencies [zod]
  * @related-files [src/rules/whole_tree/options.ts, src/config/descriptor.ts, src/rules/meta.ts]
@@ -12,6 +12,7 @@ import { DEFAULT_HOST_MODE, type IRuleControls } from "../../config/descriptor.t
 import type { IRuleMeta } from "../meta.ts";
 import {
   ConstantRestatementSettingsSchema,
+  DuplicateCodeSettingsSchema,
   DuplicateConstantOptionsSchema,
   DuplicateTypeOptionsSchema,
   MagicLiteralOptionsSchema,
@@ -28,7 +29,8 @@ export type WholeTreeCheckKey =
   | "constant-restatement"
   | "unused-exports"
   | "unused-files"
-  | "optional-params";
+  | "optional-params"
+  | "duplicate-code";
 
 /** One whole-tree check that a host script runs in process. */
 export interface IWholeTreeCheck {
@@ -97,7 +99,7 @@ function hostCommand(rule: WholeTreeCheckKey): readonly string[] {
   return ["deno", "run", "-A", CLI_PATH, CATALOG_ARGUMENT, `--rule=${rule}`];
 }
 
-/** The seven whole-tree checks, in guide order. */
+/** The eight whole-tree checks, in guide order. */
 export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeCheck>> = {
   "duplicate-type": {
     meta: {
@@ -187,5 +189,18 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
     optionSchema: OptionalParamsSettingsSchema,
     controls: OPTIONAL_PARAMS_CONTROLS,
     command: hostCommand("optional-params"),
+  },
+  "duplicate-code": {
+    meta: {
+      description: "Code duplication above the configured percentage in a scan group.",
+      category: "magic-values",
+      docs: "#no-magic-values",
+      preset: "opt-in",
+      limits:
+        "jscpd compares token streams, so a clone is found even when names differ. Each scan group fails when its duplicated-token percentage exceeds its threshold; a group that scans no files is an error. The check starts a pinned jscpd release through npx, so it needs Node.js and the npm registry or a warm npm cache.",
+    },
+    optionSchema: DuplicateCodeSettingsSchema,
+    controls: FIXED_ERROR_CONTROLS,
+    command: hostCommand("duplicate-code"),
   },
 };
