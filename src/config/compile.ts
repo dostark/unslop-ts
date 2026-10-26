@@ -38,6 +38,7 @@ const WHOLE_TREE_SECTIONS: Readonly<Record<string, string>> = {
   "magic-literals": "magicLiterals",
   "optional-params": "optionalParams",
   "unused-exports": "unusedExports",
+  "unused-files": "unusedFiles",
   "constant-restatement": "constantRestatement",
 };
 

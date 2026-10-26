@@ -326,7 +326,7 @@ Statuses describe the configuration, not the host:
 - `not-selected`: a selection excludes the rule for this call.
 
 A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
-stays a warning until `--strict`, and `optional-params` stays a warning until `--fail` or `--staged`,
+and `unused-files` stay warnings until `--strict`, and `optional-params` stays a warning until `--fail` or `--staged`,
 regardless of the configured level shown by the CLI.
 
 ## Project descriptor
@@ -437,7 +437,7 @@ diff before any lock or temporary file exists.
 
 `unslop migrate` reads a version 1 catalog through the descriptor, so it works before any version 2
 file exists. It moves `scopes`, `ignore`, and `tagVocabulary` to their version 2 fields, keeps explicit
-applicability, options, docs, and tags, and maps the four whole-tree setting sections to their rule ids.
+applicability, options, docs, and tags, and maps the five whole-tree setting sections to their rule ids.
 The layout moves to a separate file and requires `--layout-out` when the input has one. An engine limit
 that differs from the rule metadata is refused instead of discarded.
 
@@ -457,6 +457,7 @@ running:
 ```sh
 deno task unslop config print > catalog.json
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-exports
+deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-files
 ```
 
 The same hint prints after a migration. Phase 232 Step 5 replaces this bridge with a compiled-settings
@@ -493,7 +494,7 @@ adapter, so the separate catalog is temporary.
   test runner helper.
 - `src/rules/` — rule implementations, option schemas, metadata, and the two packs. `src/rules/deno/`
   holds the Deno pack. Every pack entry carries the rule's `meta`.
-- `src/rules/whole_tree/` — the six whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
+- `src/rules/whole_tree/` — the seven whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
   descriptors (metadata, controls, host command). The Deno-only entry `@dostark/unslop-ts/whole-tree`
   exports the duplicate, constant-restatement, optional-parameter, unused-export, and magic-literal
   checkers so a host script can call them in-process.

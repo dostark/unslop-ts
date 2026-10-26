@@ -29,7 +29,7 @@ interface IDescriptor {
 }
 
 const PACK_RULE_COUNT = 39;
-const WHOLE_TREE_CHECK_COUNT = 6;
+const WHOLE_TREE_CHECK_COUNT = 7;
 const DESCRIPTOR_COUNT = PACK_RULE_COUNT + WHOLE_TREE_CHECK_COUNT;
 const GUIDE_ANCHOR = /^#[a-z0-9-]+$/;
 const EMPTY = 0;
@@ -100,6 +100,7 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
     "magic-literals": "error",
     "constant-restatement": "error",
     "unused-exports": null,
+    "unused-files": null,
     "optional-params": null,
   };
   for (const [id, check] of Object.entries(WHOLE_TREE_CHECKS)) {

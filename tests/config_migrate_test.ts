@@ -19,6 +19,7 @@ const SETTINGS_SECTIONS = [
   ["magicLiterals", "magic-literals"],
   ["constantRestatement", "constant-restatement"],
   ["unusedExports", "unused-exports"],
+  ["unusedFiles", "unused-files"],
   ["optionalParams", "optional-params"],
 ] as const;
 

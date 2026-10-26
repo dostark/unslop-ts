@@ -100,6 +100,26 @@ export interface IUnusedExportsSettings {
   strictSkipSegments: string[];
 }
 
+/** One configured module alias: a bare specifier prefix and the repository path it resolves to. */
+export interface IUnusedFilesAlias {
+  readonly prefix: string;
+  readonly target: string;
+}
+
+/** Options of the unused-files check. Every field is project-specific, so none has a default. */
+export interface IUnusedFilesSettings {
+  productionRoots: string[];
+  testSegments: string[];
+  testSuffixes: string[];
+  entrypointSuffixes: string[];
+  mainEntrypointSuffixes: string[];
+  scriptRoot: string;
+  walkSkipPatterns: string[];
+  aliases: IUnusedFilesAlias[];
+  skipPrefixes: string[];
+  skipSegments: string[];
+}
+
 /** Settings for the constant-restatement rule. */
 export interface IConstantRestatementSettings {
   constantModules: string[];
@@ -111,6 +131,7 @@ export interface IConstantRestatementSettings {
 export interface IWholeTreeSettingsInput {
   optionalParams?: IOptionalParamsSettings;
   unusedExports?: IUnusedExportsSettings;
+  unusedFiles?: IUnusedFilesSettings;
   constantRestatement?: IConstantRestatementSettings;
   magicLiterals?: IMagicLiteralOptionsInput;
 }
@@ -119,6 +140,7 @@ export interface IWholeTreeSettingsInput {
 export interface IWholeTreeSettings {
   optionalParams?: IOptionalParamsSettings;
   unusedExports?: IUnusedExportsSettings;
+  unusedFiles?: IUnusedFilesSettings;
   constantRestatement?: IConstantRestatementSettings;
   magicLiterals?: IMagicLiteralOptions;
 }
@@ -201,6 +223,26 @@ export const UnusedExportsSettingsSchema: z.ZodType<IUnusedExportsSettings, IUnu
   strictSkipSegments: z.array(z.string()),
 }).strict();
 
+/** One module alias as the catalog states it. */
+const UnusedFilesAliasSchema: z.ZodType<IUnusedFilesAlias, IUnusedFilesAlias> = z.object({
+  prefix: z.string(),
+  target: z.string(),
+}).strict();
+
+/** Options of the unused-files check. Every field is project-specific, so none has a default. */
+export const UnusedFilesSettingsSchema: z.ZodType<IUnusedFilesSettings, IUnusedFilesSettings> = z.object({
+  productionRoots: z.array(z.string()),
+  testSegments: z.array(z.string()),
+  testSuffixes: z.array(z.string()),
+  entrypointSuffixes: z.array(z.string()),
+  mainEntrypointSuffixes: z.array(z.string()),
+  scriptRoot: z.string(),
+  walkSkipPatterns: z.array(z.string()),
+  aliases: z.array(UnusedFilesAliasSchema),
+  skipPrefixes: z.array(z.string()),
+  skipSegments: z.array(z.string()),
+}).strict();
+
 /** Options of the constant-restatement check. Every field is project-specific, so none has a default. */
 export const ConstantRestatementSettingsSchema: z.ZodType<IConstantRestatementSettings, IConstantRestatementSettings> =
   z.object({
@@ -213,6 +255,7 @@ export const ConstantRestatementSettingsSchema: z.ZodType<IConstantRestatementSe
 const WholeTreeSettingsSchema: z.ZodType<IWholeTreeSettings, IWholeTreeSettingsInput> = z.object({
   optionalParams: OptionalParamsSettingsSchema,
   unusedExports: UnusedExportsSettingsSchema,
+  unusedFiles: UnusedFilesSettingsSchema,
   constantRestatement: ConstantRestatementSettingsSchema,
   magicLiterals: MagicLiteralOptionsSchema,
 }).partial().strict();

@@ -223,6 +223,7 @@ Deno.test("config_print_output_is_a_working_whole_tree_catalog", async () => {
 const ALL_RULES = [
   "constant-restatement",
   "unused-exports",
+  "unused-files",
   "optional-params",
   "magic-literals",
   "duplicate-type",

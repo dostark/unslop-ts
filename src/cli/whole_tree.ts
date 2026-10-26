@@ -9,6 +9,7 @@
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--strict]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--strict]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
@@ -27,6 +28,7 @@ import {
   type TOptionalViolationKind,
 } from "../rules/whole_tree/optional_params.ts";
 import { checkRepository as checkUnusedExports } from "../rules/whole_tree/unused_exports.ts";
+import { checkRepository as checkUnusedFiles } from "../rules/whole_tree/unused_files.ts";
 import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
 import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
@@ -34,6 +36,7 @@ import {
   type IConstantRestatementSettings,
   type IOptionalParamsSettings,
   type IUnusedExportsSettings,
+  type IUnusedFilesSettings,
   type IWholeTreeSettings,
   parseWholeTreeSettings,
 } from "../rules/whole_tree/options.ts";
@@ -42,6 +45,7 @@ const MAGIC_RULE = "magic-literals";
 const RULES: readonly string[] = [
   "constant-restatement",
   "unused-exports",
+  "unused-files",
   "optional-params",
   MAGIC_RULE,
   ...DUPLICATE_RULES,
@@ -90,6 +94,26 @@ async function runUnusedExports(strict: boolean, settings: IUnusedExportsSetting
   console.log("  Run with --strict for CI-grade dead-code detection.");
   console.log("\nTop directories:");
   for (const [dir, count] of report.topDirectories) console.log(`  ${dir}: ${count}`);
+}
+
+async function runUnusedFiles(strict: boolean, settings: IUnusedFilesSettings): Promise<void> {
+  const report = await checkUnusedFiles(Deno.cwd(), settings);
+  if (report.findings.length === 0) {
+    console.log(`✅ No unreachable files found in ${report.scannedFileCount} scanned file(s).`);
+    return;
+  }
+  for (const finding of report.findings) {
+    const prefix = strict ? "ERROR" : "WARN";
+    console.log(
+      `${prefix} [unused-file] ${finding.repoPath} – no entry point reaches this file. Delete it or wire it.`,
+    );
+  }
+  if (strict) {
+    console.log(`\n❌ ${report.findings.length} unreachable file(s) — likely dead code. Fix before commit.`);
+    Deno.exit(1);
+  }
+  console.log(`\n⚠️  ${report.findings.length} unreachable file(s) found (relaxed mode).`);
+  console.log("  Run with --strict for CI-grade dead-code detection.");
 }
 
 const OPTIONAL_SECTIONS: ReadonlyArray<readonly [TOptionalViolationKind, string, boolean]> = [
@@ -357,6 +381,10 @@ async function main(): Promise<void> {
   if (rule === "unused-exports") {
     if (!settings.unusedExports) exitWithUsage("The catalog has no wholeTree.unusedExports section.");
     await runUnusedExports(args.includes("--strict"), settings.unusedExports);
+  }
+  if (rule === "unused-files") {
+    if (!settings.unusedFiles) exitWithUsage("The catalog has no wholeTree.unusedFiles section.");
+    await runUnusedFiles(args.includes("--strict"), settings.unusedFiles);
   }
   if (rule === "optional-params") {
     if (!settings.optionalParams) exitWithUsage("The catalog has no wholeTree.optionalParams section.");

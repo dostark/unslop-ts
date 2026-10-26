@@ -181,6 +181,12 @@
       "docs": "#module-order"
     },
     {
+      "id": "unused-files",
+      "category": "module-structure",
+      "preset": "opt-in",
+      "docs": "#module-order"
+    },
+    {
       "id": "test-inline-multiline-fixture",
       "category": "test-quality",
       "preset": "strict",

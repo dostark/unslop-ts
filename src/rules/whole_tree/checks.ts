@@ -1,7 +1,7 @@
 /**
  * @module WholeTreeChecks
  * @path src/rules/whole_tree/checks.ts
- * @description Engine descriptors of the six whole-tree checks: metadata, option schema, controls, and host command.
+ * @description Engine descriptors of the seven whole-tree checks: metadata, option schema, controls, and host command.
  * @architectural-layer Shared
  * @dependencies [zod]
  * @related-files [src/rules/whole_tree/options.ts, src/config/descriptor.ts, src/rules/meta.ts]
@@ -17,6 +17,7 @@ import {
   MagicLiteralOptionsSchema,
   OptionalParamsSettingsSchema,
   UnusedExportsSettingsSchema,
+  UnusedFilesSettingsSchema,
 } from "./options.ts";
 
 /** The id of each whole-tree check. These ids stay bare; the engine prefixes plugin ids only. */
@@ -26,6 +27,7 @@ export type WholeTreeCheckKey =
   | "magic-literals"
   | "constant-restatement"
   | "unused-exports"
+  | "unused-files"
   | "optional-params";
 
 /** One whole-tree check that a host script runs in process. */
@@ -67,6 +69,16 @@ const UNUSED_EXPORTS_CONTROLS: IRuleControls = {
   hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [UNUSED_EXPORTS_STRICT]: ERROR_MODE },
 };
 
+/** The unused-files check is a warning until its host adds --strict. */
+const UNUSED_FILES_CONTROLS: IRuleControls = {
+  editable: ["options"],
+  fixedLevel: null,
+  fixedScope: null,
+  fixedInclude: null,
+  fixedExclude: null,
+  hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [UNUSED_EXPORTS_STRICT]: ERROR_MODE },
+};
+
 /** The optional-parameters check is a warning until its host adds --fail or --staged. */
 const OPTIONAL_PARAMS_CONTROLS: IRuleControls = {
   editable: ["options"],
@@ -85,7 +97,7 @@ function hostCommand(rule: WholeTreeCheckKey): readonly string[] {
   return ["deno", "run", "-A", CLI_PATH, CATALOG_ARGUMENT, `--rule=${rule}`];
 }
 
-/** The six whole-tree checks, in guide order. */
+/** The seven whole-tree checks, in guide order. */
 export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeCheck>> = {
   "duplicate-type": {
     meta: {
@@ -150,6 +162,19 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
     optionSchema: UnusedExportsSettingsSchema,
     controls: UNUSED_EXPORTS_CONTROLS,
     command: hostCommand("unused-exports"),
+  },
+  "unused-files": {
+    meta: {
+      description: "A production file that no entry point reaches.",
+      category: "module-structure",
+      docs: "#module-order",
+      preset: "opt-in",
+      limits:
+        "Reachability follows relative imports, re-exports, and configured aliases inside the walked root. A dynamic import or an unresolved specifier is not followed.",
+    },
+    optionSchema: UnusedFilesSettingsSchema,
+    controls: UNUSED_FILES_CONTROLS,
+    command: hostCommand("unused-files"),
   },
   "optional-params": {
     meta: {

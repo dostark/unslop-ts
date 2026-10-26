@@ -473,7 +473,7 @@ limits are checked against the option schemas.
 
 A query status describes the configuration only. `active`, `parked`, `off`, and `not-selected` say
 whether the current selection enables a rule. They never change how a host runs it. Whole-tree checks
-keep their host modes: `unused-exports` warns until `--strict`, and `optional-params` warns until
+keep their host modes: `unused-exports` and `unused-files` warn until `--strict`, and `optional-params` warns until
 `--fail` or `--staged`. A script rule's configured level does not override a fixed host flag. The CLI
 prints the editable controls and the host modes, so the enforcement owner stays visible.
 

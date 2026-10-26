@@ -40,6 +40,7 @@ Deno.test("parseWholeTreeSettings reads the sections a catalog holds", () => {
   assertEquals(settings.optionalParams?.walkSkipSegments, ["/generated/"]);
   assertEquals(settings.constantRestatement?.minRestatedElements, 2);
   assertEquals(settings.unusedExports, undefined);
+  assertEquals(settings.unusedFiles, undefined);
 });
 
 Deno.test("parseWholeTreeSettings returns no section for a catalog without wholeTree", () => {
