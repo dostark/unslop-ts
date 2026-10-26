@@ -43,7 +43,7 @@ export interface IWholeTreeCheck {
 const CLI_SEGMENTS = ["src", "cli", "whole_tree.ts"] as const;
 const CLI_PATH = CLI_SEGMENTS.join("/");
 const CATALOG_ARGUMENT = "--catalog=<catalog>";
-const UNUSED_EXPORTS_STRICT = "--strict";
+const UNUSED_EXPORTS_FAIL = "--fail";
 const OPTIONAL_PARAMS_FAIL = "--fail";
 const OPTIONAL_PARAMS_STAGED = "--staged";
 const ERROR_MODE = "error";
@@ -59,24 +59,24 @@ const FIXED_ERROR_CONTROLS: IRuleControls = {
   hostModes: { [DEFAULT_HOST_MODE]: ERROR_MODE },
 };
 
-/** The unused-exports check is a warning until its host adds --strict. */
+/** The unused-exports check warns; a host adds --fail to make findings fatal. */
 const UNUSED_EXPORTS_CONTROLS: IRuleControls = {
   editable: ["options"],
   fixedLevel: null,
   fixedScope: null,
   fixedInclude: null,
   fixedExclude: null,
-  hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [UNUSED_EXPORTS_STRICT]: ERROR_MODE },
+  hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [UNUSED_EXPORTS_FAIL]: ERROR_MODE },
 };
 
-/** The unused-files check is a warning until its host adds --strict. */
+/** The unused-files check warns; a host adds --fail to make findings fatal. */
 const UNUSED_FILES_CONTROLS: IRuleControls = {
   editable: ["options"],
   fixedLevel: null,
   fixedScope: null,
   fixedInclude: null,
   fixedExclude: null,
-  hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [UNUSED_EXPORTS_STRICT]: ERROR_MODE },
+  hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [UNUSED_EXPORTS_FAIL]: ERROR_MODE },
 };
 
 /** The optional-parameters check is a warning until its host adds --fail or --staged. */
@@ -157,7 +157,7 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
       docs: "#module-order",
       preset: "opt-in",
       limits:
-        "Production roots are walked; barrel re-exports, tests, entry points, and configured skip paths are exempt.",
+        "The default report applies the exemption list: barrels, tests, entry points, and configured skip paths. `--all` reports the broad superset; `--fail` fails the run.",
     },
     optionSchema: UnusedExportsSettingsSchema,
     controls: UNUSED_EXPORTS_CONTROLS,

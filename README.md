@@ -326,7 +326,8 @@ Statuses describe the configuration, not the host:
 - `not-selected`: a selection excludes the rule for this call.
 
 A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
-and `unused-files` stay warnings until `--strict`, and `optional-params` stays a warning until `--fail` or `--staged`,
+reports the trusted exemption set by default, `--all` widens the report, and only `--fail` fails the run;
+`unused-files` warns until `--fail`; `optional-params` warns until `--fail` or `--staged`,
 regardless of the configured level shown by the CLI.
 
 ## Project descriptor

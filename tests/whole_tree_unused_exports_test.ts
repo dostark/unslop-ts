@@ -45,3 +45,20 @@ Deno.test("an export re-exported through a configured entry point is not reporte
 Deno.test("changing entryPoints changes the result", async () => {
   assert(await scenario([]));
 });
+
+Deno.test("the default report applies the exemption list and the broad report widens it", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    await Deno.mkdir(join(root, "packages/p/src"), { recursive: true });
+    await Deno.writeTextFile(join(root, "packages/p/mod.ts"), 'export * from "./src/a.ts";\n');
+    await Deno.writeTextFile(join(root, "packages/p/src/a.ts"), "export function helper(): number { return 1; }\n");
+    const trusted = await checkRepository(root, true, settings(["/mod.ts"]));
+    const broad = await checkRepository(root, false, settings(["/mod.ts"]));
+    assert(!trusted.findings.some((finding) => finding.name === "helper"));
+    assert(broad.findings.some((finding) => finding.name === "helper"));
+    assert(trusted.topDirectories.length === 0);
+    assert(broad.topDirectories.length > 0);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

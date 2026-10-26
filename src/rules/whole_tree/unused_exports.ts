@@ -30,7 +30,8 @@ export interface IUnwiredExport {
 
 /** The result of an unused-exports run. */
 export interface IUnusedExportsReport {
-  readonly strict: boolean;
+  /** True when the report applies the trusted exemption set; false is the broad superset. */
+  readonly includeExempt: boolean;
   readonly findings: readonly IUnwiredExport[];
   /** Directories ranked by finding count (relaxed mode only). */
   readonly topDirectories: readonly (readonly [string, number])[];
@@ -325,7 +326,7 @@ function collectFindings(
   publicFiles: Set<string>,
   scriptImportedNames: Set<string>,
   settings: IUnusedExportsSettings,
-  strict: boolean,
+  includeExempt: boolean,
 ): IUnwiredExport[] {
   const findings: IUnwiredExport[] = [];
   for (const [name, sites] of exportMap) {
@@ -338,7 +339,7 @@ function collectFindings(
       if (name.startsWith("I") && name.length > 1 && name[1] === name[1]?.toUpperCase()) continue;
       if (publicFiles.has(site.repoPath)) continue;
       if (isMainEntrypoint(site.repoPath, settings)) continue;
-      if (strict && isStrictExempt(site, name, hasBarrel, scriptImportedNames, settings)) continue;
+      if (includeExempt && isStrictExempt(site, name, hasBarrel, scriptImportedNames, settings)) continue;
       findings.push({ repoPath: site.repoPath, line: site.line, name });
     }
   }
@@ -357,7 +358,7 @@ function rankDirectories(findings: readonly IUnwiredExport[]): Array<[string, nu
 /** Walk a repository checkout and report its unwired exports. */
 export async function checkRepository(
   repoRoot: string,
-  strict: boolean,
+  includeExempt: boolean,
   settings: IUnusedExportsSettings,
 ): Promise<IUnusedExportsReport> {
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
@@ -372,6 +373,6 @@ export async function checkRepository(
   resolveBarrelReExports(files, cache, exportMap, settings);
   const publicFiles = collectPublicFiles(files, cache);
   const scriptImportedNames = await collectScriptImportedNames(repoRoot, settings);
-  const findings = collectFindings(exportMap, importMap, publicFiles, scriptImportedNames, settings, strict);
-  return { strict, findings, topDirectories: strict ? [] : rankDirectories(findings) };
+  const findings = collectFindings(exportMap, importMap, publicFiles, scriptImportedNames, settings, includeExempt);
+  return { includeExempt, findings, topDirectories: includeExempt ? [] : rankDirectories(findings) };
 }

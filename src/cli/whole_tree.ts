@@ -8,8 +8,9 @@
  *
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--strict]
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--strict]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--fail]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--fail]
+ *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
@@ -72,48 +73,54 @@ async function runConstantRestatement(settings: IConstantRestatementSettings): P
   Deno.exit(1);
 }
 
-async function runUnusedExports(strict: boolean, settings: IUnusedExportsSettings): Promise<void> {
-  const report = await checkUnusedExports(Deno.cwd(), strict, settings);
+async function runUnusedExports(
+  includeExempt: boolean,
+  fail: boolean,
+  settings: IUnusedExportsSettings,
+): Promise<void> {
+  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings);
   if (report.findings.length === 0) {
-    console.log("✅ No unwired exports found.");
+    console.log(includeExempt ? "✅ No unwired exports found." : "✅ No unwired exports found in the broad report.");
     return;
   }
   for (const finding of report.findings) {
-    const tail = strict
-      ? "This is likely dead code or was never wired. Remove it or wire it."
-      : "exported but never imported by production code.";
-    const prefix = strict ? "ERROR" : "WARN";
-    const lead = strict ? "is exported, NOT re-exported through any barrel, and never imported." : "is";
-    console.log(`${prefix} [unwired-export] ${finding.repoPath}:${finding.line} – '${finding.name}' ${lead} ${tail}`);
+    const prefix = fail ? "ERROR" : "WARN";
+    const scope = includeExempt
+      ? "is exported and never imported by a production file under the exemption list."
+      : "is exported and never imported anywhere the walk covers.";
+    console.log(`${prefix} [unwired-export] ${finding.repoPath}:${finding.line} – '${finding.name}' ${scope}`);
   }
-  if (strict) {
-    console.log(`\n❌ ${report.findings.length} strictly unwired export(s) — likely dead code. Fix before commit.`);
-    Deno.exit(1);
+  if (includeExempt) {
+    console.log(`\n${fail ? "❌" : "⚠️ "} ${report.findings.length} unwired export(s) in the trusted report.`);
+    if (!fail) console.log("  Add `--fail` to the host command to make these findings fail the run.");
+    if (fail) Deno.exit(1);
+    return;
   }
-  console.log(`\n⚠️  ${report.findings.length} unwired export(s) found (relaxed mode).`);
-  console.log("  Run with --strict for CI-grade dead-code detection.");
+  console.log(`\n📋 ${report.findings.length} unwired export(s) in the broad report (--all).`);
+  console.log("  Drop `--all` for the trusted set that applies the exemption lists.");
   console.log("\nTop directories:");
   for (const [dir, count] of report.topDirectories) console.log(`  ${dir}: ${count}`);
+  if (fail) Deno.exit(1);
 }
 
-async function runUnusedFiles(strict: boolean, settings: IUnusedFilesSettings): Promise<void> {
+async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings): Promise<void> {
   const report = await checkUnusedFiles(Deno.cwd(), settings);
   if (report.findings.length === 0) {
     console.log(`✅ No unreachable files found in ${report.scannedFileCount} scanned file(s).`);
     return;
   }
   for (const finding of report.findings) {
-    const prefix = strict ? "ERROR" : "WARN";
+    const prefix = fail ? "ERROR" : "WARN";
     console.log(
       `${prefix} [unused-file] ${finding.repoPath} – no entry point reaches this file. Delete it or wire it.`,
     );
   }
-  if (strict) {
+  if (fail) {
     console.log(`\n❌ ${report.findings.length} unreachable file(s) — likely dead code. Fix before commit.`);
     Deno.exit(1);
   }
-  console.log(`\n⚠️  ${report.findings.length} unreachable file(s) found (relaxed mode).`);
-  console.log("  Run with --strict for CI-grade dead-code detection.");
+  console.log(`\n⚠️  ${report.findings.length} unreachable file(s) found.`);
+  console.log("  Add `--fail` to the host command to make these findings fail the run.");
 }
 
 const OPTIONAL_SECTIONS: ReadonlyArray<readonly [TOptionalViolationKind, string, boolean]> = [
@@ -309,7 +316,7 @@ function exitWithUsage(message: string): never {
   console.error(
     `Usage: whole_tree.ts (--catalog=<path> | --descriptor=<path> | --plugin=<path>) --rule=<${
       RULES.join("|")
-    }> [--strict] [--staged] [--include-tests] [--fail]`,
+    }> [--all] [--fail] [--staged] [--include-tests]`,
   );
   Deno.exit(USAGE_EXIT);
 }
@@ -380,11 +387,13 @@ async function main(): Promise<void> {
   }
   if (rule === "unused-exports") {
     if (!settings.unusedExports) exitWithUsage("The catalog has no wholeTree.unusedExports section.");
-    await runUnusedExports(args.includes("--strict"), settings.unusedExports);
+    const includeExempt = !args.includes("--all");
+    const fail = args.includes("--fail") || args.includes("--strict");
+    await runUnusedExports(includeExempt, fail, settings.unusedExports);
   }
   if (rule === "unused-files") {
     if (!settings.unusedFiles) exitWithUsage("The catalog has no wholeTree.unusedFiles section.");
-    await runUnusedFiles(args.includes("--strict"), settings.unusedFiles);
+    await runUnusedFiles(args.includes("--fail") || args.includes("--strict"), settings.unusedFiles);
   }
   if (rule === "optional-params") {
     if (!settings.optionalParams) exitWithUsage("The catalog has no wholeTree.optionalParams section.");

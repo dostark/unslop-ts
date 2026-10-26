@@ -298,9 +298,9 @@ Deno.test("whole_tree_modes_preserve_existing_enforcement", async () => {
       assertEquals(v2.code, v1.code, flags.join(" "));
       assertEquals(v2.stdout, v1.stdout, flags.join(" "));
     }
-    const strict = ["--rule=unused-exports", "--strict"];
-    const v1 = await runDeno(["run", "-A", CLI, ...strict, "--catalog=catalog.json"], dir);
-    const v2 = await runDeno(["run", "-A", CLI, ...strict, "--descriptor=examples/unslop.project.ts"], dir);
+    const failing = ["--rule=unused-exports", "--fail"];
+    const v1 = await runDeno(["run", "-A", CLI, ...failing, "--catalog=catalog.json"], dir);
+    const v2 = await runDeno(["run", "-A", CLI, ...failing, "--descriptor=examples/unslop.project.ts"], dir);
     assertEquals(v2.code, v1.code);
     assertEquals(v2.stdout, v1.stdout);
   });

@@ -113,8 +113,8 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
     assert(check.command.length > EMPTY, `${id} declares no host command`);
     assertStringIncludes(check.command.join(" "), `--rule=${id}`);
   }
-  assertEquals(Object.keys(WHOLE_TREE_CHECKS["unused-exports"].controls.hostModes).includes("--strict"), true);
-  assertEquals(WHOLE_TREE_CHECKS["unused-exports"].controls.hostModes["--strict"], "error");
+  assertEquals(Object.keys(WHOLE_TREE_CHECKS["unused-exports"].controls.hostModes).includes("--fail"), true);
+  assertEquals(WHOLE_TREE_CHECKS["unused-exports"].controls.hostModes["--fail"], "error");
   assertEquals(WHOLE_TREE_CHECKS["optional-params"].controls.hostModes["--fail"], "error");
   assertEquals(WHOLE_TREE_CHECKS["optional-params"].controls.hostModes["--staged"], "error");
 });
