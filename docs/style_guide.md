@@ -503,7 +503,8 @@ Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these
 ## Re-export Placement {#barrel-only-reexports}
 
 A module re-export (`export … from "…"`) belongs in a barrel file: a module whose name ends with a
-configured suffix, by default `/mod.ts` or `/index.ts`. An ordinary module states its own surface and
+configured suffix, by default a name ending in `mod.ts` or `index.ts`. An ordinary module states its
+own surface and
 imports what it uses; forwarding another module's symbols from it hides where those symbols live and
 adds a second public path that the barrel cannot police. The `barrel-only-reexports` check reports
 that placement.
