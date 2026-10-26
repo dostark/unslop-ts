@@ -12,7 +12,7 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-code [--verbose] [--group=<name>]... [--top=<n>]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-code [--verbose] [--group=<name>]... [--top=<n>] [--by=pair|file|block]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
@@ -37,6 +37,7 @@ import {
   selectGroups,
 } from "../rules/whole_tree/duplicate_code.ts";
 import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
+import { collapseBlocks, type DuplicateView, parseView, rankFiles } from "../rules/whole_tree/duplicate_views.ts";
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
 import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
 import {
@@ -194,7 +195,12 @@ async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings): Pr
   console.log("  Add `--fail` to the host command to make these findings fail the run.");
 }
 
-function printDuplicateGroup(group: IDuplicateCodeGroupResult, verbose: boolean, top: number): void {
+function printDuplicateGroup(
+  group: IDuplicateCodeGroupResult,
+  verbose: boolean,
+  top: number,
+  view: DuplicateView,
+): void {
   const status = group.passed ? "✅" : "❌";
   console.log(
     `${status} ${group.name}: ${
@@ -202,6 +208,21 @@ function printDuplicateGroup(group: IDuplicateCodeGroupResult, verbose: boolean,
     }% duplicated (threshold ${group.threshold}%, ${group.clones.length} clone(s), ${group.duplicatedLines} line(s))`,
   );
   if (!verbose) return;
+  if (view === "file") {
+    for (const row of rankFiles(group.clones).slice(0, top)) {
+      console.log(
+        `    ${row.duplicatedLines} lines  ${row.file}  (${row.clones} clone(s), ${row.partners} partner file(s))`,
+      );
+    }
+    return;
+  }
+  if (view === "block") {
+    for (const block of collapseBlocks(group.clones).slice(0, top)) {
+      console.log(`    ${block.copies} copies, up to ${block.lines} lines`);
+      for (const range of block.locations) console.log(`        ${range.file}:${range.start}-${range.end}`);
+    }
+    return;
+  }
   for (const clone of group.clones.slice(0, top)) {
     console.log(
       `    ${clone.first.file}:${clone.first.start}-${clone.first.end} ~ ${clone.second.file}:${clone.second.start}-${clone.second.end} (${clone.lines} lines)`,
@@ -212,6 +233,7 @@ function printDuplicateGroup(group: IDuplicateCodeGroupResult, verbose: boolean,
 async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly string[]): Promise<void> {
   const verbose = args.includes("--verbose");
   const top = parseTop(flagValue(args, "top"));
+  const view = parseView(flagValue(args, "by")) ?? exitWithUsage("--by must be pair, file, or block.");
   const groupNames = args.filter((arg) => arg.startsWith(GROUP_FLAG)).map((arg) => arg.slice(GROUP_FLAG.length));
   let selected: IDuplicateCodeSettings;
   try {
@@ -220,7 +242,7 @@ async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly
     return exitWithUsage(error instanceof Error ? error.message : String(error));
   }
   const report = await checkDuplicateCode(Deno.cwd(), selected);
-  for (const group of report.groups) printDuplicateGroup(group, verbose, top);
+  for (const group of report.groups) printDuplicateGroup(group, verbose, top, view);
   const failed = report.groups.filter((group) => !group.passed);
   if (failed.length === 0) return;
   console.error(

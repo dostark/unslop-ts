@@ -491,7 +491,10 @@ without `ignore` or `pattern` scans everything under its `paths`. A group that s
 error, so a wrong glob never passes at zero percent. Run it with
 `deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=duplicate-code`;
 `--verbose` lists every clone, largest first. `--group=<name>` (repeatable) runs only the named scan
-groups, and `--top=<n>` caps the clones listed per group.
+groups, and `--top=<n>` caps the rows listed per group. `--by=file` ranks files by the lines that clones
+cover, and `--by=block` collapses clone pairs that share a region into blocks with a copy count, the longest copy, and every
+location.
+The default `--by=pair` lists each clone pair.
 
 ## Working with deno lint
 

@@ -8,6 +8,14 @@
  */
 
 export {
+  collapseBlocks,
+  type DuplicateView,
+  type IDuplicateBlock,
+  type IFileDuplication,
+  parseView,
+  rankFiles,
+} from "./duplicate_views.ts";
+export {
   buildJscpdArgs,
   checkRepository as checkDuplicateCode,
   type IClone,
