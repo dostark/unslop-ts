@@ -28,7 +28,7 @@ import {
   type IOptionalViolation,
   type TOptionalViolationKind,
 } from "../rules/whole_tree/optional_params.ts";
-import { checkRepository as checkUnusedExports } from "../rules/whole_tree/unused_exports.ts";
+import { checkRepository as checkUnusedExports, type IUnwiredExport } from "../rules/whole_tree/unused_exports.ts";
 import { checkRepository as checkUnusedFiles } from "../rules/whole_tree/unused_files.ts";
 import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
@@ -73,6 +73,53 @@ async function runConstantRestatement(settings: IConstantRestatementSettings): P
   Deno.exit(1);
 }
 
+function unwiredScope(finding: IUnwiredExport, includeExempt: boolean): string {
+  if (finding.severity === "warning") {
+    return "is an interface exported and never imported; add `// unslop-ignore-next-line unused-interface` above it if it is intentional API.";
+  }
+  return includeExempt
+    ? "is exported and never imported by a production file under the exemption list."
+    : "is exported and never imported anywhere the walk covers.";
+}
+
+function printUnwiredExports(
+  findings: readonly IUnwiredExport[],
+  includeExempt: boolean,
+  fail: boolean,
+): { readonly errors: number; readonly warnings: number } {
+  const errors = findings.filter((finding) => finding.severity === "error").length;
+  for (const finding of findings) {
+    const prefix = finding.severity === "error" && fail ? "ERROR" : "WARN";
+    console.log(
+      `${prefix} [unwired-export] ${finding.repoPath}:${finding.line} – '${finding.name}' ${
+        unwiredScope(finding, includeExempt)
+      }`,
+    );
+  }
+  return { errors, warnings: findings.length - errors };
+}
+
+function printBroadSummary(errors: number, warnings: number): void {
+  console.log(
+    `\n📋 ${
+      errors + warnings
+    } unwired export(s) in the broad report (--all): ${errors} error(s), ${warnings} warning(s).`,
+  );
+  console.log("  Drop `--all` for the trusted set that applies the exemption lists.");
+}
+
+function printTrustedSummary(errors: number, warnings: number, fail: boolean): void {
+  const mark = fail && errors > 0 ? "❌" : "⚠️ ";
+  console.log(
+    `\n${mark} ${
+      errors + warnings
+    } unwired export(s) in the trusted report: ${errors} error(s), ${warnings} warning(s).`,
+  );
+  if (warnings > 0) console.log("  Interface warnings never fail the run; add the pragma or delete the interface.");
+  if (errors === 0) console.log("  No error findings, so `--fail` leaves the exit code at 0.");
+  else if (!fail) console.log("  Add `--fail` to the host command to make the error findings fail the run.");
+}
+
 async function runUnusedExports(
   includeExempt: boolean,
   fail: boolean,
@@ -83,24 +130,15 @@ async function runUnusedExports(
     console.log(includeExempt ? "✅ No unwired exports found." : "✅ No unwired exports found in the broad report.");
     return;
   }
-  for (const finding of report.findings) {
-    const prefix = fail ? "ERROR" : "WARN";
-    const scope = includeExempt
-      ? "is exported and never imported by a production file under the exemption list."
-      : "is exported and never imported anywhere the walk covers.";
-    console.log(`${prefix} [unwired-export] ${finding.repoPath}:${finding.line} – '${finding.name}' ${scope}`);
-  }
+  const { errors, warnings } = printUnwiredExports(report.findings, includeExempt, fail);
   if (includeExempt) {
-    console.log(`\n${fail ? "❌" : "⚠️ "} ${report.findings.length} unwired export(s) in the trusted report.`);
-    if (!fail) console.log("  Add `--fail` to the host command to make these findings fail the run.");
-    if (fail) Deno.exit(1);
-    return;
+    printTrustedSummary(errors, warnings, fail);
+  } else {
+    printBroadSummary(errors, warnings);
+    console.log("\nTop directories:");
+    for (const [dir, count] of report.topDirectories) console.log(`  ${dir}: ${count}`);
   }
-  console.log(`\n📋 ${report.findings.length} unwired export(s) in the broad report (--all).`);
-  console.log("  Drop `--all` for the trusted set that applies the exemption lists.");
-  console.log("\nTop directories:");
-  for (const [dir, count] of report.topDirectories) console.log(`  ${dir}: ${count}`);
-  if (fail) Deno.exit(1);
+  if (fail && errors > 0) Deno.exit(1);
 }
 
 async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings): Promise<void> {

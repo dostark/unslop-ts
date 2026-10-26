@@ -30,6 +30,7 @@ const TS_API_ALLOWLIST = [
   "SyntaxKind",
   "createSourceFile",
   "forEachChild",
+  "getLeadingCommentRanges",
   "isArrowFunction",
   "isBlock",
   "isCallExpression",

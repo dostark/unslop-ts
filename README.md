@@ -327,7 +327,9 @@ Statuses describe the configuration, not the host:
 
 A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
 reports the trusted exemption set by default, `--all` widens the report, and only `--fail` fails the run;
-`unused-files` warns until `--fail`; `optional-params` warns until `--fail` or `--staged`,
+`unused-files` warns until `--fail`; `optional-params` warns until `--fail` or `--staged`. An exported
+interface that no file imports reports as a warning and never fails the run; put
+`// unslop-ignore-next-line unused-interface` above it when it is intentional API,
 regardless of the configured level shown by the CLI.
 
 ## Project descriptor

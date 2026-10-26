@@ -157,7 +157,7 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
       docs: "#module-order",
       preset: "opt-in",
       limits:
-        "The default report applies the exemption list: barrels, tests, entry points, and configured skip paths. `--all` reports the broad superset; `--fail` fails the run.",
+        "The default report applies the exemption list: barrels, tests, entry points, and configured skip paths. An unused interface reports as a warning unless `// unslop-ignore-next-line unused-interface` or `@public` exempts it. `--all` reports the broad superset; `--fail` fails only on error findings.",
     },
     optionSchema: UnusedExportsSettingsSchema,
     controls: UNUSED_EXPORTS_CONTROLS,

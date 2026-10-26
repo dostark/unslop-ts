@@ -19,13 +19,19 @@ export interface IExportSite {
   readonly line: number;
   readonly isBarrelPassThrough: boolean;
   readonly isTypeDecl: boolean;
+  readonly isInterface: boolean;
+  readonly hasIgnorePragma: boolean;
 }
+
+/** How an unwired export finding is enforced. Interfaces stay warnings, so `--fail` leaves them alone. */
+export type TUnwiredSeverity = "warning" | "error";
 
 /** One unwired export. */
 export interface IUnwiredExport {
   readonly repoPath: string;
   readonly line: number;
   readonly name: string;
+  readonly severity: TUnwiredSeverity;
 }
 
 /** The result of an unused-exports run. */
@@ -212,6 +218,15 @@ function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Ma
   });
 }
 
+const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-interface\b/;
+
+/** True when the declaration carries the exclusion pragma on the line above it. */
+function hasIgnorePragma(sourceFile: ts.SourceFile, node: ts.Node): boolean {
+  const text = sourceFile.getFullText();
+  const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
+  return ranges.some((range) => IGNORE_NEXT_LINE.test(text.slice(range.pos, range.end)));
+}
+
 function recordExport(name: string, site: IExportSite, exportMap: Map<string, IExportSite[]>): void {
   const sites = exportMap.get(name) ?? [];
   sites.push(site);
@@ -233,6 +248,8 @@ function parseExports(
           line: lineOf(el),
           isBarrelPassThrough: isPackageEntrypoint(repoPath, settings),
           isTypeDecl: false,
+          isInterface: false,
+          hasIgnorePragma: false,
         }, exportMap);
       }
       return;
@@ -245,6 +262,8 @@ function parseExports(
       line: lineOf(node),
       isBarrelPassThrough: false,
       isTypeDecl: isIfaceOrType(node),
+      isInterface: ts.isInterfaceDeclaration(node),
+      hasIgnorePragma: hasIgnorePragma(sourceFile, node),
     }, exportMap);
   });
 }
@@ -276,7 +295,14 @@ function resolveBarrelReExports(
       const addBarrelEntry = (name: string, isType: boolean): void => {
         const sites = exportMap.get(name) ?? [];
         if (!sites.some((s) => s.repoPath === repoPath && s.isBarrelPassThrough)) {
-          sites.push({ repoPath, line, isBarrelPassThrough: true, isTypeDecl: isType });
+          sites.push({
+            repoPath,
+            line,
+            isBarrelPassThrough: true,
+            isTypeDecl: isType,
+            isInterface: false,
+            hasIgnorePragma: false,
+          });
         }
         exportMap.set(name, sites);
       };
@@ -320,6 +346,44 @@ function isStrictExempt(
   return false;
 }
 
+function isInterfaceName(name: string): boolean {
+  return name.startsWith("I") && name.length > 1 && name[1] === name[1]?.toUpperCase();
+}
+
+function isSkippedPath(repoPath: string, settings: IUnusedExportsSettings): boolean {
+  return settings.strictSkipPrefixes.some((prefix) => repoPath.startsWith(prefix)) ||
+    settings.strictSkipSegments.some((segment) => repoPath.includes(segment));
+}
+
+/** An interface finding survives unless a pragma, a public tag, or an entry-point rule exempts it. */
+function isInterfaceFinding(
+  site: IExportSite,
+  name: string,
+  scriptImportedNames: Set<string>,
+  settings: IUnusedExportsSettings,
+): boolean {
+  if (site.hasIgnorePragma) return false;
+  if (isPackageEntrypoint(site.repoPath, settings)) return false;
+  if (isSkippedPath(site.repoPath, settings)) return false;
+  return !scriptImportedNames.has(name);
+}
+
+function isValueFinding(
+  site: IExportSite,
+  name: string,
+  hasBarrel: boolean,
+  publicFiles: Set<string>,
+  scriptImportedNames: Set<string>,
+  settings: IUnusedExportsSettings,
+  includeExempt: boolean,
+): boolean {
+  if (site.isTypeDecl) return false;
+  if (isInterfaceName(name)) return false;
+  if (publicFiles.has(site.repoPath)) return false;
+  if (isMainEntrypoint(site.repoPath, settings)) return false;
+  return !(includeExempt && isStrictExempt(site, name, hasBarrel, scriptImportedNames, settings));
+}
+
 function collectFindings(
   exportMap: Map<string, IExportSite[]>,
   importMap: Map<string, Set<string>>,
@@ -331,16 +395,18 @@ function collectFindings(
   const findings: IUnwiredExport[] = [];
   for (const [name, sites] of exportMap) {
     if (importMap.has(name)) continue;
-    const nonTypeSites = sites.filter((s) => !s.isTypeDecl);
-    if (nonTypeSites.length === 0) continue;
-    const hasBarrel = sites.some((s) => s.isBarrelPassThrough);
-    for (const site of nonTypeSites) {
+    const hasBarrel = sites.some((site) => site.isBarrelPassThrough);
+    for (const site of sites) {
       if (site.isBarrelPassThrough) continue;
-      if (name.startsWith("I") && name.length > 1 && name[1] === name[1]?.toUpperCase()) continue;
-      if (publicFiles.has(site.repoPath)) continue;
-      if (isMainEntrypoint(site.repoPath, settings)) continue;
-      if (includeExempt && isStrictExempt(site, name, hasBarrel, scriptImportedNames, settings)) continue;
-      findings.push({ repoPath: site.repoPath, line: site.line, name });
+      if (site.isInterface) {
+        if (isInterfaceFinding(site, name, scriptImportedNames, settings)) {
+          findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "warning" });
+        }
+        continue;
+      }
+      if (isValueFinding(site, name, hasBarrel, publicFiles, scriptImportedNames, settings, includeExempt)) {
+        findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "error" });
+      }
     }
   }
   return findings;
