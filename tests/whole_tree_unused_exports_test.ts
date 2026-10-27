@@ -283,3 +283,86 @@ Deno.test("the unused-type pragma exempts a type alias and an interface", async 
     assert(!report.findings.some((entry) => entry.name === "KeptAlias" || entry.name === "IKept"));
   });
 });
+
+Deno.test("the parity report flags a named re-export that no consumer imports", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/a.ts", "export const barrelOnly = 1;\n");
+    await write(root, "packages/p/mod.ts", 'export { barrelOnly } from "./src/a.ts";\n');
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(report.findings.some((entry) => entry.name === "barrelOnly"));
+  });
+});
+
+Deno.test("the parity report flags an entry-point declaration", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/mod.ts", "export const entryValue = 1;\n");
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(report.findings.some((entry) => entry.name === "entryValue"));
+  });
+});
+
+Deno.test("the parity report flags a test helper and ignores test imports", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/tests/helper.ts", "export const helperValue = 1;\n");
+    await write(root, "packages/p/src/used.ts", "export const prodUsedByTest = 1;\n");
+    await write(
+      root,
+      "packages/p/tests/use_test.ts",
+      'import { prodUsedByTest } from "../src/used.ts";\n\nexport const value = prodUsedByTest;\n',
+    );
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(report.findings.some((entry) => entry.name === "helperValue"));
+    assert(report.findings.some((entry) => entry.name === "prodUsedByTest"));
+  });
+});
+
+Deno.test("the parity report includes scripts", async () => {
+  await withRepo(async (root) => {
+    await write(root, "scripts/tool.ts", "export const scriptValue = 1;\n");
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(report.findings.some((entry) => entry.name === "scriptValue"));
+  });
+});
+
+Deno.test("the parity report flags an unused interface as an error", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/types.ts", "export interface IUnusedParity {\n  a: string;\n}\n");
+    const report = await checkRepository(root, false, settings([]), true);
+    const finding = report.findings.find((entry) => entry.name === "IUnusedParity");
+    assert(finding?.severity === "error");
+  });
+});
+
+Deno.test("the parity report flags a default export and a namespace", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/default.ts", "export default 1;\n");
+    await write(root, "packages/p/src/space.ts", "export namespace NsParity {\n  export const a = 1;\n}\n");
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(report.findings.some((entry) => entry.name === "default"));
+    assert(report.findings.some((entry) => entry.name === "NsParity"));
+  });
+});
+
+Deno.test("the parity report honours the unused-export pragma", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/kept.ts",
+      "// unslop-ignore-next-line unused-export\nexport const keptValue = 1;\n",
+    );
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(!report.findings.some((entry) => entry.name === "keptValue"));
+  });
+});
+
+Deno.test("the parity report keeps a configurable registration exempt", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/config.ts",
+      'export const DEFAULT_BETA = configurable({ key: "beta.key", default: 1 });\n',
+    );
+    const report = await checkRepository(root, false, settings([]), true);
+    assert(!report.findings.some((entry) => entry.name === "DEFAULT_BETA"));
+  });
+});

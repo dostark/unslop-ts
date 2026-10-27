@@ -48,6 +48,7 @@ const TS_API_ALLOWLIST = [
   "isImportDeclaration",
   "isInterfaceDeclaration",
   "isMethodDeclaration",
+  "isModuleDeclaration",
   "isNamedExports",
   "isNamedImports",
   "isNamespaceImport",

@@ -22,6 +22,7 @@ export interface IExportSite {
   readonly isInterface: boolean;
   readonly isConfigurable: boolean;
   readonly isTypeAlias: boolean;
+  readonly isNamespace: boolean;
   readonly hasIgnorePragma: boolean;
 }
 
@@ -29,7 +30,7 @@ export interface IExportSite {
 export type TUnwiredSeverity = "warning" | "error";
 
 /** The declaration shape an unwired export finding comes from. */
-export type TUnwiredKind = "export" | "interface" | "type-alias";
+export type TUnwiredKind = "export" | "interface" | "type-alias" | "default" | "namespace";
 
 /** One unwired export. */
 export interface IUnwiredExport {
@@ -85,18 +86,23 @@ function hasExportModifier(node: ts.Node): boolean {
 }
 
 function getExportName(node: ts.Node): string | null {
-  if (ts.isClassDeclaration(node) && node.name) return node.name.text;
-  if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
-  if (ts.isVariableStatement(node)) {
-    for (const decl of node.declarationList.declarations) {
-      if (ts.isIdentifier(decl.name)) return decl.name.text;
-    }
-    return null;
+  if (
+    ts.isClassDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isInterfaceDeclaration(node) ||
+    ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node) || ts.isModuleDeclaration(node)
+  ) {
+    return node.name?.text ?? null;
   }
-  if (ts.isInterfaceDeclaration(node) && node.name) return node.name.text;
-  if (ts.isTypeAliasDeclaration(node) && node.name) return node.name.text;
-  if (ts.isEnumDeclaration(node) && node.name) return node.name.text;
+  if (!ts.isVariableStatement(node)) return null;
+  for (const decl of node.declarationList.declarations) {
+    if (ts.isIdentifier(decl.name)) return decl.name.text;
+  }
   return null;
+}
+
+function hasDefaultModifier(node: ts.Node): boolean {
+  if (!("modifiers" in node)) return false;
+  const mods = (node as { modifiers?: ts.Modifier[] }).modifiers;
+  return mods ? mods.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) : false;
 }
 
 function isIfaceOrType(node: ts.Node): boolean {
@@ -266,7 +272,14 @@ function collectDynamicImportVariables(sourceFile: ts.SourceFile): Set<string> {
   return names;
 }
 
-function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Map<string, Set<string>>): void {
+function parseImports(
+  sourceFile: ts.SourceFile,
+  repoPath: string,
+  importMap: Map<string, Set<string>>,
+  settings: IUnusedExportsSettings,
+  parity: boolean,
+): void {
+  if (parity && isTestFilePath(repoPath, settings)) return;
   ts.forEachChild(sourceFile, (node) => {
     if (ts.isImportDeclaration(node) && node.importClause) {
       const clause = node.importClause;
@@ -285,9 +298,9 @@ function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Ma
       }
       return;
     }
-    // A named re-export forwards a symbol from its source module, so the source export is used.
+    // A named re-export forwards a symbol; in parity mode it does not count as a consumer.
     if (
-      ts.isExportDeclaration(node) && node.moduleSpecifier && node.exportClause &&
+      !parity && ts.isExportDeclaration(node) && node.moduleSpecifier && node.exportClause &&
       ts.isNamedExports(node.exportClause)
     ) {
       for (const el of node.exportClause.elements) {
@@ -312,7 +325,7 @@ function recordNestedDynamicImports(
   visit(sourceFile);
 }
 
-const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-(?:type|interface)\b/;
+const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-(?:type|interface|export)\b/;
 
 /** True when the declaration carries the exclusion pragma on the line above it. */
 function hasIgnorePragma(sourceFile: ts.SourceFile, node: ts.Node): boolean {
@@ -332,6 +345,7 @@ function parseExports(
   repoPath: string,
   exportMap: Map<string, IExportSite[]>,
   settings: IUnusedExportsSettings,
+  parity: boolean,
 ): void {
   ts.forEachChild(sourceFile, (node) => {
     const lineOf = (child: ts.Node): number => sourceFile.getLineAndCharacterOfPosition(child.getStart()).line + 1;
@@ -340,18 +354,36 @@ function parseExports(
         recordExport(el.name.text, {
           repoPath,
           line: lineOf(el),
-          isBarrelPassThrough: isPackageEntrypoint(repoPath, settings),
+          isBarrelPassThrough: !parity && isPackageEntrypoint(repoPath, settings),
           isTypeDecl: false,
           isInterface: false,
           isConfigurable: false,
           isTypeAlias: false,
-          hasIgnorePragma: false,
+          isNamespace: false,
+          hasIgnorePragma: hasIgnorePragma(sourceFile, el),
         }, exportMap);
       }
       return;
     }
-    if (ts.isExportAssignment(node) || !hasExportModifier(node)) return;
-    const name = getExportName(node);
+    if (ts.isExportAssignment(node)) {
+      if (!parity) return;
+      recordExport("default", {
+        repoPath,
+        line: lineOf(node),
+        isBarrelPassThrough: false,
+        isTypeDecl: false,
+        isInterface: false,
+        isConfigurable: false,
+        isTypeAlias: false,
+        isNamespace: false,
+        hasIgnorePragma: hasIgnorePragma(sourceFile, node),
+      }, exportMap);
+      return;
+    }
+    if (!hasExportModifier(node)) return;
+    const declared = getExportName(node);
+    const isDefault = parity && hasDefaultModifier(node);
+    const name = isDefault ? "default" : declared;
     if (!name) return;
     recordExport(name, {
       repoPath,
@@ -361,6 +393,7 @@ function parseExports(
       isInterface: ts.isInterfaceDeclaration(node),
       isConfigurable: isConfigurableRegistration(node, sourceFile),
       isTypeAlias: ts.isTypeAliasDeclaration(node),
+      isNamespace: ts.isModuleDeclaration(node),
       hasIgnorePragma: hasIgnorePragma(sourceFile, node),
     }, exportMap);
   });
@@ -401,6 +434,7 @@ function resolveBarrelReExports(
             isInterface: false,
             isConfigurable: false,
             isTypeAlias: false,
+            isNamespace: false,
             hasIgnorePragma: false,
           });
         }
@@ -493,6 +527,37 @@ function isValueFinding(
   return !(includeExempt && isStrictExempt(site, name, hasBarrel, scriptImportedNames, settings));
 }
 
+/** The finding kind a site declares, used by the parity report. */
+function kindOfSite(site: IExportSite, name: string): TUnwiredKind {
+  if (site.isInterface) return "interface";
+  if (site.isTypeAlias) return "type-alias";
+  if (site.isNamespace) return "namespace";
+  return name === "default" ? "default" : "export";
+}
+
+/** Fallow-parity findings: every unwired site, with no exemption list. */
+function collectParityFindings(
+  exportMap: Map<string, IExportSite[]>,
+  importMap: Map<string, Set<string>>,
+): IUnwiredExport[] {
+  const findings: IUnwiredExport[] = [];
+  for (const [name, sites] of exportMap) {
+    if (importMap.has(name)) continue;
+    if (isTestExport(name)) continue;
+    for (const site of sites) {
+      if (site.isConfigurable || site.hasIgnorePragma) continue;
+      findings.push({
+        repoPath: site.repoPath,
+        line: site.line,
+        name,
+        severity: "error",
+        kind: kindOfSite(site, name),
+      });
+    }
+  }
+  return findings;
+}
+
 function collectFindings(
   exportMap: Map<string, IExportSite[]>,
   importMap: Map<string, Set<string>>,
@@ -500,7 +565,9 @@ function collectFindings(
   scriptImportedNames: Set<string>,
   settings: IUnusedExportsSettings,
   includeExempt: boolean,
+  parity: boolean,
 ): IUnwiredExport[] {
+  if (parity) return collectParityFindings(exportMap, importMap);
   const findings: IUnwiredExport[] = [];
   for (const [name, sites] of exportMap) {
     if (importMap.has(name)) continue;
@@ -542,6 +609,7 @@ export async function checkRepository(
   repoRoot: string,
   includeExempt: boolean,
   settings: IUnusedExportsSettings,
+  parity = false,
 ): Promise<IUnusedExportsReport> {
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
   const exportMap = new Map<string, IExportSite[]>();
@@ -549,14 +617,22 @@ export async function checkRepository(
   for (const repoPath of files) {
     const sourceFile = ts.createSourceFile(repoPath, cache.get(repoPath)!.text, ts.ScriptTarget.Latest, true);
     cache.get(repoPath)!.sourceFile = sourceFile;
-    parseImports(sourceFile, repoPath, importMap);
-    if (!isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings)) {
-      parseExports(sourceFile, repoPath, exportMap, settings);
+    parseImports(sourceFile, repoPath, importMap, settings, parity);
+    if (parity || (!isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings))) {
+      parseExports(sourceFile, repoPath, exportMap, settings, parity);
     }
   }
-  resolveBarrelReExports(files, cache, exportMap, settings);
-  const publicFiles = collectPublicFiles(files, cache);
+  if (!parity) resolveBarrelReExports(files, cache, exportMap, settings);
+  const publicFiles = parity ? new Set<string>() : collectPublicFiles(files, cache);
   const scriptImportedNames = await collectScriptImportedNames(repoRoot, settings);
-  const findings = collectFindings(exportMap, importMap, publicFiles, scriptImportedNames, settings, includeExempt);
+  const findings = collectFindings(
+    exportMap,
+    importMap,
+    publicFiles,
+    scriptImportedNames,
+    settings,
+    includeExempt,
+    parity,
+  );
   return { includeExempt, findings, topDirectories: includeExempt ? [] : rankDirectories(findings) };
 }

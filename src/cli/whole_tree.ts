@@ -8,7 +8,7 @@
  *
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--fail]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity] [--fail]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
@@ -101,6 +101,12 @@ function printUnwiredExports(
   return { errors, warnings: findings.length - errors };
 }
 
+function printParitySummary(errors: number, fail: boolean): void {
+  const mark = fail && errors > 0 ? "❌" : "⚠️ ";
+  console.log(`\n${mark} ${errors} unwired export(s) in the parity report (fallow-aligned).`);
+  if (errors > 0 && !fail) console.log("  Add `--fail` to make the parity findings fail the run.");
+}
+
 function printBroadSummary(errors: number, warnings: number): void {
   console.log(
     `\n📋 ${
@@ -126,14 +132,17 @@ async function runUnusedExports(
   includeExempt: boolean,
   fail: boolean,
   settings: IUnusedExportsSettings,
+  parity: boolean,
 ): Promise<void> {
-  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings);
+  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings, parity);
   if (report.findings.length === 0) {
     console.log(includeExempt ? "✅ No unwired exports found." : "✅ No unwired exports found in the broad report.");
     return;
   }
   const { errors, warnings } = printUnwiredExports(report.findings, includeExempt, fail);
-  if (includeExempt) {
+  if (parity) {
+    printParitySummary(errors, fail);
+  } else if (includeExempt) {
     printTrustedSummary(errors, warnings, fail);
   } else {
     printBroadSummary(errors, warnings);
@@ -413,6 +422,14 @@ function loadSettings(catalog: JsonValue): IWholeTreeSettings {
   }
 }
 
+async function runUnusedRule(settings: IWholeTreeSettings, args: readonly string[]): Promise<void> {
+  if (!settings.unusedExports) exitWithUsage("The catalog has no wholeTree.unusedExports section.");
+  const parity = args.includes("--parity");
+  const includeExempt = !parity && !args.includes("--all");
+  const fail = args.includes("--fail") || args.includes("--strict");
+  await runUnusedExports(includeExempt, fail, settings.unusedExports, parity);
+}
+
 async function main(): Promise<void> {
   const rule = flagValue(Deno.args, "rule");
   if (rule === undefined || !RULES.includes(rule)) exitWithUsage("Missing or unknown --rule.");
@@ -425,12 +442,7 @@ async function main(): Promise<void> {
     if (!settings.constantRestatement) exitWithUsage("The catalog has no wholeTree.constantRestatement section.");
     await runConstantRestatement(settings.constantRestatement);
   }
-  if (rule === "unused-exports") {
-    if (!settings.unusedExports) exitWithUsage("The catalog has no wholeTree.unusedExports section.");
-    const includeExempt = !args.includes("--all");
-    const fail = args.includes("--fail") || args.includes("--strict");
-    await runUnusedExports(includeExempt, fail, settings.unusedExports);
-  }
+  if (rule === "unused-exports") return await runUnusedRule(settings, args);
   if (rule === "unused-files") {
     if (!settings.unusedFiles) exitWithUsage("The catalog has no wholeTree.unusedFiles section.");
     await runUnusedFiles(args.includes("--fail") || args.includes("--strict"), settings.unusedFiles);
