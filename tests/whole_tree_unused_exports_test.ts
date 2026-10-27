@@ -220,3 +220,16 @@ Deno.test("a name destructured from a nested dynamic import counts as usage", as
     assert(!report.findings.some((entry) => entry.name === "nestedDynUsed"));
   });
 });
+
+Deno.test("a name destructured from a module variable imported dynamically counts as usage", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/a.ts", "export const moduleVarUsed = 1;\n");
+    await write(
+      root,
+      "packages/p/src/b.ts",
+      'const moduleExports = await import("./a.ts");\n\nconst { moduleVarUsed } = moduleExports;\n\nexport const value = moduleVarUsed;\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "moduleVarUsed"));
+  });
+});

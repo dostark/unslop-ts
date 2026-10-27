@@ -206,12 +206,14 @@ function recordDynamicImportNames(
   node: ts.VariableStatement,
   repoPath: string,
   importMap: Map<string, Set<string>>,
+  moduleVariables: ReadonlySet<string>,
 ): void {
   for (const declaration of node.declarationList.declarations) {
     const initializer = declaration.initializer;
-    if (!initializer || !ts.isAwaitExpression(initializer)) continue;
-    const call = initializer.expression;
-    if (!ts.isCallExpression(call) || call.expression.kind !== ts.SyntaxKind.ImportKeyword) continue;
+    if (!initializer) continue;
+    const fromImport = ts.isAwaitExpression(initializer) && isDynamicImportCall(initializer.expression);
+    const fromModuleVariable = ts.isIdentifier(initializer) && moduleVariables.has(initializer.text);
+    if (!fromImport && !fromModuleVariable) continue;
     if (!ts.isObjectBindingPattern(declaration.name)) continue;
     for (const element of declaration.name.elements) {
       if (!ts.isIdentifier(element.name)) continue;
@@ -221,6 +223,30 @@ function recordDynamicImportNames(
       recordImport(imported, repoPath, importMap);
     }
   }
+}
+
+/** True when the expression calls the dynamic `import()` form. */
+function isDynamicImportCall(call: ts.Expression): boolean {
+  return ts.isCallExpression(call) && call.expression.kind === ts.SyntaxKind.ImportKeyword;
+}
+
+/** The variables a file binds to a whole `await import("./m.ts")` module object. */
+function collectDynamicImportVariables(sourceFile: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableStatement(node)) {
+      for (const declaration of node.declarationList.declarations) {
+        const initializer = declaration.initializer;
+        if (!initializer || !ts.isAwaitExpression(initializer)) continue;
+        if (ts.isIdentifier(declaration.name) && isDynamicImportCall(initializer.expression)) {
+          names.add(declaration.name.text);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return names;
 }
 
 function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Map<string, Set<string>>): void {
@@ -261,8 +287,9 @@ function recordNestedDynamicImports(
   repoPath: string,
   importMap: Map<string, Set<string>>,
 ): void {
+  const moduleVariables = collectDynamicImportVariables(sourceFile);
   const visit = (node: ts.Node): void => {
-    if (ts.isVariableStatement(node)) recordDynamicImportNames(node, repoPath, importMap);
+    if (ts.isVariableStatement(node)) recordDynamicImportNames(node, repoPath, importMap, moduleVariables);
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);

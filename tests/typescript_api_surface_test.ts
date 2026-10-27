@@ -17,6 +17,7 @@ const CONSUMER_FILES = [
 
 const TS_API_ALLOWLIST = [
   "ConciseBody",
+  "Expression",
   "ExportDeclaration",
   "FunctionBody",
   "Modifier",
