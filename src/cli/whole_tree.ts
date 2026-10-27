@@ -74,10 +74,13 @@ async function runConstantRestatement(settings: IConstantRestatementSettings): P
 }
 
 function unwiredScope(finding: IUnwiredExport, includeExempt: boolean): string {
-  if (finding.severity === "warning") {
+  if (finding.kind === "interface" || finding.kind === "type-alias") {
     return finding.kind === "type-alias"
       ? "is a type alias exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API."
       : "is an interface exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API.";
+  }
+  if (finding.kind === "default") {
+    return "is the default export and never imported; add `// unslop-ignore-next-line unused-export` above it if it is intentional API.";
   }
   return includeExempt
     ? "is exported and never imported by a production file under the exemption list."
@@ -101,10 +104,13 @@ function printUnwiredExports(
   return { errors, warnings: findings.length - errors };
 }
 
-function printParitySummary(errors: number, fail: boolean): void {
+function printParitySummary(total: number, errors: number, fail: boolean): void {
   const mark = fail && errors > 0 ? "❌" : "⚠️ ";
-  console.log(`\n${mark} ${errors} unwired export(s) in the parity report (fallow-aligned).`);
-  if (errors > 0 && !fail) console.log("  Add `--fail` to make the parity findings fail the run.");
+  const warnings = total - errors;
+  console.log(
+    `\n${mark} ${total} unwired export(s) in the parity report (fallow-aligned): ${errors} error(s), ${warnings} warning(s).`,
+  );
+  if (errors > 0 && !fail) console.log("  Add `--fail` to make the error findings fail the run.");
 }
 
 function printBroadSummary(errors: number, warnings: number): void {
@@ -141,7 +147,7 @@ async function runUnusedExports(
   }
   const { errors, warnings } = printUnwiredExports(report.findings, includeExempt, fail);
   if (parity) {
-    printParitySummary(errors, fail);
+    printParitySummary(report.findings.length, errors, fail);
   } else if (includeExempt) {
     printTrustedSummary(errors, warnings, fail);
   } else {
