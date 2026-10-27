@@ -105,6 +105,18 @@ function hasDefaultModifier(node: ts.Node): boolean {
   return mods ? mods.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) : false;
 }
 
+/** True when the parity report treats the file as a test artifact (a test directory or a test file). */
+function isTestArtifact(repoPath: string): boolean {
+  return repoPath.includes("/tests/") || repoPath.endsWith("_test.ts") || repoPath.endsWith(".test.ts");
+}
+
+/** True when the parity report scans the file: workspace roots and scripts, not fixtures or vendored trees. */
+function isParityScanPath(repoPath: string, settings: IUnusedExportsSettings): boolean {
+  if (repoPath.includes("/fixtures/")) return false;
+  if (repoPath.startsWith(`${settings.scriptRoot}/`)) return true;
+  return isProductionRoot(repoPath, settings);
+}
+
 function isIfaceOrType(node: ts.Node): boolean {
   return ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 }
@@ -279,7 +291,6 @@ function parseImports(
   settings: IUnusedExportsSettings,
   parity: boolean,
 ): void {
-  if (parity && isTestFilePath(repoPath, settings)) return;
   ts.forEachChild(sourceFile, (node) => {
     if (ts.isImportDeclaration(node) && node.importClause) {
       const clause = node.importClause;
@@ -535,7 +546,7 @@ function kindOfSite(site: IExportSite, name: string): TUnwiredKind {
   return name === "default" ? "default" : "export";
 }
 
-/** Fallow-parity findings: every unwired site, with no exemption list. */
+/** Fallow-parity findings: one finding per unwired name, with no exemption list. */
 function collectParityFindings(
   exportMap: Map<string, IExportSite[]>,
   importMap: Map<string, Set<string>>,
@@ -544,16 +555,9 @@ function collectParityFindings(
   for (const [name, sites] of exportMap) {
     if (importMap.has(name)) continue;
     if (isTestExport(name)) continue;
-    for (const site of sites) {
-      if (site.isConfigurable || site.hasIgnorePragma) continue;
-      findings.push({
-        repoPath: site.repoPath,
-        line: site.line,
-        name,
-        severity: "error",
-        kind: kindOfSite(site, name),
-      });
-    }
+    const site = sites.find((entry) => !entry.isBarrelPassThrough) ?? sites[0];
+    if (site === undefined || site.isConfigurable || site.hasIgnorePragma) continue;
+    findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "error", kind: kindOfSite(site, name) });
   }
   return findings;
 }
@@ -618,9 +622,10 @@ export async function checkRepository(
     const sourceFile = ts.createSourceFile(repoPath, cache.get(repoPath)!.text, ts.ScriptTarget.Latest, true);
     cache.get(repoPath)!.sourceFile = sourceFile;
     parseImports(sourceFile, repoPath, importMap, settings, parity);
-    if (parity || (!isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings))) {
-      parseExports(sourceFile, repoPath, exportMap, settings, parity);
-    }
+    const scanExports = parity
+      ? isParityScanPath(repoPath, settings)
+      : !isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings);
+    if (scanExports) parseExports(sourceFile, repoPath, exportMap, settings, parity);
   }
   if (!parity) resolveBarrelReExports(files, cache, exportMap, settings);
   const publicFiles = parity ? new Set<string>() : collectPublicFiles(files, cache);

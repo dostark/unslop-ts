@@ -312,7 +312,7 @@ Deno.test("the parity report flags a test helper and ignores test imports", asyn
     );
     const report = await checkRepository(root, false, settings([]), true);
     assert(report.findings.some((entry) => entry.name === "helperValue"));
-    assert(report.findings.some((entry) => entry.name === "prodUsedByTest"));
+    assert(!report.findings.some((entry) => entry.name === "prodUsedByTest"));
   });
 });
 
