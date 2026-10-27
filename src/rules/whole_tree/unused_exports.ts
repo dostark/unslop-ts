@@ -124,6 +124,13 @@ function isIfaceOrType(node: ts.Node): boolean {
   return ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 }
 
+function isLocalExportList(node: ts.Node): node is ts.ExportDeclaration & {
+  exportClause: ts.NamedExports;
+} {
+  return ts.isExportDeclaration(node) && node.moduleSpecifier === undefined && node.exportClause !== undefined &&
+    ts.isNamedExports(node.exportClause);
+}
+
 function isNamedReExport(node: ts.Node): node is ts.ExportDeclaration & {
   moduleSpecifier: ts.StringLiteral;
   exportClause: ts.NamedExports;
@@ -314,7 +321,7 @@ function parseImports(
     }
     // A named re-export forwards a symbol; in parity mode it does not count as a consumer.
     if (
-      !parity && ts.isExportDeclaration(node) && node.moduleSpecifier && node.exportClause &&
+      !parity && ts.isExportDeclaration(node) && node.exportClause &&
       ts.isNamedExports(node.exportClause)
     ) {
       for (const el of node.exportClause.elements) {
@@ -363,6 +370,22 @@ function parseExports(
 ): void {
   ts.forEachChild(sourceFile, (node) => {
     const lineOf = (child: ts.Node): number => sourceFile.getLineAndCharacterOfPosition(child.getStart()).line + 1;
+    if (isLocalExportList(node)) {
+      for (const el of node.exportClause.elements) {
+        recordExport(el.name.text, {
+          repoPath,
+          line: lineOf(el),
+          isBarrelPassThrough: false,
+          isTypeDecl: false,
+          isInterface: false,
+          isConfigurable: false,
+          isTypeAlias: false,
+          isNamespace: false,
+          hasIgnorePragma: hasIgnorePragma(sourceFile, node),
+        }, exportMap);
+      }
+      return;
+    }
     if (isNamedReExport(node)) {
       for (const el of node.exportClause.elements) {
         recordExport(el.name.text, {

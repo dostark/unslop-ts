@@ -402,3 +402,13 @@ Deno.test("the severity option lowers a parity finding to a warning", async () =
     assert(finding?.severity === "warning");
   });
 });
+
+Deno.test("a local export list is reported by parity but counts as surface by default", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/local.ts", "class LocalError extends Error {}\n\nexport { LocalError };\n");
+    const parity = await checkRepository(root, false, settings([]), true);
+    assert(parity.findings.some((entry) => entry.name === "LocalError"));
+    const trusted = await checkRepository(root, true, settings([]));
+    assert(!trusted.findings.some((entry) => entry.name === "LocalError"));
+  });
+});
