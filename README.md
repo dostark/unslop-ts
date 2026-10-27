@@ -486,8 +486,10 @@ or a warm npm cache. It reads the `wholeTree.duplicateCode` section:
 }
 ```
 
-`jscpdVersion`, `minLines`, and `minTokens` are optional and default to the values shown. A group
-without `ignore` or `pattern` scans everything under its `paths`. A group that scans no files is an
+`jscpdVersion`, `minLines`, and `minTokens` are optional and default to the values shown. A group may
+set its own `minLines`, which replaces the shared one for that group only, so production code can keep
+a low minimum while test code uses a higher one. A group without `ignore` or `pattern` scans everything
+under its `paths`. A group that scans no files is an
 error, so a wrong glob never passes at zero percent. Run it with
 `deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=duplicate-code`;
 `--verbose` lists every clone, largest first. `--group=<name>` (repeatable) runs only the named scan

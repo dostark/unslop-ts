@@ -77,7 +77,7 @@ export function buildJscpdArgs(
   const args = [
     ...group.paths,
     "--min-lines",
-    String(settings.minLines),
+    String(group.minLines ?? settings.minLines),
     "--min-tokens",
     String(settings.minTokens),
     "--reporters",

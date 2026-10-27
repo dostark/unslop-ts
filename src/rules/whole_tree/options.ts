@@ -140,6 +140,8 @@ export interface IDuplicateCodeGroup {
   ignore: string[];
   /** A jscpd glob that narrows the scan to the matching files, or null to scan every file under the paths. */
   pattern: string | null;
+  /** The smallest clone this group counts, or null to use the shared minimum. */
+  minLines: number | null;
   /** The highest duplicated-token percentage that still passes. */
   threshold: number;
 }
@@ -150,6 +152,7 @@ export interface IDuplicateCodeGroupInput {
   paths: string[];
   ignore?: string[];
   pattern?: string | null;
+  minLines?: number | null;
   threshold: number;
 }
 
@@ -312,6 +315,7 @@ const DuplicateCodeGroupSchema: z.ZodType<IDuplicateCodeGroup, IDuplicateCodeGro
   paths: z.array(z.string().min(1)).min(1),
   ignore: z.array(z.string()).default([]),
   pattern: z.string().min(1).nullable().default(null),
+  minLines: z.number().int().positive().nullable().default(null),
   threshold: z.number().nonnegative(),
 }).strict();
 

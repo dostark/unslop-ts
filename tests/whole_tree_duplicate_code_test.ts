@@ -25,7 +25,15 @@ import {
 const OUTPUT_DIR = "/tmp/report";
 
 function group(overrides: Partial<IDuplicateCodeGroup>): IDuplicateCodeGroup {
-  return { name: "source", paths: ["packages/"], ignore: [], pattern: null, threshold: 2, ...overrides };
+  return {
+    name: "source",
+    paths: ["packages/"],
+    ignore: [],
+    pattern: null,
+    minLines: null,
+    threshold: 2,
+    ...overrides,
+  };
 }
 
 function settings(groups: IDuplicateCodeGroup[]): IDuplicateCodeSettings {
@@ -65,6 +73,24 @@ Deno.test("the jscpd arguments carry the group paths, filters, and limits but no
   assertEquals(args[args.indexOf("--reporters") + 1], "json");
   assertEquals(args[args.indexOf("--output") + 1], OUTPUT_DIR);
   assertEquals(args.includes("--threshold"), false);
+});
+
+Deno.test("a group minimum overrides the shared minimum for that group only", () => {
+  const shared = settings([]);
+  const own = buildJscpdArgs(shared, group({ minLines: 10 }), OUTPUT_DIR);
+  const inherited = buildJscpdArgs(shared, group({}), OUTPUT_DIR);
+  assertEquals(own[own.indexOf("--min-lines") + 1], "10");
+  assertEquals(inherited[inherited.indexOf("--min-lines") + 1], "5");
+});
+
+Deno.test("the group minimum defaults to null and must be a positive integer", () => {
+  const parsed = DuplicateCodeSettingsSchema.parse({
+    groups: [{ name: "a", paths: ["x/"], threshold: 1 }, { name: "b", paths: ["y/"], threshold: 1, minLines: 12 }],
+  });
+  assertEquals(parsed.groups.map((entry) => entry.minLines), [null, 12]);
+  assertThrows(() =>
+    DuplicateCodeSettingsSchema.parse({ groups: [{ name: "a", paths: ["x/"], threshold: 1, minLines: 0 }] })
+  );
 });
 
 Deno.test("a group without a pattern or ignore globs passes neither flag", () => {
