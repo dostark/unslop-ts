@@ -1,154 +1,22 @@
 {
   "rules": [
     {
-      "id": "no-chained-type-assertions",
-      "category": "type-safety",
-      "preset": "recommended",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-pass-through-type-alias",
-      "category": "type-safety",
-      "preset": "recommended",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "promise-response-alias",
-      "category": "type-safety",
-      "preset": "recommended",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "ts-suppression-pragmas",
-      "category": "type-safety",
-      "preset": "recommended",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-forbidden-lint-ignore",
-      "category": "type-safety",
-      "preset": "recommended",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "ignore-needs-reason",
-      "category": "type-safety",
-      "preset": "recommended",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-explicit-unknown",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-unsafe-dictionary",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-typeof-escape",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-object-parameters",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "require-safety-comment",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-runtime-typeof",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "no-conditional-empty-object-spread",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "promise-response-return",
-      "category": "type-safety",
-      "preset": "strict",
-      "docs": "#strict-type-safety"
-    },
-    {
-      "id": "import-inside-statement",
-      "category": "imports",
-      "preset": "recommended",
-      "docs": "#imports-at-the-top"
-    },
-    {
-      "id": "inline-type-import",
-      "category": "imports",
-      "preset": "recommended",
-      "docs": "#no-inline-type-imports"
-    },
-    {
-      "id": "dynamic-import",
-      "category": "imports",
-      "preset": "strict",
-      "docs": "#dynamic-imports"
-    },
-    {
-      "id": "import-placement",
-      "category": "imports",
-      "preset": "strict",
-      "docs": "#imports-at-the-top"
-    },
-    {
-      "id": "re-export-imported",
-      "category": "imports",
-      "preset": "strict",
-      "docs": "#no-re-exporting"
-    },
-    {
-      "id": "import-boundaries",
-      "category": "boundaries",
+      "id": "barrel-only-reexports",
+      "category": "module-structure",
       "preset": "opt-in",
-      "docs": "#import-boundaries"
+      "docs": "#barrel-only-reexports"
     },
     {
-      "id": "exported-interface-naming",
-      "category": "interfaces",
-      "preset": "opt-in",
-      "docs": "#interface-conventions"
-    },
-    {
-      "id": "exported-interface-placement",
-      "category": "interfaces",
-      "preset": "opt-in",
-      "docs": "#interface-conventions"
-    },
-    {
-      "id": "no-interface-rename-on-import",
-      "category": "interfaces",
-      "preset": "opt-in",
-      "docs": "#interface-conventions"
-    },
-    {
-      "id": "magic-union-type",
+      "id": "constant-restatement",
       "category": "magic-values",
-      "preset": "strict",
+      "preset": "opt-in",
       "docs": "#no-magic-values"
     },
     {
-      "id": "magic-literals",
-      "category": "magic-values",
-      "preset": "strict",
-      "docs": "#no-magic-values"
+      "id": "decorative-comment",
+      "category": "comments",
+      "preset": "recommended",
+      "docs": "#comment-discipline"
     },
     {
       "id": "duplicate-constant",
@@ -163,64 +31,88 @@
       "docs": "#no-magic-values"
     },
     {
-      "id": "constant-restatement",
-      "category": "magic-values",
+      "id": "dynamic-import",
+      "category": "imports",
+      "preset": "strict",
+      "docs": "#dynamic-imports"
+    },
+    {
+      "id": "ephemeral-comment",
+      "category": "comments",
+      "preset": "strict",
+      "docs": "#comment-discipline"
+    },
+    {
+      "id": "ephemeral-filename",
+      "category": "comments",
+      "preset": "recommended",
+      "docs": "#comment-discipline"
+    },
+    {
+      "id": "exported-interface-naming",
+      "category": "interfaces",
       "preset": "opt-in",
+      "docs": "#interface-conventions"
+    },
+    {
+      "id": "exported-interface-placement",
+      "category": "interfaces",
+      "preset": "opt-in",
+      "docs": "#interface-conventions"
+    },
+    {
+      "id": "ignore-needs-reason",
+      "category": "type-safety",
+      "preset": "recommended",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "import-boundaries",
+      "category": "boundaries",
+      "preset": "opt-in",
+      "docs": "#import-boundaries"
+    },
+    {
+      "id": "import-inside-statement",
+      "category": "imports",
+      "preset": "recommended",
+      "docs": "#imports-at-the-top"
+    },
+    {
+      "id": "import-placement",
+      "category": "imports",
+      "preset": "strict",
+      "docs": "#imports-at-the-top"
+    },
+    {
+      "id": "inline-type-import",
+      "category": "imports",
+      "preset": "recommended",
+      "docs": "#no-inline-type-imports"
+    },
+    {
+      "id": "long-comment",
+      "category": "comments",
+      "preset": "strict",
+      "docs": "#comment-discipline"
+    },
+    {
+      "id": "magic-literals",
+      "category": "magic-values",
+      "preset": "strict",
       "docs": "#no-magic-values"
     },
     {
-      "id": "require-module-header",
-      "category": "module-structure",
-      "preset": "opt-in",
-      "docs": "#module-order"
-    },
-    {
-      "id": "unused-exports",
-      "category": "module-structure",
-      "preset": "opt-in",
-      "docs": "#module-order"
-    },
-    {
-      "id": "unused-files",
-      "category": "module-structure",
-      "preset": "opt-in",
-      "docs": "#module-order"
-    },
-    {
-      "id": "test-inline-multiline-fixture",
-      "category": "test-quality",
+      "id": "magic-union-type",
+      "category": "magic-values",
       "preset": "strict",
-      "docs": "#test-fixtures"
+      "docs": "#no-magic-values"
     },
     {
-      "id": "no-boolean-assert",
-      "category": "test-quality",
+      "id": "max-class-size",
+      "category": "complexity",
       "preset": "strict",
-      "docs": "#test-assertions"
-    },
-    {
-      "id": "no-repeated-assert-call",
-      "category": "test-quality",
-      "preset": "strict",
-      "docs": "#test-assertions"
-    },
-    {
-      "id": "no-constant-substring-assert",
-      "category": "test-quality",
-      "preset": "strict",
-      "docs": "#test-assertions"
-    },
-    {
-      "id": "require-deno-shebang",
-      "category": "scripts",
-      "preset": "opt-in",
-      "docs": "#deno-scripts"
-    },
-    {
-      "id": "require-script-usage",
-      "category": "scripts",
-      "preset": "opt-in",
-      "docs": "#deno-scripts"
+      "docs": "#complexity-rules"
     },
     {
       "id": "max-cyclomatic-complexity",
@@ -235,16 +127,82 @@
       "docs": "#complexity-rules"
     },
     {
-      "id": "max-class-size",
-      "category": "complexity",
+      "id": "no-boolean-assert",
+      "category": "test-quality",
       "preset": "strict",
-      "docs": "#complexity-rules"
+      "docs": "#test-assertions"
     },
     {
-      "id": "require-optional-wrapper",
-      "category": "optional-parameters",
+      "id": "no-chained-type-assertions",
+      "category": "type-safety",
+      "preset": "recommended",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-conditional-empty-object-spread",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-constant-substring-assert",
+      "category": "test-quality",
+      "preset": "strict",
+      "docs": "#test-assertions"
+    },
+    {
+      "id": "no-explicit-unknown",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-forbidden-lint-ignore",
+      "category": "type-safety",
+      "preset": "recommended",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-interface-rename-on-import",
+      "category": "interfaces",
       "preset": "opt-in",
-      "docs": "#optional-parameters"
+      "docs": "#interface-conventions"
+    },
+    {
+      "id": "no-object-parameters",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-pass-through-type-alias",
+      "category": "type-safety",
+      "preset": "recommended",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-repeated-assert-call",
+      "category": "test-quality",
+      "preset": "strict",
+      "docs": "#test-assertions"
+    },
+    {
+      "id": "no-runtime-typeof",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-typeof-escape",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "no-unsafe-dictionary",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
     },
     {
       "id": "optional-params",
@@ -253,34 +211,82 @@
       "docs": "#optional-parameters"
     },
     {
-      "id": "long-comment",
-      "category": "comments",
-      "preset": "strict",
-      "docs": "#comment-discipline"
-    },
-    {
-      "id": "ephemeral-comment",
-      "category": "comments",
-      "preset": "strict",
-      "docs": "#comment-discipline"
-    },
-    {
-      "id": "decorative-comment",
-      "category": "comments",
-      "preset": "recommended",
-      "docs": "#comment-discipline"
-    },
-    {
-      "id": "ephemeral-filename",
-      "category": "comments",
-      "preset": "recommended",
-      "docs": "#comment-discipline"
-    },
-    {
-      "id": "barrel-only-reexports",
+      "id": "prefer-named-imports",
       "category": "module-structure",
       "preset": "opt-in",
-      "docs": "#barrel-only-reexports"
+      "docs": "#prefer-named-imports"
+    },
+    {
+      "id": "promise-response-alias",
+      "category": "type-safety",
+      "preset": "recommended",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "promise-response-return",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "re-export-imported",
+      "category": "imports",
+      "preset": "strict",
+      "docs": "#no-re-exporting"
+    },
+    {
+      "id": "require-deno-shebang",
+      "category": "scripts",
+      "preset": "opt-in",
+      "docs": "#deno-scripts"
+    },
+    {
+      "id": "require-module-header",
+      "category": "module-structure",
+      "preset": "opt-in",
+      "docs": "#module-order"
+    },
+    {
+      "id": "require-optional-wrapper",
+      "category": "optional-parameters",
+      "preset": "opt-in",
+      "docs": "#optional-parameters"
+    },
+    {
+      "id": "require-safety-comment",
+      "category": "type-safety",
+      "preset": "strict",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "require-script-usage",
+      "category": "scripts",
+      "preset": "opt-in",
+      "docs": "#deno-scripts"
+    },
+    {
+      "id": "test-inline-multiline-fixture",
+      "category": "test-quality",
+      "preset": "strict",
+      "docs": "#test-fixtures"
+    },
+    {
+      "id": "ts-suppression-pragmas",
+      "category": "type-safety",
+      "preset": "recommended",
+      "docs": "#strict-type-safety"
+    },
+    {
+      "id": "unused-exports",
+      "category": "module-structure",
+      "preset": "opt-in",
+      "docs": "#module-order"
+    },
+    {
+      "id": "unused-files",
+      "category": "module-structure",
+      "preset": "opt-in",
+      "docs": "#module-order"
     }
   ]
 }

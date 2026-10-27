@@ -53,6 +53,12 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "prefer-named-imports",
+    name: "a namespace import read only through members",
+    source: 'import * as path from "@std/path";\n\nexport const joined = path.join("a", "b");\n',
+    expectedBuiltins: {},
+  },
+  {
     rule: "no-chained-type-assertions",
     name: "an as unknown as chain",
     source: `${DECLARATIONS}export const value = input as unknown as number;\n`,
@@ -161,6 +167,12 @@ const CASES: readonly IOverlapCase[] = [
     rule: "require-deno-shebang",
     name: "a file without a shebang",
     source: "export const value = 1;\n",
+    expectedBuiltins: {},
+  },
+  {
+    rule: "prefer-named-imports",
+    name: "a namespace import read only through members",
+    source: 'import * as path from "@std/path";\n\nexport const joined = path.join("a", "b");\n',
     expectedBuiltins: {},
   },
   {

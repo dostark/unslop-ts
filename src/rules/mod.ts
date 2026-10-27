@@ -51,6 +51,7 @@ import { createMaxParams } from "./max_params.ts";
 import { createImportBoundaries } from "./import_boundaries.ts";
 import { createExportedInterfaceNaming, createNoInterfaceRenameOnImport } from "./interface_convention_rules.ts";
 import { createBarrelOnlyReExports } from "./reexport_rules.ts";
+import { createPreferNamedImports } from "./prefer_named_imports.ts";
 import { createTestInlineMultilineFixture } from "./test_fixture_rules.ts";
 import type { IRulePack } from "../engine/registry.ts";
 import { DENO_OPTION_SCHEMAS, TYPESCRIPT_OPTION_SCHEMAS } from "./rule_options.ts";
@@ -303,6 +304,19 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       },
       requiresTestGlobs: false,
       create: createReExportImported,
+    },
+    "prefer-named-imports": {
+      overlaps: [],
+      requiresTestGlobs: false,
+      meta: {
+        description: "A namespace import read only through static members.",
+        category: "module-structure",
+        docs: "#prefer-named-imports",
+        preset: "opt-in",
+        limits:
+          "Only a namespace import whose members are all read as `NS.member` is reported; spread, computed, and whole-object uses are skipped.",
+      },
+      create: createPreferNamedImports,
     },
     "import-placement": {
       overlaps: [],

@@ -28,7 +28,7 @@ interface IDescriptor {
   readonly controls: IRuleControls;
 }
 
-const PACK_RULE_COUNT = 40;
+const PACK_RULE_COUNT = 41;
 const WHOLE_TREE_CHECK_COUNT = 7;
 const DESCRIPTOR_COUNT = PACK_RULE_COUNT + WHOLE_TREE_CHECK_COUNT;
 const GUIDE_ANCHOR = /^#[a-z0-9-]+$/;

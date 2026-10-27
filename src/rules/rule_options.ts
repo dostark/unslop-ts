@@ -225,6 +225,7 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "inline-type-import": NoOptions,
   "re-export-imported": NoOptions,
   "import-placement": NoOptions,
+  "prefer-named-imports": NoOptions,
   "exported-interface-placement": NoOptions,
   "promise-response-alias": NoOptions,
   "promise-response-return": NoOptions,

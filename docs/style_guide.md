@@ -500,6 +500,22 @@ Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these
 8. A rule does not branch on the host. The host entry normalizes settings, options, and paths before
    the rule runs, and the conformance suite holds that normalization to one result.
 
+## Named Imports {#prefer-named-imports}
+
+A namespace import (`import * as ns from "…"`) hides which symbols a module consumes. When every use
+of `ns` is a static member read such as `ns.load`, import the members by name instead:
+`import { load } from "…"`. The import then states the consumer surface, and a rename inside the
+namespace cannot silently escape the consumer.
+
+| Check                  | Reports                                                      |
+| ---------------------- | ------------------------------------------------------------ |
+| `prefer-named-imports` | A namespace import whose members are all read as `ns.member` |
+
+The rule is opt-in and has no options. It skips a namespace that is spread, indexed dynamically,
+passed as a whole value, or read without any member, so it never proposes a lossy rewrite. Test
+files and helpers follow the same rule. A facade that forwards the namespace stays valid; mark the
+intentional case with `// unslop-ignore-next-line prefer-named-imports` above the import.
+
 ## Re-export Placement {#barrel-only-reexports}
 
 A module re-export (`export … from "…"`) belongs in a barrel file: a module whose name ends with a
