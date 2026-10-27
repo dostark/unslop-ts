@@ -33,6 +33,7 @@ const TS_API_ALLOWLIST = [
   "getLeadingCommentRanges",
   "isArrowFunction",
   "isBlock",
+  "isAwaitExpression",
   "isCallExpression",
   "isClassDeclaration",
   "isConstructorDeclaration",
@@ -48,6 +49,7 @@ const TS_API_ALLOWLIST = [
   "isNamedExports",
   "isNamedImports",
   "isNamespaceImport",
+  "isObjectBindingPattern",
   "isParameter",
   "isPropertyAccessExpression",
   "isStringLiteral",
@@ -55,6 +57,7 @@ const TS_API_ALLOWLIST = [
   "isTypeReferenceNode",
   "isUnionTypeNode",
   "isVariableStatement",
+  "VariableStatement",
 ] as const;
 
 const allowlist = new Set<string>(TS_API_ALLOWLIST);

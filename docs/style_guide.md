@@ -475,7 +475,10 @@ A query status describes the configuration only. `active`, `parked`, `off`, and 
 whether the current selection enables a rule. They never change how a host runs it. Whole-tree checks
 keep their host modes: `unused-exports` reports the trusted set by default (`--all` widens it) and fails only
 with `--fail`; an unused exported interface reports as a warning that `--fail` ignores, and the
-`// unslop-ignore-next-line unused-interface` pragma exempts a deliberate one; `unused-files` and `optional-params` warn until
+`// unslop-ignore-next-line unused-type` pragma exempts a deliberate one. A `configurable(…)`
+registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never
+reported: the wrapper, the test prefix, and the binding are the exemption markers because a string
+key, a test seam, and a dynamic binding consume them; `unused-files` and `optional-params` warn until
 `--fail` or `--staged`. A script rule's configured level does not override a fixed host flag. The CLI
 prints the editable controls and the host modes, so the enforcement owner stays visible.
 

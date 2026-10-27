@@ -172,3 +172,38 @@ Deno.test("a member reached through a namespace import counts as usage", async (
     assert(!report.findings.some((entry) => entry.name === "nsUsed"));
   });
 });
+
+Deno.test("a configurable registration is exempt from the unused export report", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/config.ts",
+      'export const DEFAULT_ALPHA = configurable({ key: "alpha.key", default: 1 });\n' +
+        "export const UNUSED_PLAIN = 1;\n",
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "DEFAULT_ALPHA"));
+    assert(report.findings.some((entry) => entry.name === "UNUSED_PLAIN"));
+  });
+});
+
+Deno.test("a name destructured from a dynamic import counts as usage", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/a.ts", "export const dynUsed = 1;\n");
+    await write(
+      root,
+      "packages/p/src/b.ts",
+      'const { dynUsed } = await import("./a.ts");\n\nexport const value = dynUsed;\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "dynUsed"));
+  });
+});
+
+Deno.test("a test hook export is exempt in the broad report", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/hook.ts", "export function __test_probe(): number {\n  return 1;\n}\n");
+    const report = await checkRepository(root, false, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "__test_probe"));
+  });
+});

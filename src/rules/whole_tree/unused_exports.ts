@@ -20,6 +20,7 @@ export interface IExportSite {
   readonly isBarrelPassThrough: boolean;
   readonly isTypeDecl: boolean;
   readonly isInterface: boolean;
+  readonly isConfigurable: boolean;
   readonly hasIgnorePragma: boolean;
 }
 
@@ -200,6 +201,28 @@ function recordImport(name: string, repoPath: string, importMap: Map<string, Set
   importMap.set(name, importers);
 }
 
+/** Records the names a destructured `await import("./m.ts")` binds. */
+function recordDynamicImportNames(
+  node: ts.VariableStatement,
+  repoPath: string,
+  importMap: Map<string, Set<string>>,
+): void {
+  for (const declaration of node.declarationList.declarations) {
+    const initializer = declaration.initializer;
+    if (!initializer || !ts.isAwaitExpression(initializer)) continue;
+    const call = initializer.expression;
+    if (!ts.isCallExpression(call) || call.expression.kind !== ts.SyntaxKind.ImportKeyword) continue;
+    if (!ts.isObjectBindingPattern(declaration.name)) continue;
+    for (const element of declaration.name.elements) {
+      if (!ts.isIdentifier(element.name)) continue;
+      const imported = element.propertyName && ts.isIdentifier(element.propertyName)
+        ? element.propertyName.text
+        : element.name.text;
+      recordImport(imported, repoPath, importMap);
+    }
+  }
+}
+
 function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Map<string, Set<string>>): void {
   ts.forEachChild(sourceFile, (node) => {
     if (ts.isImportDeclaration(node) && node.importClause) {
@@ -219,6 +242,8 @@ function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Ma
       }
       return;
     }
+    // A destructured await import("./m.ts") consumes the names it binds.
+    if (ts.isVariableStatement(node)) recordDynamicImportNames(node, repoPath, importMap);
     // A named re-export forwards a symbol from its source module, so the source export is used.
     if (
       ts.isExportDeclaration(node) && node.moduleSpecifier && node.exportClause &&
@@ -262,6 +287,7 @@ function parseExports(
           isBarrelPassThrough: isPackageEntrypoint(repoPath, settings),
           isTypeDecl: false,
           isInterface: false,
+          isConfigurable: false,
           hasIgnorePragma: false,
         }, exportMap);
       }
@@ -276,6 +302,7 @@ function parseExports(
       isBarrelPassThrough: false,
       isTypeDecl: isIfaceOrType(node),
       isInterface: ts.isInterfaceDeclaration(node),
+      isConfigurable: isConfigurableRegistration(node, sourceFile),
       hasIgnorePragma: hasIgnorePragma(sourceFile, node),
     }, exportMap);
   });
@@ -314,6 +341,7 @@ function resolveBarrelReExports(
             isBarrelPassThrough: true,
             isTypeDecl: isType,
             isInterface: false,
+            isConfigurable: false,
             hasIgnorePragma: false,
           });
         }
@@ -381,6 +409,14 @@ function isInterfaceFinding(
   return !scriptImportedNames.has(name);
 }
 
+/** True when every initializer of the declaration is a `configurable(…)` registration. */
+function isConfigurableRegistration(node: ts.Node, sourceFile: ts.SourceFile): boolean {
+  if (!ts.isVariableStatement(node)) return false;
+  return node.declarationList.declarations.every((declaration) =>
+    declaration.initializer !== undefined && declaration.initializer.getText(sourceFile).includes("configurable(")
+  );
+}
+
 function isValueFinding(
   site: IExportSite,
   name: string,
@@ -390,6 +426,7 @@ function isValueFinding(
   settings: IUnusedExportsSettings,
   includeExempt: boolean,
 ): boolean {
+  if (site.isConfigurable) return false;
   if (site.isTypeDecl) return false;
   if (isInterfaceName(name)) return false;
   if (publicFiles.has(site.repoPath)) return false;
@@ -411,6 +448,7 @@ function collectFindings(
     const hasBarrel = sites.some((site) => site.isBarrelPassThrough);
     for (const site of sites) {
       if (site.isBarrelPassThrough) continue;
+      if (isTestExport(name)) continue;
       if (site.isInterface) {
         if (isInterfaceFinding(site, name, scriptImportedNames, settings)) {
           findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "warning" });
