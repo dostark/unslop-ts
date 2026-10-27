@@ -207,7 +207,11 @@ function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Ma
       if (clause.name) recordImport(clause.name.text, repoPath, importMap);
       if (!clause.namedBindings) return;
       if (ts.isNamespaceImport(clause.namedBindings)) {
-        recordImport(clause.namedBindings.name.text, repoPath, importMap);
+        const namespaceName = clause.namedBindings.name.text;
+        recordImport(namespaceName, repoPath, importMap);
+        for (const member of sourceFile.text.matchAll(new RegExp(`\\b${namespaceName}\\.([A-Za-z_$][\\w$]*)`, "g"))) {
+          recordImport(member[1], repoPath, importMap);
+        }
         return;
       }
       for (const el of clause.namedBindings.elements) {

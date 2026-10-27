@@ -163,3 +163,12 @@ Deno.test("an interface imported only by a test file is not reported", async () 
     assert(!report.findings.some((entry) => entry.name === "ITestOnly"));
   });
 });
+
+Deno.test("a member reached through a namespace import counts as usage", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/a.ts", "export function nsUsed(): number {\n  return 1;\n}\n");
+    await write(root, "packages/p/src/b.ts", 'import * as M from "./a.ts";\n\nexport const value = M.nsUsed();\n');
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "nsUsed"));
+  });
+});
