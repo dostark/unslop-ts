@@ -242,8 +242,6 @@ function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Ma
       }
       return;
     }
-    // A destructured await import("./m.ts") consumes the names it binds.
-    if (ts.isVariableStatement(node)) recordDynamicImportNames(node, repoPath, importMap);
     // A named re-export forwards a symbol from its source module, so the source export is used.
     if (
       ts.isExportDeclaration(node) && node.moduleSpecifier && node.exportClause &&
@@ -254,6 +252,20 @@ function parseImports(sourceFile: ts.SourceFile, repoPath: string, importMap: Ma
       }
     }
   });
+  recordNestedDynamicImports(sourceFile, repoPath, importMap);
+}
+
+/** Records destructured dynamic imports at any depth, including inside a conditional block. */
+function recordNestedDynamicImports(
+  sourceFile: ts.SourceFile,
+  repoPath: string,
+  importMap: Map<string, Set<string>>,
+): void {
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableStatement(node)) recordDynamicImportNames(node, repoPath, importMap);
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
 }
 
 const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-interface\b/;

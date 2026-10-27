@@ -207,3 +207,16 @@ Deno.test("a test hook export is exempt in the broad report", async () => {
     assert(!report.findings.some((entry) => entry.name === "__test_probe"));
   });
 });
+
+Deno.test("a name destructured from a nested dynamic import counts as usage", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/a.ts", "export const nestedDynUsed = 1;\n");
+    await write(
+      root,
+      "packages/p/src/b.ts",
+      'const load = async () => {\n  const { nestedDynUsed } = await import("./a.ts");\n  return nestedDynUsed;\n};\n\nexport const value = load;\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "nestedDynUsed"));
+  });
+});
