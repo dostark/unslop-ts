@@ -75,7 +75,9 @@ async function runConstantRestatement(settings: IConstantRestatementSettings): P
 
 function unwiredScope(finding: IUnwiredExport, includeExempt: boolean): string {
   if (finding.severity === "warning") {
-    return "is an interface exported and never imported; add `// unslop-ignore-next-line unused-interface` above it if it is intentional API.";
+    return finding.kind === "type-alias"
+      ? "is a type alias exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API."
+      : "is an interface exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API.";
   }
   return includeExempt
     ? "is exported and never imported by a production file under the exemption list."
@@ -115,7 +117,7 @@ function printTrustedSummary(errors: number, warnings: number, fail: boolean): v
       errors + warnings
     } unwired export(s) in the trusted report: ${errors} error(s), ${warnings} warning(s).`,
   );
-  if (warnings > 0) console.log("  Interface warnings never fail the run; add the pragma or delete the interface.");
+  if (warnings > 0) console.log("  Type warnings never fail the run; add the pragma or delete the declaration.");
   if (errors === 0) console.log("  No error findings, so `--fail` leaves the exit code at 0.");
   else if (!fail) console.log("  Add `--fail` to the host command to make the error findings fail the run.");
 }

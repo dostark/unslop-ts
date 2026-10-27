@@ -157,7 +157,7 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
       docs: "#module-order",
       preset: "opt-in",
       limits:
-        "The default report applies the exemption list: barrels, tests, entry points, and configured skip paths. An unused interface reports as a warning unless `// unslop-ignore-next-line unused-interface` or `@public` exempts it. A `configurable(…)` registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never reported because a string key, a test seam, or a dynamic binding consumes them. `--all` reports the broad superset; `--fail` fails only on error findings.",
+        "The default report applies the exemption list: barrels, tests, entry points, and configured skip paths. An unused interface or type alias reports as a warning unless `// unslop-ignore-next-line unused-type` or `@public` exempts it. A `configurable(…)` registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never reported because a string key, a test seam, or a dynamic binding consumes them. `--all` reports the broad superset; `--fail` fails only on error findings.",
     },
     optionSchema: UnusedExportsSettingsSchema,
     controls: UNUSED_EXPORTS_CONTROLS,

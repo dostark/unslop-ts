@@ -21,11 +21,15 @@ export interface IExportSite {
   readonly isTypeDecl: boolean;
   readonly isInterface: boolean;
   readonly isConfigurable: boolean;
+  readonly isTypeAlias: boolean;
   readonly hasIgnorePragma: boolean;
 }
 
-/** How an unwired export finding is enforced. Interfaces stay warnings, so `--fail` leaves them alone. */
+/** How an unwired export finding is enforced. Type declarations stay warnings, so `--fail` leaves them alone. */
 export type TUnwiredSeverity = "warning" | "error";
+
+/** The declaration shape an unwired export finding comes from. */
+export type TUnwiredKind = "export" | "interface" | "type-alias";
 
 /** One unwired export. */
 export interface IUnwiredExport {
@@ -33,6 +37,7 @@ export interface IUnwiredExport {
   readonly line: number;
   readonly name: string;
   readonly severity: TUnwiredSeverity;
+  readonly kind: TUnwiredKind;
 }
 
 /** The result of an unused-exports run. */
@@ -307,7 +312,7 @@ function recordNestedDynamicImports(
   visit(sourceFile);
 }
 
-const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-interface\b/;
+const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-(?:type|interface)\b/;
 
 /** True when the declaration carries the exclusion pragma on the line above it. */
 function hasIgnorePragma(sourceFile: ts.SourceFile, node: ts.Node): boolean {
@@ -339,6 +344,7 @@ function parseExports(
           isTypeDecl: false,
           isInterface: false,
           isConfigurable: false,
+          isTypeAlias: false,
           hasIgnorePragma: false,
         }, exportMap);
       }
@@ -354,6 +360,7 @@ function parseExports(
       isTypeDecl: isIfaceOrType(node),
       isInterface: ts.isInterfaceDeclaration(node),
       isConfigurable: isConfigurableRegistration(node, sourceFile),
+      isTypeAlias: ts.isTypeAliasDeclaration(node),
       hasIgnorePragma: hasIgnorePragma(sourceFile, node),
     }, exportMap);
   });
@@ -393,6 +400,7 @@ function resolveBarrelReExports(
             isTypeDecl: isType,
             isInterface: false,
             isConfigurable: false,
+            isTypeAlias: false,
             hasIgnorePragma: false,
           });
         }
@@ -500,14 +508,20 @@ function collectFindings(
     for (const site of sites) {
       if (site.isBarrelPassThrough) continue;
       if (isTestExport(name)) continue;
-      if (site.isInterface) {
+      if (site.isInterface || site.isTypeAlias) {
         if (isInterfaceFinding(site, name, scriptImportedNames, settings)) {
-          findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "warning" });
+          findings.push({
+            repoPath: site.repoPath,
+            line: site.line,
+            name,
+            severity: "warning",
+            kind: site.isInterface ? "interface" : "type-alias",
+          });
         }
         continue;
       }
       if (isValueFinding(site, name, hasBarrel, publicFiles, scriptImportedNames, settings, includeExempt)) {
-        findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "error" });
+        findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "error", kind: "export" });
       }
     }
   }

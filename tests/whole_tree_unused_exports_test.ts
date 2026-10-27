@@ -112,11 +112,13 @@ Deno.test("the unused-interface pragma exempts a declared interface", async () =
   });
 });
 
-Deno.test("an exported type alias stays out of the interface warning", async () => {
+Deno.test("an exported type alias is reported with the type-alias kind", async () => {
   await withRepo(async (root) => {
     await write(root, "packages/p/src/kind.ts", 'export type Kind = "a" | "b";\n');
     const report = await checkRepository(root, true, settings([]));
-    assert(!report.findings.some((entry) => entry.name === "Kind"));
+    const finding = report.findings.find((entry) => entry.name === "Kind");
+    assert(finding?.severity === "warning");
+    assert(finding?.kind === "type-alias");
   });
 });
 
@@ -244,5 +246,40 @@ Deno.test("a name destructured from a stored import promise counts as usage", as
     );
     const report = await checkRepository(root, true, settings([]));
     assert(!report.findings.some((entry) => entry.name === "promiseUsed"));
+  });
+});
+
+Deno.test("an exported type alias that no file imports is reported as a warning", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/kind.ts", 'export type UnusedAlias = "a" | "b";\n');
+    const report = await checkRepository(root, true, settings([]));
+    const finding = report.findings.find((entry) => entry.name === "UnusedAlias");
+    assert(finding?.severity === "warning");
+  });
+});
+
+Deno.test("an imported type alias is not reported", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/kind.ts", 'export type UsedAlias = "a" | "b";\n');
+    await write(
+      root,
+      "packages/p/src/use.ts",
+      'import type { UsedAlias } from "./kind.ts";\nexport const value: UsedAlias = "a";\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "UsedAlias"));
+  });
+});
+
+Deno.test("the unused-type pragma exempts a type alias and an interface", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/kept.ts",
+      "// unslop-ignore-next-line unused-type\nexport type KeptAlias = string;\n" +
+        "// unslop-ignore-next-line unused-type\nexport interface IKept {\n  a: string;\n}\n",
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "KeptAlias" || entry.name === "IKept"));
   });
 });
