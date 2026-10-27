@@ -509,7 +509,8 @@ baseline does not list, even while the group stays under its threshold. The perc
 applies. Each clone has an id built from its two files and its code, so moving a clone inside its files or
 changing whitespace keeps the id. Create or refresh the file with `--update-baseline`, which writes one
 line per clone and keeps the entries of groups that the run did not measure. The check prints how many
-baseline entries no longer match a clone, so the file can shrink as clones go.
+baseline entries no longer match a clone, so the file can shrink as clones go. The lines are longer than
+most formatters allow, so exclude the baseline file from the project formatter.
 
 **Cross-group clones.** Each group runs on its own, so a clone between two groups, such as source and
 tests, is never compared. Set `crossGroups` to `true` and the check scans all groups together once more
