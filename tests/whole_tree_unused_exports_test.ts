@@ -233,3 +233,16 @@ Deno.test("a name destructured from a module variable imported dynamically count
     assert(!report.findings.some((entry) => entry.name === "moduleVarUsed"));
   });
 });
+
+Deno.test("a name destructured from a stored import promise counts as usage", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/a.ts", "export const promiseUsed = 1;\n");
+    await write(
+      root,
+      "packages/p/src/b.ts",
+      'const modulePromise = import("./a.ts");\n\nconst { promiseUsed } = await modulePromise;\n\nexport const value = promiseUsed;\n',
+    );
+    const report = await checkRepository(root, true, settings([]));
+    assert(!report.findings.some((entry) => entry.name === "promiseUsed"));
+  });
+});

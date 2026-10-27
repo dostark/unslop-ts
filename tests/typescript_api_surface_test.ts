@@ -20,6 +20,7 @@ const TS_API_ALLOWLIST = [
   "Expression",
   "ExportDeclaration",
   "FunctionBody",
+  "Identifier",
   "Modifier",
   "NamedExports",
   "Node",

@@ -211,8 +211,9 @@ function recordDynamicImportNames(
   for (const declaration of node.declarationList.declarations) {
     const initializer = declaration.initializer;
     if (!initializer) continue;
-    const fromImport = ts.isAwaitExpression(initializer) && isDynamicImportCall(initializer.expression);
-    const fromModuleVariable = ts.isIdentifier(initializer) && moduleVariables.has(initializer.text);
+    const fromImport = importsModule(initializer);
+    const moduleIdentifier = moduleIdentifierOf(initializer);
+    const fromModuleVariable = moduleIdentifier !== null && moduleVariables.has(moduleIdentifier.text);
     if (!fromImport && !fromModuleVariable) continue;
     if (!ts.isObjectBindingPattern(declaration.name)) continue;
     for (const element of declaration.name.elements) {
@@ -230,6 +231,19 @@ function isDynamicImportCall(call: ts.Expression): boolean {
   return ts.isCallExpression(call) && call.expression.kind === ts.SyntaxKind.ImportKeyword;
 }
 
+/** True when the initializer is `import("./m.ts")` or `await import("./m.ts")`. */
+function importsModule(initializer: ts.Expression): boolean {
+  return isDynamicImportCall(initializer) ||
+    (ts.isAwaitExpression(initializer) && isDynamicImportCall(initializer.expression));
+}
+
+/** The module object identifier an initializer holds, directly or after an await. */
+function moduleIdentifierOf(initializer: ts.Expression): ts.Identifier | null {
+  if (ts.isIdentifier(initializer)) return initializer;
+  if (ts.isAwaitExpression(initializer) && ts.isIdentifier(initializer.expression)) return initializer.expression;
+  return null;
+}
+
 /** The variables a file binds to a whole `await import("./m.ts")` module object. */
 function collectDynamicImportVariables(sourceFile: ts.SourceFile): Set<string> {
   const names = new Set<string>();
@@ -237,10 +251,8 @@ function collectDynamicImportVariables(sourceFile: ts.SourceFile): Set<string> {
     if (ts.isVariableStatement(node)) {
       for (const declaration of node.declarationList.declarations) {
         const initializer = declaration.initializer;
-        if (!initializer || !ts.isAwaitExpression(initializer)) continue;
-        if (ts.isIdentifier(declaration.name) && isDynamicImportCall(initializer.expression)) {
-          names.add(declaration.name.text);
-        }
+        if (!initializer) continue;
+        if (ts.isIdentifier(declaration.name) && importsModule(initializer)) names.add(declaration.name.text);
       }
     }
     ts.forEachChild(node, visit);
