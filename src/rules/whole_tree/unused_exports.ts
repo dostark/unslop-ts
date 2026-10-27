@@ -293,7 +293,6 @@ function parseImports(
   sourceFile: ts.SourceFile,
   repoPath: string,
   importMap: Map<string, Set<string>>,
-  settings: IUnusedExportsSettings,
   parity: boolean,
 ): void {
   ts.forEachChild(sourceFile, (node) => {
@@ -656,7 +655,7 @@ export async function checkRepository(
   for (const repoPath of files) {
     const sourceFile = ts.createSourceFile(repoPath, cache.get(repoPath)!.text, ts.ScriptTarget.Latest, true);
     cache.get(repoPath)!.sourceFile = sourceFile;
-    parseImports(sourceFile, repoPath, importMap, settings, parity);
+    parseImports(sourceFile, repoPath, importMap, parity);
     const scanExports = parity
       ? isParityScanPath(repoPath, settings)
       : !isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings);
