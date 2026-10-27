@@ -108,11 +108,6 @@ function hasDefaultModifier(node: ts.Node): boolean {
   return mods ? mods.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) : false;
 }
 
-/** True when the parity report treats the file as a test artifact (a test directory or a test file). */
-function isTestArtifact(repoPath: string): boolean {
-  return repoPath.includes("/tests/") || repoPath.endsWith("_test.ts") || repoPath.endsWith(".test.ts");
-}
-
 /** True when the parity report scans the file: workspace roots and scripts, not fixtures or vendored trees. */
 function isParityScanPath(repoPath: string, settings: IUnusedExportsSettings): boolean {
   if (repoPath.includes("/fixtures/")) return false;

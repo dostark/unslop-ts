@@ -10,7 +10,7 @@ add the same rules to an existing configuration without changing a foreign diagn
 lists and explains rules, edits supported settings, migrates a version 1 catalog, and exports a host
 fragment.
 
-The engine ships two rule packs. `TYPESCRIPT_RULE_PACK` holds 35 rules for type evidence, imports,
+The engine ships two rule packs. `TYPESCRIPT_RULE_PACK` holds 37 rules for type evidence, imports,
 module layout, comments, interface conventions, test assertions, and size limits. `DENO_RULE_PACK`
 holds 4 rules about `deno-lint-ignore` comments and Deno script headers. Every rule declares its
 description, category, guide anchor, preset membership, and overlaps in code. A project can add its
