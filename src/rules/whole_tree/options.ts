@@ -142,6 +142,8 @@ export interface IDuplicateCodeGroup {
   pattern: string | null;
   /** The smallest clone this group counts, or null to use the shared minimum. */
   minLines: number | null;
+  /** The unmatched lines that may separate two clones that jscpd merges into one, or null to use the shared value. */
+  maxGapLines: number | null;
   /** The highest duplicated-token percentage that still passes. */
   threshold: number;
 }
@@ -153,6 +155,7 @@ export interface IDuplicateCodeGroupInput {
   ignore?: string[];
   pattern?: string | null;
   minLines?: number | null;
+  maxGapLines?: number | null;
   threshold: number;
 }
 
@@ -161,6 +164,12 @@ export interface IDuplicateCodeSettings {
   jscpdVersion: string;
   minLines: number;
   minTokens: number;
+  /** The unmatched lines that may separate two clones that jscpd merges into one. Zero keeps every clone apart. */
+  maxGapLines: number;
+  /** The repository path of the committed clone baseline, or null for a threshold-only gate. */
+  baseline: string | null;
+  /** Whether the check also scans all groups together for clones whose copies sit in different groups. */
+  crossGroups: boolean;
   groups: IDuplicateCodeGroup[];
 }
 
@@ -169,6 +178,9 @@ export interface IDuplicateCodeSettingsInput {
   jscpdVersion?: string;
   minLines?: number;
   minTokens?: number;
+  maxGapLines?: number;
+  baseline?: string | null;
+  crossGroups?: boolean;
   groups: IDuplicateCodeGroupInput[];
 }
 
@@ -316,6 +328,7 @@ const DuplicateCodeGroupSchema: z.ZodType<IDuplicateCodeGroup, IDuplicateCodeGro
   ignore: z.array(z.string()).default([]),
   pattern: z.string().min(1).nullable().default(null),
   minLines: z.number().int().positive().nullable().default(null),
+  maxGapLines: z.number().int().nonnegative().nullable().default(null),
   threshold: z.number().nonnegative(),
 }).strict();
 
@@ -324,6 +337,9 @@ export const DuplicateCodeSettingsSchema: z.ZodType<IDuplicateCodeSettings, IDup
   jscpdVersion: z.string().min(1).default(DEFAULT_JSCPD_VERSION),
   minLines: z.number().int().positive().default(DEFAULT_MIN_CLONE_LINES),
   minTokens: z.number().int().positive().default(DEFAULT_MIN_CLONE_TOKENS),
+  maxGapLines: z.number().int().nonnegative().default(0),
+  baseline: z.string().min(1).nullable().default(null),
+  crossGroups: z.boolean().default(false),
   groups: z.array(DuplicateCodeGroupSchema).min(1).refine(
     (groups) => new Set(groups.map((group) => group.name)).size === groups.length,
     { message: "Scan group names must be unique." },

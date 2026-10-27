@@ -197,7 +197,7 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
       docs: "#no-magic-values",
       preset: "opt-in",
       limits:
-        "jscpd compares token streams, so a clone is found even when names differ. Each scan group fails when its duplicated-token percentage exceeds its threshold; a group that scans no files is an error. The check starts a pinned jscpd release through npx, so it needs Node.js and the npm registry or a warm npm cache.",
+        "jscpd compares token streams, so a clone is found even when names differ. Each scan group fails when its duplicated-token percentage exceeds its threshold, or, with a committed baseline, when it holds a clone that the baseline does not list; a group that scans no files is an error. Template and regex literals are compared by their text, so a clone that differs only inside one is not found. The check starts a pinned jscpd release through npx, so it needs Node.js and the npm registry or a warm npm cache.",
     },
     optionSchema: DuplicateCodeSettingsSchema,
     controls: FIXED_ERROR_CONTROLS,

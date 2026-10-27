@@ -12,7 +12,7 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-code [--verbose] [--group=<name>]... [--top=<n>] [--by=pair|file|block] [--min-lines=<n>]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-code [--verbose] [--group=<name>]... [--top=<n>] [--by=pair|file|block] [--min-lines=<n>] [--max-gap-lines=<n>] [--format=text|json] [--update-baseline]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
@@ -33,9 +33,15 @@ import { checkRepository as checkUnusedExports, type IUnwiredExport } from "../r
 import { checkRepository as checkUnusedFiles } from "../rules/whole_tree/unused_files.ts";
 import {
   checkRepository as checkDuplicateCode,
+  CROSS_GROUP_NAME,
+  type IClone,
+  type ICrossGroupResult,
   type IDuplicateCodeGroupResult,
+  type IDuplicateCodeReport,
+  saveBaseline,
   selectGroups,
 } from "../rules/whole_tree/duplicate_code.ts";
+import { toJsonReport } from "../rules/whole_tree/duplicate_format.ts";
 import { checkDuplicates, DUPLICATE_RULES, type DuplicateRuleKey } from "../rules/whole_tree/duplicate_check.ts";
 import {
   atLeastLines,
@@ -208,53 +214,76 @@ async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings): Pr
   console.log("  Add `--fail` to the host command to make these findings fail the run.");
 }
 
-function printDuplicateGroup(
-  group: IDuplicateCodeGroupResult,
-  verbose: boolean,
-  top: number,
-  view: DuplicateView,
-  minLines: number,
-): void {
-  const status = group.passed ? "✅" : "❌";
-  console.log(
-    `${status} ${group.name}: ${
-      group.percentage.toFixed(2)
-    }% duplicated (threshold ${group.threshold}%, ${group.clones.length} clone(s), ${group.duplicatedLines} line(s))`,
-  );
-  if (!verbose) return;
-  const clones = atLeastLines(group.clones, minLines);
-  if (minLines > 1) {
+function describeClone(clone: IClone): string {
+  const { first, second } = clone;
+  return `${first.file}:${first.start}-${first.end} ~ ${second.file}:${second.start}-${second.end} (${clone.lines} lines)`;
+}
+
+/** The view and limits of the clone listing. */
+interface IDuplicateListing {
+  readonly verbose: boolean;
+  readonly top: number;
+  readonly view: DuplicateView;
+  readonly minLines: number;
+}
+
+function printNewClones(fresh: readonly IClone[], resolved: number): void {
+  if (fresh.length > 0) {
+    console.log(`    ${fresh.length} new clone(s) that the baseline does not list:`);
+    for (const clone of fresh) console.log(`        ${describeClone(clone)}`);
+  }
+  if (resolved > 0) {
+    console.log(`    ${resolved} baseline clone(s) no longer exist; run with --update-baseline to drop them.`);
+  }
+}
+
+function printClones(allClones: readonly IClone[], listing: IDuplicateListing): void {
+  const clones = atLeastLines(allClones, listing.minLines);
+  if (listing.minLines > 1) {
     console.log(
-      `    listing ${clones.length} of ${group.clones.length} clone(s) with at least ${minLines} lines; the figures above count every clone`,
+      `    listing ${clones.length} of ${allClones.length} clone(s) with at least ${listing.minLines} lines; the figures above count every clone`,
     );
   }
-  if (view === "file") {
-    for (const row of rankFiles(clones).slice(0, top)) {
+  if (listing.view === "file") {
+    for (const row of rankFiles(clones).slice(0, listing.top)) {
       console.log(
         `    ${row.duplicatedLines} lines  ${row.file}  (${row.clones} clone(s), ${row.partners} partner file(s))`,
       );
     }
     return;
   }
-  if (view === "block") {
-    for (const block of collapseBlocks(clones).slice(0, top)) {
+  if (listing.view === "block") {
+    for (const block of collapseBlocks(clones).slice(0, listing.top)) {
       console.log(`    ${block.copies} copies, up to ${block.lines} lines`);
       for (const range of block.locations) console.log(`        ${range.file}:${range.start}-${range.end}`);
     }
     return;
   }
-  for (const clone of clones.slice(0, top)) {
-    console.log(
-      `    ${clone.first.file}:${clone.first.start}-${clone.first.end} ~ ${clone.second.file}:${clone.second.start}-${clone.second.end} (${clone.lines} lines)`,
-    );
-  }
+  for (const clone of clones.slice(0, listing.top)) console.log(`    ${describeClone(clone)}`);
 }
 
-async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly string[]): Promise<void> {
-  const verbose = args.includes("--verbose");
-  const top = parseTop(flagValue(args, "top"));
-  const view = parseView(flagValue(args, "by")) ?? exitWithUsage("--by must be pair, file, or block.");
-  const minLines = parseMinLines(flagValue(args, "min-lines"));
+function printDuplicateGroup(group: IDuplicateCodeGroupResult, listing: IDuplicateListing): void {
+  const status = group.passed ? "✅" : "❌";
+  console.log(
+    `${status} ${group.name}: ${
+      group.percentage.toFixed(2)
+    }% duplicated (threshold ${group.threshold}%, ${group.clones.length} clone(s), ${group.duplicatedLines} line(s); ${
+      group.involvedPercentage.toFixed(2)
+    }% of lines involved)`,
+  );
+  printNewClones(group.newClones, group.resolvedClones);
+  if (listing.verbose) printClones(group.clones, listing);
+}
+
+function printCrossGroup(cross: ICrossGroupResult, listing: IDuplicateListing): void {
+  const status = cross.passed ? "✅" : "❌";
+  console.log(`${status} ${CROSS_GROUP_NAME}: ${cross.clones.length} clone(s) between scan groups`);
+  printNewClones(cross.newClones, cross.resolvedClones);
+  if (listing.verbose) printClones(cross.clones, listing);
+}
+
+/** The scan groups to run, with the `--max-gap-lines` override applied when the command line gives one. */
+function selectDuplicateSettings(settings: IDuplicateCodeSettings, args: readonly string[]): IDuplicateCodeSettings {
   const groupNames = args.filter((arg) => arg.startsWith(GROUP_FLAG)).map((arg) => arg.slice(GROUP_FLAG.length));
   let selected: IDuplicateCodeSettings;
   try {
@@ -262,14 +291,77 @@ async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly
   } catch (error) {
     return exitWithUsage(error instanceof Error ? error.message : String(error));
   }
-  const report = await checkDuplicateCode(Deno.cwd(), selected);
-  for (const group of report.groups) printDuplicateGroup(group, verbose, top, view, minLines);
-  const failed = report.groups.filter((group) => !group.passed);
+  const gap = flagValue(args, "max-gap-lines");
+  if (gap === undefined) return selected;
+  const maxGapLines = Number(gap);
+  if (!Number.isInteger(maxGapLines) || maxGapLines < 0) {
+    return exitWithUsage("--max-gap-lines must be a non-negative integer.");
+  }
+  return { ...selected, maxGapLines, groups: selected.groups.map((group) => ({ ...group, maxGapLines: null })) };
+}
+
+function failedGroupNames(report: IDuplicateCodeReport, updating: boolean): string[] {
+  const failed = report.groups.filter((group) => (updating ? group.percentage > group.threshold : !group.passed));
+  const names = failed.map((group) => group.name);
+  if (!updating && report.cross?.passed === false) names.push(CROSS_GROUP_NAME);
+  return names;
+}
+
+/** What the command line asks of one duplicate-code run. */
+interface IDuplicateRun {
+  readonly listing: IDuplicateListing;
+  readonly json: boolean;
+  /** Whether the run rewrites the baseline file. */
+  readonly updating: boolean;
+  /** Whether a gap-merge override makes the run a survey that skips the baseline gate. */
+  readonly surveying: boolean;
+}
+
+function parseDuplicateRun(settings: IDuplicateCodeSettings, args: readonly string[]): IDuplicateRun {
+  const format = flagValue(args, "format") ?? "text";
+  if (format !== "text" && format !== "json") exitWithUsage("--format must be text or json.");
+  const updating = args.includes("--update-baseline");
+  const surveying = flagValue(args, "max-gap-lines") !== undefined;
+  if (updating && settings.baseline === null) {
+    exitWithUsage("--update-baseline needs a `baseline` path in the duplicate-code settings.");
+  }
+  if (updating && surveying) exitWithUsage("--update-baseline cannot be combined with --max-gap-lines.");
+  return {
+    listing: {
+      verbose: args.includes("--verbose"),
+      top: parseTop(flagValue(args, "top")),
+      view: parseView(flagValue(args, "by")) ?? exitWithUsage("--by must be pair, file, or block."),
+      minLines: parseMinLines(flagValue(args, "min-lines")),
+    },
+    json: format === "json",
+    updating,
+    surveying,
+  };
+}
+
+function printDuplicateReport(report: IDuplicateCodeReport, run: IDuplicateRun): void {
+  if (run.json) {
+    console.log(JSON.stringify(toJsonReport(report, run.listing.minLines), null, 2));
+    return;
+  }
+  for (const group of report.groups) printDuplicateGroup(group, run.listing);
+  if (report.cross !== null) printCrossGroup(report.cross, run.listing);
+}
+
+async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly string[]): Promise<void> {
+  const run = parseDuplicateRun(settings, args);
+  const selected = selectDuplicateSettings(settings, args);
+  // An update has no baseline to check against yet, and a gap-merged survey changes the clone ids, so both skip the gate.
+  const gated = run.updating || run.surveying ? { ...selected, baseline: null } : selected;
+  const report = await checkDuplicateCode(Deno.cwd(), gated);
+  printDuplicateReport(report, run);
+  if (run.updating) {
+    console.error(`\nWrote the duplicate-code baseline to ${await saveBaseline(Deno.cwd(), selected, report)}.`);
+  }
+  const failed = failedGroupNames(report, run.updating);
   if (failed.length === 0) return;
-  console.error(
-    `\n❌ ${failed.length} scan group(s) exceed the duplication threshold: ${failed.map((g) => g.name).join(", ")}`,
-  );
-  if (!verbose) console.error("  Add `--verbose` to list every clone.");
+  console.error(`\n❌ ${failed.length} scan group(s) fail the duplication check: ${failed.join(", ")}`);
+  if (!run.listing.verbose && !run.json) console.error("  Add `--verbose` to list every clone.");
   Deno.exit(1);
 }
 

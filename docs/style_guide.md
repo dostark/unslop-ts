@@ -219,7 +219,7 @@ A value that carries meaning needs a name.
   duplicate.
 - Keep one owner for logic. A block of code that is copied to another place is a clone, even when the names
   differ. The `duplicate-code` check compares token streams and holds each scan group below its percentage
-  threshold.
+  threshold. With a committed baseline it also fails a clone that the baseline does not list.
 
 ### How the detector counts
 

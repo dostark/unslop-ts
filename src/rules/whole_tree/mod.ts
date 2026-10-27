@@ -12,18 +12,42 @@ export {
   type DuplicateView,
   type IDuplicateBlock,
   type IFileDuplication,
+  involvedLineCount,
   parseView,
   rankFiles,
 } from "./duplicate_views.ts";
 export {
   buildJscpdArgs,
+  buildUnionJscpdArgs,
   checkRepository as checkDuplicateCode,
+  CROSS_GROUP_NAME,
   type IClone,
+  type ICrossGroupResult,
   type IDuplicateCodeGroupResult,
   type IDuplicateCodeReport,
+  loadBaseline,
   npxRunner,
+  saveBaseline,
   type TJscpdRunner,
 } from "./duplicate_code.ts";
+export {
+  buildBaseline,
+  fingerprintClone,
+  type IBaselineEntry,
+  type IDuplicateBaseline,
+  newClones,
+  parseBaseline,
+  resolvedCount,
+  serializeBaseline,
+} from "./duplicate_baseline.ts";
+export { crossGroupClones, groupOf } from "./duplicate_scope.ts";
+export {
+  type IJsonClone,
+  type IJsonCrossGroup,
+  type IJsonGroup,
+  type IJsonReport,
+  toJsonReport,
+} from "./duplicate_format.ts";
 export { findDuplicateConstants, validateConstantAllowEntries } from "./duplicate_constant.ts";
 export { findDuplicateTypes, validateTypeAllowEntries } from "./duplicate_type.ts";
 export {

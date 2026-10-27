@@ -8,10 +8,17 @@
 
 import { assertEquals } from "@std/assert";
 import type { IClone } from "../src/rules/whole_tree/duplicate_code.ts";
-import { atLeastLines, collapseBlocks, parseView, rankFiles } from "../src/rules/whole_tree/duplicate_views.ts";
+import {
+  atLeastLines,
+  collapseBlocks,
+  involvedLineCount,
+  parseView,
+  rankFiles,
+} from "../src/rules/whole_tree/duplicate_views.ts";
 
 function clone(a: string, aStart: number, aEnd: number, b: string, bStart: number, bEnd: number): IClone {
   return {
+    id: `${a}:${aStart}-${b}:${bStart}`,
     lines: aEnd - aStart + 1,
     first: { file: a, start: aStart, end: aEnd },
     second: { file: b, start: bStart, end: bEnd },
@@ -92,6 +99,12 @@ Deno.test("atLeastLines drops clones shorter than the limit and keeps the order"
   assertEquals(atLeastLines(clones, 12).map((entry) => entry.lines), [30, 12]);
   assertEquals(atLeastLines(clones, 1).length, 3);
   assertEquals(atLeastLines(clones, 31), []);
+});
+
+Deno.test("involved lines count every line that any clone touches once, in both copies", () => {
+  assertEquals(involvedLineCount([]), 0);
+  assertEquals(involvedLineCount([clone("a.ts", 1, 10, "b.ts", 1, 10)]), 20);
+  assertEquals(involvedLineCount([clone("a.ts", 1, 10, "b.ts", 1, 10), clone("a.ts", 5, 12, "c.ts", 20, 27)]), 30);
 });
 
 Deno.test("a file ranking built from filtered clones counts only the long clones", () => {

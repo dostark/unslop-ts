@@ -486,7 +486,8 @@ or a warm npm cache. It reads the `wholeTree.duplicateCode` section:
 }
 ```
 
-`jscpdVersion`, `minLines`, and `minTokens` are optional and default to the values shown. A group may
+`jscpdVersion`, `minLines`, and `minTokens` are optional and default to the values shown, and so are
+`maxGapLines` (0), `baseline` (none), and `crossGroups` (false), which the paragraphs below describe. A group may
 set its own `minLines`, which replaces the shared one for that group only, so production code can keep
 a low minimum while test code uses a higher one. A group without `ignore` or `pattern` scans everything
 under its `paths`. A group that scans no files is an
@@ -498,6 +499,38 @@ cover, and `--by=block` collapses clone pairs that share a region into blocks wi
 location.
 The default `--by=pair` lists each clone pair. `--min-lines=<n>` drops clones shorter than `n` lines from
 the listing in every view. It changes only what is listed, never the percentage or the threshold check.
+
+Each group line also shows the **involved** share: the lines that any clone touches, counted once across
+every copy, as a percentage of the scanned lines. The gate uses jscpd's percentage, which counts each clone
+pair once, so the involved share is the larger figure and the one that other detectors report.
+
+**Baseline.** Set `baseline` to a repository path and the check also fails a group that holds a clone the
+baseline does not list, even while the group stays under its threshold. The percentage threshold still
+applies. Each clone has an id built from its two files and its code, so moving a clone inside its files or
+changing whitespace keeps the id. Create or refresh the file with `--update-baseline`, which writes one
+line per clone and keeps the entries of groups that the run did not measure. The check prints how many
+baseline entries no longer match a clone, so the file can shrink as clones go.
+
+**Cross-group clones.** Each group runs on its own, so a clone between two groups, such as source and
+tests, is never compared. Set `crossGroups` to `true` and the check scans all groups together once more
+and keeps the clones whose two copies fall in different groups. A cross-group clone must reach the larger of
+the two group minimums. With a baseline, a cross-group clone that it does not list fails the run; without
+one the pass only reports them. The pass runs only when two or more groups run.
+
+**Gap merging.** jscpd ends a clone at the first token that differs. `maxGapLines` (shared, with a per-group
+override) lets jscpd join clones of one file pair that sit that many unmatched lines apart into one larger
+clone. It gives fewer and bigger targets and barely changes the percentage. `--max-gap-lines=<n>` overrides
+it for one run.
+
+**Machine-readable output.** `--format=json` prints one JSON document instead of the text report: each
+group's figures, its clones with their ids and an `isNew` flag, the cross-group result, and an overall
+`passed`. The exit code is the same as in text mode.
+
+**Comparing with other detectors.** Detectors count differently, so their percentages do not compare
+directly. jscpd counts a token for each punctuation mark; `fallow` counts roughly half as many tokens for the
+same code, so `minTokens: 50` here matches about `--min-tokens 25` there. `fallow` also treats a template or
+regex literal as one token whatever its text, so it finds clones that differ only inside one, which jscpd
+cannot. Compare involved shares, not the gate percentages.
 
 ## Working with deno lint
 

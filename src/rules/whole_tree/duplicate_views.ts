@@ -43,15 +43,32 @@ export function atLeastLines(clones: readonly IClone[], minLines: number): IClon
   return clones.filter((clone) => clone.lines >= minLines);
 }
 
+/** The lines of each file that at least one clone covers. */
+function coveredLines(clones: readonly IClone[]): Map<string, Set<number>> {
+  const lines = new Map<string, Set<number>>();
+  for (const clone of clones) {
+    for (const range of [clone.first, clone.second]) {
+      const covered = lines.get(range.file) ?? new Set<number>();
+      for (let line = range.start; line <= range.end; line++) covered.add(line);
+      lines.set(range.file, covered);
+    }
+  }
+  return lines;
+}
+
+/** Counts the lines that any clone touches, once each, across both copies of every clone. */
+export function involvedLineCount(clones: readonly IClone[]): number {
+  let total = 0;
+  for (const covered of coveredLines(clones).values()) total += covered.size;
+  return total;
+}
+
 /** Ranks files by the union of the lines that clones cover, most first, ties by path. */
 export function rankFiles(clones: readonly IClone[]): IFileDuplication[] {
-  const lines = new Map<string, Set<number>>();
+  const lines = coveredLines(clones);
   const cloneCount = new Map<string, number>();
   const partners = new Map<string, Set<string>>();
   const touch = (range: ICloneRange, other: ICloneRange): void => {
-    const covered = lines.get(range.file) ?? new Set<number>();
-    for (let line = range.start; line <= range.end; line++) covered.add(line);
-    lines.set(range.file, covered);
     cloneCount.set(range.file, (cloneCount.get(range.file) ?? 0) + 1);
     const others = partners.get(range.file) ?? new Set<string>();
     if (other.file !== range.file) others.add(other.file);
