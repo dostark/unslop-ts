@@ -98,6 +98,14 @@ export interface IUnusedExportsSettings {
   walkSkipPatterns: string[];
   strictSkipPrefixes: string[];
   strictSkipSegments: string[];
+  severity?: IUnusedSeverity;
+}
+
+/** Per-class enforcement: a justified class can report a warning instead of an error. */
+export interface IUnusedSeverity {
+  type: "warning" | "error";
+  value: "warning" | "error";
+  parity: "warning" | "error";
 }
 
 /** One configured module alias: a bare specifier prefix and the repository path it resolves to. */
@@ -221,6 +229,11 @@ export const UnusedExportsSettingsSchema: z.ZodType<IUnusedExportsSettings, IUnu
   walkSkipPatterns: z.array(z.string()),
   strictSkipPrefixes: z.array(z.string()),
   strictSkipSegments: z.array(z.string()),
+  severity: z.object({
+    type: z.enum(["warning", "error"]),
+    value: z.enum(["warning", "error"]),
+    parity: z.enum(["warning", "error"]),
+  }).strict().optional(),
 }).strict();
 
 /** One module alias as the catalog states it. */

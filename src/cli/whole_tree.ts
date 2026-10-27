@@ -8,7 +8,7 @@
  *
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity] [--fail]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity] [--severity=warn|error] [--relaxed] [--fail]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
@@ -422,12 +422,29 @@ function loadSettings(catalog: JsonValue): IWholeTreeSettings {
   }
 }
 
+/** The severity override the command line requests: `--severity=…` beats `--relaxed`. */
+function severityOverride(args: readonly string[]): "warning" | "error" | null {
+  const flag = args.find((arg) => arg.startsWith("--severity="));
+  if (flag !== undefined) {
+    const value = flag.slice("--severity=".length);
+    if (value === "warn" || value === "warning") return "warning";
+    if (value === "error") return "error";
+    return exitWithUsage("--severity must be warn or error.");
+  }
+  return args.includes("--relaxed") ? "warning" : null;
+}
+
 async function runUnusedRule(settings: IWholeTreeSettings, args: readonly string[]): Promise<void> {
   if (!settings.unusedExports) exitWithUsage("The catalog has no wholeTree.unusedExports section.");
   const parity = args.includes("--parity");
   const includeExempt = !parity && !args.includes("--all");
   const fail = args.includes("--fail") || args.includes("--strict");
-  await runUnusedExports(includeExempt, fail, settings.unusedExports, parity);
+  const override = severityOverride(args);
+  const configured = override === null ? settings.unusedExports : {
+    ...settings.unusedExports,
+    severity: { type: override, value: override, parity: override },
+  };
+  await runUnusedExports(includeExempt, fail, configured, parity);
 }
 
 async function main(): Promise<void> {

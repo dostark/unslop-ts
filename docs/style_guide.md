@@ -479,9 +479,11 @@ with `--fail`; an unused exported interface reports as a warning that `--fail` i
 registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never
 reported: the wrapper, the test prefix, and the binding are the exemption markers because a string
 key, a test seam, and a dynamic binding consume them. `--parity` runs the fallow-aligned report:
-re-exports, entry points, tests, scripts, default exports, and namespaces are reported, and every
-finding is an error; `configurable(…)` registrations and `__test_*` hooks stay exempt, and
-`// unslop-ignore-next-line unused-export` marks an intentional value export. `unused-files` and
+re-exports, entry points, tests, scripts, default exports, and namespaces are reported. The
+`severity` option sets each class (`type`, `value`, `parity`) to `warning` or `error`;
+`--severity=warn|error` and `--relaxed` override it for one run. `configurable(…)` registrations and
+`__test_*` hooks stay exempt, and `// unslop-ignore-next-line unused-export` marks an intentional
+value export. `unused-files` and
 `optional-params` warn until
 `--fail` or `--staged`. A script rule's configured level does not override a fixed host flag. The CLI
 prints the editable controls and the host modes, so the enforcement owner stays visible.

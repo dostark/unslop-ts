@@ -29,6 +29,9 @@ export interface IExportSite {
 /** How an unwired export finding is enforced. Type declarations stay warnings, so `--fail` leaves them alone. */
 export type TUnwiredSeverity = "warning" | "error";
 
+/** The enforcement the catalog leaves unset: type declarations warn, values and parity findings fail. */
+const DEFAULT_SEVERITY = { type: "warning", value: "error", parity: "error" } as const;
+
 /** The declaration shape an unwired export finding comes from. */
 export type TUnwiredKind = "export" | "interface" | "type-alias" | "default" | "namespace";
 
@@ -550,6 +553,7 @@ function kindOfSite(site: IExportSite, name: string): TUnwiredKind {
 function collectParityFindings(
   exportMap: Map<string, IExportSite[]>,
   importMap: Map<string, Set<string>>,
+  settings: IUnusedExportsSettings,
 ): IUnwiredExport[] {
   const findings: IUnwiredExport[] = [];
   for (const [name, sites] of exportMap) {
@@ -557,7 +561,13 @@ function collectParityFindings(
     if (isTestExport(name)) continue;
     const site = sites.find((entry) => !entry.isBarrelPassThrough) ?? sites[0];
     if (site === undefined || site.isConfigurable || site.hasIgnorePragma) continue;
-    findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "error", kind: kindOfSite(site, name) });
+    findings.push({
+      repoPath: site.repoPath,
+      line: site.line,
+      name,
+      severity: settings.severity?.parity ?? DEFAULT_SEVERITY.parity,
+      kind: kindOfSite(site, name),
+    });
   }
   return findings;
 }
@@ -571,7 +581,7 @@ function collectFindings(
   includeExempt: boolean,
   parity: boolean,
 ): IUnwiredExport[] {
-  if (parity) return collectParityFindings(exportMap, importMap);
+  if (parity) return collectParityFindings(exportMap, importMap, settings);
   const findings: IUnwiredExport[] = [];
   for (const [name, sites] of exportMap) {
     if (importMap.has(name)) continue;
@@ -585,14 +595,20 @@ function collectFindings(
             repoPath: site.repoPath,
             line: site.line,
             name,
-            severity: "warning",
+            severity: settings.severity?.type ?? DEFAULT_SEVERITY.type,
             kind: site.isInterface ? "interface" : "type-alias",
           });
         }
         continue;
       }
       if (isValueFinding(site, name, hasBarrel, publicFiles, scriptImportedNames, settings, includeExempt)) {
-        findings.push({ repoPath: site.repoPath, line: site.line, name, severity: "error", kind: "export" });
+        findings.push({
+          repoPath: site.repoPath,
+          line: site.line,
+          name,
+          severity: settings.severity?.value ?? DEFAULT_SEVERITY.value,
+          kind: "export",
+        });
       }
     }
   }

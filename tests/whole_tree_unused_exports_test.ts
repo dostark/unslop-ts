@@ -366,3 +366,39 @@ Deno.test("the parity report keeps a configurable registration exempt", async ()
     assert(!report.findings.some((entry) => entry.name === "DEFAULT_BETA"));
   });
 });
+
+Deno.test("the severity option raises a type finding to an error", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/types.ts", "export interface ISeverityProbe {\n  a: string;\n}\n");
+    const report = await checkRepository(root, true, {
+      ...settings([]),
+      severity: { type: "error", value: "error", parity: "error" },
+    });
+    const finding = report.findings.find((entry) => entry.name === "ISeverityProbe");
+    assert(finding?.severity === "error");
+  });
+});
+
+Deno.test("the severity option lowers a value finding to a warning", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/value.ts", "export function severityProbe(): number {\n  return 1;\n}\n");
+    const report = await checkRepository(root, true, {
+      ...settings([]),
+      severity: { type: "warning", value: "warning", parity: "warning" },
+    });
+    const finding = report.findings.find((entry) => entry.name === "severityProbe");
+    assert(finding?.severity === "warning");
+  });
+});
+
+Deno.test("the severity option lowers a parity finding to a warning", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/mod.ts", "export const paritySeverityProbe = 1;\n");
+    const report = await checkRepository(root, false, {
+      ...settings([]),
+      severity: { type: "warning", value: "warning", parity: "warning" },
+    }, true);
+    const finding = report.findings.find((entry) => entry.name === "paritySeverityProbe");
+    assert(finding?.severity === "warning");
+  });
+});
