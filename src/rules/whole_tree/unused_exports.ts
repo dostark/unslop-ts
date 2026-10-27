@@ -552,6 +552,7 @@ function isValueFinding(
   includeExempt: boolean,
 ): boolean {
   if (site.isConfigurable) return false;
+  if (site.hasIgnorePragma) return false;
   if (site.isTypeDecl) return false;
   if (isInterfaceName(name)) return false;
   if (publicFiles.has(site.repoPath)) return false;

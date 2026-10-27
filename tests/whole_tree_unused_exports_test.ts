@@ -412,3 +412,15 @@ Deno.test("a local export list is reported by parity but counts as surface by de
     assert(!trusted.findings.some((entry) => entry.name === "LocalError"));
   });
 });
+
+Deno.test("the unused-export pragma exempts a value export in every mode", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/kept.ts",
+      "// unslop-ignore-next-line unused-export\nexport const keptValue = 1;\n",
+    );
+    const trusted = await checkRepository(root, true, settings([]));
+    assert(!trusted.findings.some((entry) => entry.name === "keptValue"));
+  });
+});
