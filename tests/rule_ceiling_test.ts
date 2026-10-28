@@ -25,7 +25,7 @@ Deno.test("a count above the ceiling is reported with its delta", () => {
   assertEquals(result.under.length, 0);
 });
 
-Deno.test("a count below the ceiling must be written back", () => {
+Deno.test("a count below the ceiling is reported as under, not as over", () => {
   const result = evaluateCeilings(
     { "demo/no-runtime-typeof": { "packages/alpha": 5 } },
     { "demo/no-runtime-typeof": { "packages/alpha": 3 } },

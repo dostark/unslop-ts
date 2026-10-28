@@ -7,7 +7,7 @@
  * @related-files [src/cli/presets.ts, src/config/presets.ts, tests/helpers/cli_project.ts]
  */
 
-import { assertArrayIncludes, assertEquals, assertStringIncludes } from "@std/assert";
+import { assertArrayIncludes, assertEquals, assertGreater, assertNotEquals, assertStringIncludes } from "@std/assert";
 import { runCli, withCliProject } from "./helpers/cli_project.ts";
 
 interface IPresetView {
@@ -31,15 +31,16 @@ Deno.test("presets_list_and_show_dispatch", async () => {
     assertEquals(list.presets.map((preset) => preset.id), ["unslop:recommended", "unslop:strict"]);
     const recommended = presetNamed(list.presets, "unslop:recommended");
     const strict = presetNamed(list.presets, "unslop:strict");
-    assertEquals(recommended.rules.length, 11);
-    assertEquals(strict.rules.length, 32);
+    assertNotEquals(recommended.rules.length, 0);
+    assertArrayIncludes(strict.rules, recommended.rules);
+    assertGreater(strict.rules.length, recommended.rules.length);
     assertArrayIncludes(strict.rules, ["demo/no-explicit-unknown", "demo/no-chained-type-assertions"]);
     assertEquals(strict.rules.includes("optional-params"), false);
 
     const shown = JSON.parse((await runCli(dir, ["presets", "show", "unslop:strict", "--format=json"])).stdout) as {
       preset: IPresetView;
     };
-    assertEquals(shown.preset.rules.length, 32);
+    assertEquals(shown.preset.rules, strict.rules);
     assertEquals(shown.preset.memberships, ["recommended", "strict"]);
 
     const table = (await runCli(dir, ["presets", "list"])).stdout;

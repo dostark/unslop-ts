@@ -36,7 +36,7 @@ function packageKeys(ceilings: ICeilings): string[] {
   return [...keys].sort();
 }
 
-/** Compares current counts to the committed ceilings. Any mismatch is a failure. */
+/** Compares current counts to the committed ceilings. A host fails on `over`, and decides what to do with `under`. */
 export function evaluateCeilings(
   ceilings: ICeilings,
   counts: ICeilings,
