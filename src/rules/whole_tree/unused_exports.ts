@@ -685,7 +685,12 @@ function memberFindings(
   isScanned: (repoPath: string) => boolean,
 ): IUnwiredExport[] {
   const severity = context.settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
-  const input = { graph, sourceFiles, isScanned };
+  const input = {
+    graph,
+    sourceFiles,
+    isScanned,
+    isTestFile: (repoPath: string) => isTestFilePath(repoPath, context.settings),
+  };
   const enums = context.options.enumMembers ? findUnusedEnumMembers(input) : [];
   const classes = context.options.classMembers ? findUnusedClassMembers(input) : [];
   return [

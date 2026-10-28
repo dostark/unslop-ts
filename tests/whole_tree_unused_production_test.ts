@@ -105,7 +105,7 @@ Deno.test("a test access to a name no longer hides a dead production member of t
     await write(
       root,
       "packages/p/tests/door_test.ts",
-      'import { Door } from "../src/door.ts";\nnew Door().open();\n',
+      'import { Door } from "../src/door.ts";\nconsole.log(Door);\nconst loose = JSON.parse("{}") as { open(): void };\nloose.open();\n',
     );
     assertEquals(await findings(root, true), ["Box.open (tests)", "Door (tests)", "Door.open (tests)"]);
     assertEquals(await findings(root, false), []);

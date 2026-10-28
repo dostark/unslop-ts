@@ -63,12 +63,165 @@ Deno.test("a destructured name, an indexed access type, and a call inside the cl
   });
 });
 
-Deno.test("an unrelated member with the same name hides a dead one, which the name match cannot tell apart", async () => {
+Deno.test("a member whose name another class accesses through a known receiver is still reported", async () => {
   await withRepo(async (root) => {
     await write(root, "packages/p/src/box.ts", "export class Box {\n  open() {}\n}\n");
     await write(root, "packages/p/src/door.ts", "export class Door {\n  open() {}\n}\n");
-    await write(root, "packages/p/use.ts", 'import { Door } from "./src/door.ts";\nnew Door().open();\n');
-    assertEquals(await unusedMembers(root), []);
+    await write(
+      root,
+      "packages/p/use.ts",
+      [
+        'import { Door } from "./src/door.ts";',
+        'import { Box } from "./src/box.ts";',
+        "const door: Door = new Door();",
+        "door.open();",
+        "console.log(Box);",
+        "",
+      ].join("\n"),
+    );
+    assertEquals(await unusedMembers(root), ["packages/p/src/box.ts:Box.open"]);
+  });
+});
+
+const TARGET = "export class Target {\n  a() {}\n  b() {}\n  c() {}\n  d() {}\n  e() {}\n  f() {}\n  g() {}\n}\n";
+const OTHER = TARGET.replace("class Target", "class Other");
+
+Deno.test("an access through a typed parameter, variable, field, return type, cast, or pattern is tied to its class", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/target.ts", TARGET.replace("  g() {}\n", "  g() {}\n  static make() {}\n"));
+    await write(root, "packages/p/src/other.ts", OTHER.replace("  g() {}\n", "  g() {}\n  static make() {}\n"));
+    await write(
+      root,
+      "packages/p/use.ts",
+      [
+        'import { Target } from "./src/target.ts";',
+        'import { Other } from "./src/other.ts";',
+        "class Holder {",
+        "  constructor(private readonly target: Target) {}",
+        "  getTarget(): Target { return this.target; }",
+        "  run(): void { this.target.d(); }",
+        "}",
+        "function viaParam(t: Target): void { t.b(); }",
+        "const local = new Target();",
+        "local.c();",
+        "new Target().a();",
+        "new Holder(local).run();",
+        "new Holder(local).getTarget().e();",
+        "viaParam(local);",
+        '(JSON.parse("1") as Target).f();',
+        "const { g } = new Target();",
+        "Target.make();",
+        "console.log(g, Other);",
+        "",
+      ].join("\n"),
+    );
+    assertEquals(
+      await unusedMembers(root),
+      ["a", "b", "c", "d", "e", "f", "g", "make"].map((name) => `packages/p/src/other.ts:Other.${name}`),
+    );
+  });
+});
+
+Deno.test("an access through an unknown receiver, or through an interface, is not tied to one class", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/target.ts", TARGET);
+    await write(root, "packages/p/src/other.ts", OTHER);
+    await write(
+      root,
+      "packages/p/src/shape.ts",
+      [
+        "export interface IShape {",
+        "  area(): number;",
+        "}",
+        "export class Circle {",
+        "  area() { return 1; }",
+        "}",
+        "export class Square {",
+        "  area() { return 2; }",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await write(
+      root,
+      "packages/p/use.ts",
+      [
+        'import { Target } from "./src/target.ts";',
+        'import { Other } from "./src/other.ts";',
+        'import { Circle, Square, type IShape } from "./src/shape.ts";',
+        "[1].forEach((item) => (item as never as { a(): void }).a());",
+        "function measure(shape: IShape): number { return shape.area(); }",
+        "console.log(Target, Other, Circle, Square, measure);",
+        "",
+      ].join("\n"),
+    );
+    // Only `a` is accessed, through a receiver of unknown type, and `area` through an interface.
+    const rest = ["b", "c", "d", "e", "f", "g"];
+    assertEquals(await unusedMembers(root), [
+      ...rest.map((name) => `packages/p/src/other.ts:Other.${name}`),
+      ...rest.map((name) => `packages/p/src/target.ts:Target.${name}`),
+    ]);
+  });
+});
+
+Deno.test("a class in a test file is matched by name, because a test double is cast to the class it replaces", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/registry.ts", "export class Registry {\n  put() {}\n  take() {}\n}\n");
+    await write(
+      root,
+      "packages/p/tests/registry_test.ts",
+      [
+        'import { Registry } from "../src/registry.ts";',
+        "class Spy {",
+        "  put() {}",
+        "  unused() {}",
+        "}",
+        "const registry = new Spy() as unknown as Registry;",
+        "registry.put();",
+        "console.log(Registry);",
+        "",
+      ].join("\n"),
+    );
+    assertEquals(await unusedMembers(root), [
+      "packages/p/src/registry.ts:Registry.take",
+      "packages/p/tests/registry_test.ts:Spy.unused",
+    ]);
+  });
+});
+
+Deno.test("a this access reaches the class and its relatives, and an instanceof narrowing keeps a subclass member", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/tree.ts",
+      [
+        "export class Base {",
+        "  run() { this.step(); }",
+        "  step() {}",
+        "}",
+        "export class Sub extends Base {",
+        "  extra() {}",
+        "}",
+        "export class Lone {",
+        "  step() {}",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await write(
+      root,
+      "packages/p/use.ts",
+      [
+        'import { Base, Lone, Sub } from "./src/tree.ts";',
+        "function use(b: Base): void {",
+        "  b.run();",
+        "  if (b instanceof Sub) b.extra();",
+        "}",
+        "console.log(use, Lone);",
+        "",
+      ].join("\n"),
+    );
+    assertEquals(await unusedMembers(root), ["packages/p/src/tree.ts:Lone.step"]);
   });
 });
 

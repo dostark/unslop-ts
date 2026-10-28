@@ -10,6 +10,7 @@
 import ts from "typescript";
 import { hasPragma, isExported } from "./declaration_markers.ts";
 import { createDefinitionReach, definitionKey, type IDefinitionReach, type IFileBindings } from "./definition_reach.ts";
+import { type AccessTargets, type IReceiverContext, type ITypeDef, recordTypedAccesses } from "./class_receivers.ts";
 import type { IModuleGraph } from "./unused_exports_resolved.ts";
 
 const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-class-member\b/;
@@ -51,14 +52,8 @@ export interface IClassMemberInput {
   readonly sourceFiles: ReadonlyMap<string, ts.SourceFile>;
   /** True for the files whose classes the report lists. */
   readonly isScanned: (repoPath: string) => boolean;
-}
-
-/** A class or an interface declaration: the types whose members are contracts for the classes that name them. */
-interface ITypeDef {
-  readonly repoPath: string;
-  readonly name: string;
-  readonly node: ts.ClassDeclaration | ts.InterfaceDeclaration;
-  exported: boolean;
+  /** True for test files, whose classes may stand in for another class without naming it. */
+  readonly isTestFile: (repoPath: string) => boolean;
 }
 
 /** The names a class owes to its heritage, or every name when a base cannot be resolved. */
@@ -178,22 +173,6 @@ function markListedExports(repoPath: string, sourceFile: ts.SourceFile, defs: Ma
   }
 }
 
-/** The property name that a node reads: `.name`, `["name"]`, a `{ name }` pattern, or `Type["name"]`. */
-function accessedNameOf(node: ts.Node): string | null {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  if (ts.isElementAccessExpression(node)) {
-    return ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
-  }
-  if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
-    const name = node.propertyName ?? node.name;
-    return ts.isIdentifier(name) || ts.isStringLiteralLike(name) ? name.text : null;
-  }
-  if (ts.isIndexedAccessTypeNode(node) && ts.isLiteralTypeNode(node.indexType)) {
-    return ts.isStringLiteralLike(node.indexType.literal) ? node.indexType.literal.text : null;
-  }
-  return null;
-}
-
 /** The type name that `keyof Type` or `keyof typeof value` exposes with all its members. */
 function keyedNameOf(node: ts.Node): string | null {
   if (!ts.isTypeOperatorNode(node) || node.operator !== ts.SyntaxKind.KeyOfKeyword) return null;
@@ -205,11 +184,9 @@ function keyedNameOf(node: ts.Node): string | null {
   return operand && ts.isIdentifier(operand) ? operand.text : null;
 }
 
-/** The property names that code accesses in one file, and the type names that `keyof` exposes. */
-function collectAccessedNames(sourceFile: ts.SourceFile, into: Set<string>, keyed: Set<string>): void {
+/** The type names that `keyof` exposes with all their members, in one file. */
+function collectKeyedNames(sourceFile: ts.SourceFile, keyed: Set<string>): void {
   const visit = (node: ts.Node): void => {
-    const accessed = accessedNameOf(node);
-    if (accessed !== null) into.add(accessed);
     const exposed = keyedNameOf(node);
     if (exposed !== null) keyed.add(exposed);
     ts.forEachChild(node, visit);
@@ -311,7 +288,10 @@ function inheritedContract(context: IClassContext, def: ITypeDef): Contract {
 
 /** Everything the check knows about the names that code reaches. */
 interface IUsage {
-  readonly accessed: ReadonlySet<string>;
+  /** For each accessed name, the classes that its receivers can be, or every class. */
+  readonly accessedBy: ReadonlyMap<string, AccessTargets>;
+  /** True for the files whose classes are matched by name, because a test double is cast to the class it replaces. */
+  readonly isTestFile: (repoPath: string) => boolean;
   readonly keyed: ReadonlySet<string>;
   readonly publicTypes: ReadonlySet<ITypeDef>;
 }
@@ -326,7 +306,9 @@ function isListable(
   if (candidate.isPrivate) return !reads.has(candidate.name);
   if (RUNTIME_NAMES.has(candidate.name) || usage.publicTypes.has(def) || usage.keyed.has(def.name)) return false;
   if (contract === "all" || contract.has(candidate.name)) return false;
-  return !usage.accessed.has(candidate.name);
+  const reached = usage.accessedBy.get(candidate.name);
+  if (usage.isTestFile(def.repoPath)) return reached === undefined;
+  return reached !== "any" && !reached?.has(def);
 }
 
 function unusedOf(
@@ -350,6 +332,52 @@ function unusedOf(
   return unused;
 }
 
+/** The types that a class or interface extends or implements, as the walked files declare them. */
+function parentsFor(context: IClassContext, def: ITypeDef): ITypeDef[] {
+  const bindings = bindingsFor(context, def.repoPath);
+  const parents: ITypeDef[] = [];
+  for (const name of heritageNames(def.node)) {
+    if (name !== null) parents.push(...bindings.names.get(name) ?? []);
+  }
+  return parents;
+}
+
+/** The lookups that receiver typing needs, with the family of a type memoized. */
+function receiverContext(context: IClassContext): IReceiverContext {
+  const defOfNode = new Map<ts.Node, ITypeDef>();
+  for (const def of context.defs.values()) defOfNode.set(def.node, def);
+  const parents = new Map<ITypeDef, ITypeDef[]>();
+  const children = new Map<ITypeDef, ITypeDef[]>();
+  for (const def of context.defs.values()) {
+    const found = parentsFor(context, def);
+    parents.set(def, found);
+    for (const parent of found) children.set(parent, [...children.get(parent) ?? [], def]);
+  }
+  const closure = (start: ITypeDef, edges: ReadonlyMap<ITypeDef, ITypeDef[]>, into: Set<ITypeDef>): void => {
+    for (const next of edges.get(start) ?? []) {
+      if (into.has(next)) continue;
+      into.add(next);
+      closure(next, edges, into);
+    }
+  };
+  const families = new Map<ITypeDef, ReadonlySet<ITypeDef>>();
+  return {
+    bindingsFor: (repoPath) => bindingsFor(context, repoPath),
+    reach: context.reach,
+    defOfNode,
+    parentsOf: (def) => parents.get(def) ?? [],
+    familyOf: (def) => {
+      const known = families.get(def);
+      if (known) return known;
+      const family = new Set<ITypeDef>([def]);
+      closure(def, parents, family);
+      closure(def, children, family);
+      families.set(def, family);
+      return family;
+    },
+  };
+}
+
 /** Lists the class members that nothing reads. */
 export function findUnusedClassMembers(input: IClassMemberInput): IUnusedClassMember[] {
   const defs = collectTypes(input.sourceFiles);
@@ -360,12 +388,16 @@ export function findUnusedClassMembers(input: IClassMemberInput): IUnusedClassMe
     bindings: new Map(),
     ...createDefinitionReach(input.graph, defs),
   };
-  const accessed = new Set<string>();
+  const accessedBy = new Map<string, AccessTargets>();
   const keyed = new Set<string>();
-  for (const sourceFile of input.sourceFiles.values()) collectAccessedNames(sourceFile, accessed, keyed);
+  const receivers = receiverContext(context);
+  for (const [repoPath, sourceFile] of input.sourceFiles) {
+    recordTypedAccesses(receivers, repoPath, sourceFile, accessedBy);
+    collectKeyedNames(sourceFile, keyed);
+  }
   const publicTypes = new Set<ITypeDef>();
   for (const entry of input.graph.configuredFiles) for (const def of context.reachAll(entry)) publicTypes.add(def);
-  const usage: IUsage = { accessed, keyed, publicTypes };
+  const usage: IUsage = { accessedBy, isTestFile: input.isTestFile, keyed, publicTypes };
   const unused: IUnusedClassMember[] = [];
   for (const def of defs.values()) {
     if (!ts.isClassDeclaration(def.node) || !input.isScanned(def.repoPath)) continue;
