@@ -327,7 +327,7 @@ Statuses describe the configuration, not the host:
 
 A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
 reports the trusted exemption set by default, `--all` widens the report, and only `--fail` fails the run;
-`unused-files` warns until `--fail` (`--manifest` starts the walk at the entry points of `deno.json` and
+`unused-files` warns until `--fail` (it starts the walk at the entry points of `deno.json` and
 `package.json`, see below); `optional-params` warns until `--fail` or `--staged`. An exported
 interface that no file imports reports as a warning and never fails the run; put
 `// unslop-ignore-next-line unused-interface` above it when it is intentional API,
@@ -466,9 +466,9 @@ deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --r
 
 ### Unused files from the manifests {#unused-files-manifest}
 
-`--rule=unused-files --manifest` replaces the path conventions of the default mode with the entry points that the
-manifests declare, and it reports every scanned file that no entry reaches. It needs the
-`wholeTree.unusedFiles.manifest` section, which has three fields:
+`--rule=unused-files` starts the walk at the entry points that the manifests declare, and it reports every scanned
+file that no entry reaches. The scan runs when the catalog has the `wholeTree.unusedFiles.manifest` section, which has
+three fields:
 
 - `walkSkipPatterns`: regular expressions for the absolute paths that the scan never enters.
 - `extraEntries`: globs of files that are entry points although no manifest names them.
@@ -489,6 +489,10 @@ to a scanned file, such as the first argument of a `new URL(…, import.meta.url
 variable prefix, such as `$SUITE_HOME/scripts/x.ts`, resolves against each ancestor directory of the file that holds it.
 The scan reads `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, and `.css` files. A `mod.ts` barrel, a
 script, or a file in a `tests` folder is not an entry by name, so an unused one is reported.
+
+A catalog without the `manifest` section keeps the older scan, which treats scripts, barrels, and files in tests folders
+as entries. `--conventions` selects that scan on a catalog that has the section, and `--manifest` fails with a usage
+error when the section is missing.
 
 The same hint prints after a migration. Phase 232 Step 5 replaces this bridge with a compiled-settings
 adapter, so the separate catalog is temporary.

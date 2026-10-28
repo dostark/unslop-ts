@@ -433,28 +433,46 @@ async function writeManifestProject(dir: string, withManifestSection: boolean): 
   await Deno.writeTextFile(join(dir, "src/mod.ts"), 'export * from "./live.ts";\n');
 }
 
-Deno.test("unused-files --manifest exits 2 when the catalog has no manifest section", async () => {
-  await inTempDir(async (dir) => {
-    await writeManifestProject(dir, false);
-    const result = await runDeno(
-      ["run", "-A", CLI, "--rule=unused-files", "--manifest", "--catalog=catalog.json"],
-      dir,
-    );
-    assertEquals(result.code, USAGE_EXIT);
-    assertStringIncludes(result.stderr, "wholeTree.unusedFiles.manifest");
-  });
-});
+const UNUSED_FILES_ARGS = ["run", "-A", CLI, "--rule=unused-files", "--catalog=catalog.json"];
 
-Deno.test("unused-files --manifest reports the file that the manifest entries miss and --fail exits 1", async () => {
+Deno.test("unused-files scans from the manifests by default and --fail exits 1", async () => {
   await inTempDir(async (dir) => {
     await writeManifestProject(dir, true);
-    const args = ["run", "-A", CLI, "--rule=unused-files", "--manifest", "--catalog=catalog.json"];
-    const warned = await runDeno(args, dir);
+    const warned = await runDeno(UNUSED_FILES_ARGS, dir);
     assertEquals(warned.code, 0, warned.stderr);
     assertStringIncludes(warned.stdout, "WARN [unused-file] src/dead.ts");
     assertStringIncludes(warned.stdout, "WARN [unused-file] src/mod.ts");
-    const failed = await runDeno([...args, "--fail"], dir);
+    const failed = await runDeno([...UNUSED_FILES_ARGS, "--fail"], dir);
     assertEquals(failed.code, 1);
     assertStringIncludes(failed.stdout, "ERROR [unused-file] src/dead.ts");
+  });
+});
+
+Deno.test("unused-files --conventions keeps the path conventions, so a barrel is an entry", async () => {
+  await inTempDir(async (dir) => {
+    await writeManifestProject(dir, true);
+    const result = await runDeno([...UNUSED_FILES_ARGS, "--conventions"], dir);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "WARN [unused-file] src/dead.ts");
+    assertEquals(result.stdout.includes("src/mod.ts"), false);
+  });
+});
+
+Deno.test("unused-files falls back to the path conventions when the catalog has no manifest section", async () => {
+  await inTempDir(async (dir) => {
+    await writeManifestProject(dir, false);
+    const result = await runDeno(UNUSED_FILES_ARGS, dir);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "WARN [unused-file] src/dead.ts");
+    assertEquals(result.stdout.includes("src/mod.ts"), false);
+  });
+});
+
+Deno.test("unused-files --manifest exits 2 when the catalog has no manifest section", async () => {
+  await inTempDir(async (dir) => {
+    await writeManifestProject(dir, false);
+    const result = await runDeno([...UNUSED_FILES_ARGS, "--manifest"], dir);
+    assertEquals(result.code, USAGE_EXIT);
+    assertStringIncludes(result.stderr, "wholeTree.unusedFiles.manifest");
   });
 });

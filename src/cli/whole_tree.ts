@@ -9,7 +9,7 @@
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity] [--severity=warn|error] [--relaxed] [--fail]
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--manifest] [--fail]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--manifest | --conventions] [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-code [--verbose] [--group=<name>]... [--top=<n>] [--by=pair|file|block] [--min-lines=<n>] [--max-gap-lines=<n>] [--format=text|json] [--update-baseline]
@@ -58,6 +58,7 @@ import {
   type IDuplicateCodeSettings,
   type IOptionalParamsSettings,
   type IUnusedExportsSettings,
+  type IUnusedFilesManifestSettings,
   type IUnusedFilesSettings,
   type IWholeTreeSettings,
   parseWholeTreeSettings,
@@ -195,10 +196,28 @@ async function runUnusedExports(
   if (fail && errors > 0) Deno.exit(1);
 }
 
-async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings, manifestMode: boolean): Promise<void> {
-  if (manifestMode && !settings.manifest) exitWithUsage("The catalog has no wholeTree.unusedFiles.manifest section.");
-  const report = settings.manifest && manifestMode
-    ? await checkManifestFiles(Deno.cwd(), settings.manifest)
+const MANIFEST_FLAG = "--manifest";
+const CONVENTIONS_FLAG = "--conventions";
+
+/**
+ * The unused-files scan starts at the manifest entry points when the catalog has a `manifest` section. `--conventions`
+ * selects the path-convention scan instead, and `--manifest` refuses to run without the section.
+ */
+function selectUnusedFilesScan(
+  args: readonly string[],
+  settings: IUnusedFilesSettings,
+): IUnusedFilesManifestSettings | undefined {
+  const manifest = args.includes(MANIFEST_FLAG);
+  const conventions = args.includes(CONVENTIONS_FLAG);
+  if (manifest && conventions) exitWithUsage(`${MANIFEST_FLAG} and ${CONVENTIONS_FLAG} exclude each other.`);
+  if (manifest && !settings.manifest) exitWithUsage("The catalog has no wholeTree.unusedFiles.manifest section.");
+  return conventions ? undefined : settings.manifest;
+}
+
+async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings, args: readonly string[]): Promise<void> {
+  const manifest = selectUnusedFilesScan(args, settings);
+  const report = manifest
+    ? await checkManifestFiles(Deno.cwd(), manifest)
     : await checkUnusedFiles(Deno.cwd(), settings);
   if (report.findings.length === 0) {
     console.log(`✅ No unreachable files found in ${report.scannedFileCount} scanned file(s).`);
@@ -662,7 +681,7 @@ async function runSettingsRule(rule: string, settings: IWholeTreeSettings, args:
   if (rule === "unused-files") {
     if (!settings.unusedFiles) exitWithUsage("The catalog has no wholeTree.unusedFiles section.");
     const fail = args.includes("--fail") || args.includes("--strict");
-    await runUnusedFiles(fail, settings.unusedFiles, args.includes("--manifest"));
+    await runUnusedFiles(fail, settings.unusedFiles, args);
   }
   if (rule === "duplicate-code") {
     if (!settings.duplicateCode) exitWithUsage("The catalog has no wholeTree.duplicateCode section.");
