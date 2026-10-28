@@ -197,3 +197,48 @@ Deno.test("findings come out in path and line order", async () => {
     assertEquals(await unwired(root), ["packages/a/a.ts:second", "packages/a/a.ts:first", "packages/z/z.ts:z"]);
   });
 });
+
+Deno.test("an import whose binding nothing reads is not a use of the export", async () => {
+  await withRepo(async (root) => {
+    await write(
+      root,
+      "packages/p/src/api.ts",
+      "export const live = 1;\nexport const silenced = 2;\nexport const typed = 3;\nexport const forwarded = 4;\n",
+    );
+    await write(root, "packages/p/src/def.ts", "export default 5;\n");
+    await write(
+      root,
+      "packages/p/use.ts",
+      [
+        'import { forwarded, live, type silenced as _silenced, typed } from "./src/api.ts";',
+        'import unusedDefault from "./src/def.ts";',
+        "const value: typeof typed = 3;",
+        "export { forwarded };",
+        "console.log(live, value);",
+        "",
+      ].join("\n"),
+    );
+    // `forwarded` is read by its own export list, so only the re-export of it in use.ts is unwired.
+    assertEquals(await unwired(root), [
+      "packages/p/src/api.ts:silenced",
+      "packages/p/src/def.ts:default",
+      "packages/p/use.ts:forwarded",
+    ]);
+  });
+});
+
+Deno.test("a default export that no import takes is reported, and a star re-export does not carry it", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/deno.json", JSON.stringify({ exports: { ".": "./mod.ts" } }));
+    await write(root, "packages/p/mod.ts", 'export * from "./src/starred.ts";\n');
+    await write(root, "packages/p/src/starred.ts", "export const named = 1;\nexport default { named };\n");
+    await write(root, "packages/p/src/dead.ts", "export const a = 1;\nexport default { a };\n");
+    await write(root, "packages/p/src/live.ts", "const b = 1;\nexport default { b };\nexport const kept = 2;\n");
+    await write(
+      root,
+      "packages/p/use.ts",
+      'import live, { kept } from "./src/live.ts";\nimport { a } from "./src/dead.ts";\nconsole.log(live, kept, a);\n',
+    );
+    assertEquals(await unwired(root), ["packages/p/src/dead.ts:default", "packages/p/src/starred.ts:default"]);
+  });
+});

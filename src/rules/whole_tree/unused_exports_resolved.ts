@@ -144,14 +144,29 @@ function dynamicImportUse(sourceFile: ts.SourceFile, call: ts.CallExpression): I
   return "all";
 }
 
+/** True when the file reads the binding anywhere besides its declaration, in a value or a type position. */
+function isBindingRead(sourceFile: ts.SourceFile, binding: ts.Identifier): boolean {
+  let read = false;
+  const visit = (node: ts.Node): void => {
+    if (read) return;
+    if (ts.isIdentifier(node) && node.text === binding.text && node !== binding && !isMemberName(node)) read = true;
+    else ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return read;
+}
+
 function importClauseUses(sourceFile: ts.SourceFile, clause: ts.ImportClause): ImportUse {
-  const names: string[] = clause.name ? [DEFAULT_EXPORT] : [];
+  const names: string[] = clause.name && isBindingRead(sourceFile, clause.name) ? [DEFAULT_EXPORT] : [];
   const bindings = clause.namedBindings;
   if (bindings && ts.isNamespaceImport(bindings)) {
     const used = identifierUse(sourceFile, bindings.name.text, bindings.name);
     return used === "all" ? "all" : [...names, ...used];
   }
-  if (bindings) names.push(...bindings.elements.map((element) => (element.propertyName ?? element.name).text));
+  if (bindings) {
+    const read = bindings.elements.filter((element) => isBindingRead(sourceFile, element.name));
+    names.push(...read.map((element) => (element.propertyName ?? element.name).text));
+  }
   return names;
 }
 
@@ -234,26 +249,28 @@ export function findUnusedCandidates(
       for (const target of targetsOf(repoPath, specifier)) markChain(target, name, seen);
     }
   };
-  const markAll = (repoPath: string, seen: Set<string>): void => {
+  const markAll = (repoPath: string, seen: Set<string>, throughStar: boolean): void => {
     if (seen.has(repoPath)) return;
     seen.add(repoPath);
     const module = edges.get(repoPath);
-    for (const name of namesByFile.get(repoPath) ?? []) used.add(keyOf(repoPath, name));
+    for (const name of namesByFile.get(repoPath) ?? []) {
+      if (!throughStar || name !== DEFAULT_EXPORT) used.add(keyOf(repoPath, name));
+    }
     for (const name of module?.forwards.keys() ?? []) markChain(repoPath, name, new Set());
     for (const specifier of module?.stars ?? []) {
-      for (const target of targetsOf(repoPath, specifier)) markAll(target, seen);
+      for (const target of targetsOf(repoPath, specifier)) markAll(target, seen, true);
     }
   };
   for (const [importer, module] of edges) {
     for (const { specifier, use } of module.imports) {
       for (const target of targetsOf(importer, specifier)) {
         if (target === importer) continue;
-        if (use === "all") markAll(target, new Set());
+        if (use === "all") markAll(target, new Set(), false);
         else for (const name of use) markChain(target, name, new Set());
       }
     }
   }
   // A published entry file is consumed from outside the walk, as a namespace import of the whole file.
-  for (const entry of graph.publicFiles) markAll(entry, new Set());
+  for (const entry of graph.publicFiles) markAll(entry, new Set(), false);
   return candidates.filter(({ repoPath, name }) => !used.has(keyOf(repoPath, name)));
 }
