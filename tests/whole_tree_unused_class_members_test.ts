@@ -27,7 +27,11 @@ const SETTINGS: IUnusedExportsSettings = {
 /** The unwired class members of the parity report as `path:Class.member`, in report order. */
 async function unusedMembers(root: string, overrides: Partial<IUnusedExportsSettings> = {}): Promise<string[]> {
   const options = { ...SETTINGS, ...overrides };
-  const report = await checkRepository(root, false, options, true, { enumMembers: false, classMembers: true });
+  const report = await checkRepository(root, false, options, true, {
+    enumMembers: false,
+    classMembers: true,
+    production: false,
+  });
   return report.findings.filter((finding) => finding.kind === "class-member").map((finding) =>
     `${finding.repoPath}:${finding.name}`
   );

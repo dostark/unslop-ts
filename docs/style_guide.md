@@ -515,6 +515,8 @@ default exports, and namespaces, and it asks which export each import reaches.
   a public method or accessor is listed when its name is accessed nowhere. A member that an implemented interface, an
   extended base, `override`, or the runtime calls is a contract. `// unslop-ignore-next-line unused-class-member`
   exempts a member, or a class when it sits above the class.
+- `--parity --production` stops counting test files as sources of uses and labels each finding as used by nothing or used
+  only by test files, so test-only code is visible. The ordinary reports count a test as a use.
 
 The README holds the reference: flags, the matching rules, the options, the markers, and the limits of the check.
 

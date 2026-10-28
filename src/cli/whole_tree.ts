@@ -8,7 +8,7 @@
  *
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity [--enum-members] [--class-members]] [--severity=warn|error] [--relaxed] [--fail]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity [--enum-members] [--class-members] [--production]] [--severity=warn|error] [--relaxed] [--fail]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--manifest | --conventions] [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
@@ -31,7 +31,7 @@ import {
 } from "../rules/whole_tree/optional_params.ts";
 import {
   checkRepository as checkUnusedExports,
-  type IMemberReports,
+  type IParityOptions,
   type IUnwiredExport,
 } from "../rules/whole_tree/unused_exports.ts";
 import { checkRepository as checkUnusedFiles } from "../rules/whole_tree/unused_files.ts";
@@ -115,7 +115,23 @@ async function runConstantRestatement(settings: IConstantRestatementSettings): P
   Deno.exit(1);
 }
 
+/** The noun phrase of each finding kind in a message. */
+const KIND_LABELS: Readonly<Record<IUnwiredExport["kind"], string>> = {
+  "export": "an export",
+  "interface": "an interface",
+  "type-alias": "a type alias",
+  "default": "a default export",
+  "namespace": "a namespace",
+  "enum-member": "an enum member",
+  "class-member": "a class member",
+};
+
 function unwiredScope(finding: IUnwiredExport, includeExempt: boolean): string {
+  if (finding.usedBy === "tests") {
+    return `is ${
+      KIND_LABELS[finding.kind]
+    } used only by test files; move it to the test helpers, wire it into production code, or delete it.`;
+  }
   if (finding.kind === "interface" || finding.kind === "type-alias") {
     return finding.kind === "type-alias"
       ? "is a type alias exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API."
@@ -150,6 +166,11 @@ function printUnwiredExports(
     );
   }
   return { errors, warnings: findings.length - errors };
+}
+
+function printTestOnlyBreakdown(findings: readonly IUnwiredExport[]): void {
+  const testOnly = findings.filter((finding) => finding.usedBy === "tests").length;
+  console.log(`  ${findings.length - testOnly} used by nothing, ${testOnly} used only by test files (--production).`);
 }
 
 function printParitySummary(total: number, errors: number, fail: boolean): void {
@@ -187,9 +208,9 @@ async function runUnusedExports(
   fail: boolean,
   settings: IUnusedExportsSettings,
   parity: boolean,
-  reports: IMemberReports,
+  options: IParityOptions,
 ): Promise<void> {
-  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings, parity, reports);
+  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings, parity, options);
   if (report.findings.length === 0) {
     console.log(includeExempt ? "✅ No unwired exports found." : "✅ No unwired exports found in the broad report.");
     return;
@@ -197,6 +218,7 @@ async function runUnusedExports(
   const { errors, warnings } = printUnwiredExports(report.findings, includeExempt, fail);
   if (parity) {
     printParitySummary(report.findings.length, errors, fail);
+    if (options.production) printTestOnlyBreakdown(report.findings);
   } else if (includeExempt) {
     printTrustedSummary(errors, warnings, fail);
   } else {
@@ -671,14 +693,15 @@ async function runUnusedRule(settings: IWholeTreeSettings, args: readonly string
     ...settings.unusedExports,
     severity: { type: override, value: override, parity: override },
   };
-  const reports: IMemberReports = {
+  const options: IParityOptions = {
     enumMembers: args.includes("--enum-members"),
     classMembers: args.includes("--class-members"),
+    production: args.includes("--production"),
   };
-  if ((reports.enumMembers || reports.classMembers) && !parity) {
-    exitWithUsage("--enum-members and --class-members need --parity.");
+  if ((options.enumMembers || options.classMembers || options.production) && !parity) {
+    exitWithUsage("--enum-members, --class-members, and --production need --parity.");
   }
-  await runUnusedExports(includeExempt, fail, configured, parity, reports);
+  await runUnusedExports(includeExempt, fail, configured, parity, options);
 }
 
 async function main(): Promise<void> {

@@ -65,6 +65,15 @@ export interface IModuleGraph {
   readonly configuredFiles: ReadonlySet<string>;
 }
 
+const NO_EDGES: IModuleEdges = { forwards: new Map(), stars: [], imports: [] };
+
+/** The same graph with the imports and re-exports of the excluded files removed, so they are not sources of uses. */
+export function withoutImportersIn(graph: IModuleGraph, isExcluded: (repoPath: string) => boolean): IModuleGraph {
+  const edges = new Map<string, IModuleEdges>();
+  for (const [repoPath, moduleEdges] of graph.edges) edges.set(repoPath, isExcluded(repoPath) ? NO_EDGES : moduleEdges);
+  return { ...graph, edges };
+}
+
 /** What the manifests below the root give: import map entries, and the files that they publish as API. */
 interface IManifestScan {
   readonly importMap: IImportMapEntry[];

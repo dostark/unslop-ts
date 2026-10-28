@@ -489,7 +489,7 @@ const UNUSED_EXPORTS_SECTION = {
   strictSkipSegments: [],
 };
 
-Deno.test("unused-exports --enum-members and --class-members need --parity and then list the unused members", async () => {
+Deno.test("unused-exports --enum-members, --class-members, and --production need --parity and then list the findings", async () => {
   await inTempDir(async (dir) => {
     await Deno.writeTextFile(
       join(dir, "catalog.json"),
@@ -505,7 +505,7 @@ Deno.test("unused-exports --enum-members and --class-members need --parity and t
     const args = ["run", "-A", CLI, "--rule=unused-exports", "--catalog=catalog.json"];
     const refused = await runDeno([...args, "--enum-members"], dir);
     assertEquals(refused.code, USAGE_EXIT);
-    assertStringIncludes(refused.stderr, "--enum-members and --class-members need --parity");
+    assertStringIncludes(refused.stderr, "--enum-members, --class-members, and --production need --parity");
     const listed = await runDeno([...args, "--parity", "--enum-members"], dir);
     assertEquals(listed.code, 0, listed.stderr);
     assertStringIncludes(listed.stdout, "'Mode.Slow' is an enum member");
@@ -517,5 +517,16 @@ Deno.test("unused-exports --enum-members and --class-members need --parity and t
     assertEquals(classes.stdout.includes("Mode.Slow"), false);
     const plain = await runDeno([...args, "--parity"], dir);
     assertEquals(plain.stdout.includes("Mode.Slow") || plain.stdout.includes("Box.idle"), false);
+    const productionRefused = await runDeno([...args, "--production"], dir);
+    assertEquals(productionRefused.code, USAGE_EXIT);
+    await Deno.mkdir(join(dir, "tests"));
+    await Deno.writeTextFile(
+      join(dir, "tests/box_test.ts"),
+      'import { Box } from "../src/box.ts";\nconsole.log(new Box().idle());\n',
+    );
+    const production = await runDeno([...args, "--parity", "--class-members", "--production"], dir);
+    assertEquals(production.code, 0, production.stderr);
+    assertStringIncludes(production.stdout, "'Box.idle' is a class member used only by test files");
+    assertStringIncludes(production.stdout, "used only by test files (--production)");
   });
 });

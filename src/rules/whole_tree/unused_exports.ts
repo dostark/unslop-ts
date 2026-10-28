@@ -14,7 +14,12 @@ import { dirname, join, normalize } from "@std/path";
 import type { IUnusedExportsSettings } from "./options.ts";
 import { findUnusedClassMembers } from "./unused_class_members.ts";
 import { findUnusedEnumMembers } from "./unused_enum_members.ts";
-import { buildModuleGraph, findUnusedCandidates, type IModuleGraph } from "./unused_exports_resolved.ts";
+import {
+  buildModuleGraph,
+  findUnusedCandidates,
+  type IModuleGraph,
+  withoutImportersIn,
+} from "./unused_exports_resolved.ts";
 
 /** One exported declaration site. */
 export interface IExportSite {
@@ -35,6 +40,12 @@ export type TUnwiredSeverity = "warning" | "error";
 /** The enforcement the catalog leaves unset: type declarations warn, values and parity findings fail. */
 const DEFAULT_SEVERITY = { type: "warning", value: "error", parity: "error" } as const;
 
+/** Who uses a finding: no file, or only test files. */
+export type TUsedBy = "nothing" | "tests";
+
+const UNUSED: TUsedBy = "nothing";
+const TESTS_ONLY: TUsedBy = "tests";
+
 /** The declaration shape an unwired export finding comes from. */
 export type TUnwiredKind =
   | "export"
@@ -52,6 +63,8 @@ export interface IUnwiredExport {
   readonly name: string;
   readonly severity: TUnwiredSeverity;
   readonly kind: TUnwiredKind;
+  /** `nothing` when no file uses it. `tests` when only test files do, which the production mode reports. */
+  readonly usedBy: TUsedBy;
 }
 
 /** The result of an unused-exports run. */
@@ -70,8 +83,10 @@ interface ISourceCacheEntry {
 
 type SourceCache = Map<string, ISourceCacheEntry>;
 
+/** True for a test file. A segment such as `/tests/` also matches a directory at the repository root. */
 function isTestFilePath(repoPath: string, settings: IUnusedExportsSettings): boolean {
-  return settings.testSegments.some((segment) => repoPath.includes(segment)) ||
+  const rooted = `/${repoPath}`;
+  return settings.testSegments.some((segment) => rooted.includes(segment)) ||
     settings.testSuffixes.some((suffix) => repoPath.endsWith(suffix));
 }
 
@@ -596,6 +611,7 @@ function collectFindings(
             name,
             severity: settings.severity?.type ?? DEFAULT_SEVERITY.type,
             kind: site.isInterface ? "interface" : "type-alias",
+            usedBy: UNUSED,
           });
         }
         continue;
@@ -607,6 +623,7 @@ function collectFindings(
           name,
           severity: settings.severity?.value ?? DEFAULT_SEVERITY.value,
           kind: "export",
+          usedBy: UNUSED,
         });
       }
     }
@@ -641,25 +658,36 @@ function isNamedByOtherExport(sourceFile: ts.SourceFile, name: string): boolean 
   return owners.length >= 2;
 }
 
-/** The optional member reports of the parity run. Each one is advisory and needs `--parity`. */
-export interface IMemberReports {
+/** The optional reports and modes of the parity run. Each one is advisory and needs `--parity`. */
+export interface IParityOptions {
   readonly enumMembers: boolean;
   readonly classMembers: boolean;
+  /** Test files are not sources of uses, and a finding says whether only tests use it. */
+  readonly production: boolean;
 }
 
-const NO_MEMBER_REPORTS: IMemberReports = { enumMembers: false, classMembers: false };
+const NO_PARITY_OPTIONS: IParityOptions = { enumMembers: false, classMembers: false, production: false };
 
-/** The enum member and class member findings that the run asked for. */
+/** Everything one parity pass reads: the walk, the declared sites, the settings, and the options. */
+interface IParityContext {
+  readonly graph: IModuleGraph;
+  readonly sourceFiles: ReadonlyMap<string, ts.SourceFile>;
+  readonly sites: ReadonlyMap<string, IParitySite>;
+  readonly settings: IUnusedExportsSettings;
+  readonly options: IParityOptions;
+}
+
+/** The enum member and class member findings that the options ask for, over the given sources. */
 function memberFindings(
+  context: IParityContext,
   graph: IModuleGraph,
   sourceFiles: ReadonlyMap<string, ts.SourceFile>,
-  settings: IUnusedExportsSettings,
-  reports: IMemberReports,
+  isScanned: (repoPath: string) => boolean,
 ): IUnwiredExport[] {
-  const severity = settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
-  const isScanned = (repoPath: string): boolean => isParityScanPath(repoPath, settings);
-  const enums = reports.enumMembers ? findUnusedEnumMembers({ graph, sourceFiles, isScanned }) : [];
-  const classes = reports.classMembers ? findUnusedClassMembers({ graph, sourceFiles, isScanned }) : [];
+  const severity = context.settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
+  const input = { graph, sourceFiles, isScanned };
+  const enums = context.options.enumMembers ? findUnusedEnumMembers(input) : [];
+  const classes = context.options.classMembers ? findUnusedClassMembers(input) : [];
   return [
     ...enums.map((member): IUnwiredExport => ({
       repoPath: member.repoPath,
@@ -667,6 +695,7 @@ function memberFindings(
       name: `${member.enumName}.${member.member}`,
       severity,
       kind: "enum-member",
+      usedBy: UNUSED,
     })),
     ...classes.map((member): IUnwiredExport => ({
       repoPath: member.repoPath,
@@ -674,8 +703,47 @@ function memberFindings(
       name: `${member.className}.${member.member}`,
       severity,
       kind: "class-member",
+      usedBy: UNUSED,
     })),
   ];
+}
+
+/** The export findings over the given graph, for the sites that `isScanned` accepts. */
+function exportFindings(
+  context: IParityContext,
+  graph: IModuleGraph,
+  isScanned: (repoPath: string) => boolean,
+): IUnwiredExport[] {
+  const severity = context.settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
+  const scanned = [...context.sites.values()].filter(({ site }) => isScanned(site.repoPath));
+  const unused = findUnusedCandidates(graph, scanned.map(({ name, site }) => ({ repoPath: site.repoPath, name })));
+  const findings: IUnwiredExport[] = [];
+  for (const { repoPath, name } of unused) {
+    const { site } = context.sites.get(`${repoPath}\0${name}`)!;
+    if (site.isTypeDecl && isNamedByOtherExport(context.sourceFiles.get(repoPath)!, name)) continue;
+    findings.push({ repoPath, line: site.line, name, severity, kind: kindOfSite(site, name), usedBy: UNUSED });
+  }
+  return findings;
+}
+
+/** One parity pass: with `production`, test files neither define the scanned sites nor use them. */
+function parityPass(context: IParityContext, production: boolean): IUnwiredExport[] {
+  const isTest = (repoPath: string): boolean => isTestFilePath(repoPath, context.settings);
+  const isScanned = (repoPath: string): boolean =>
+    isParityScanPath(repoPath, context.settings) && !(production && isTest(repoPath));
+  const graph = production ? withoutImportersIn(context.graph, isTest) : context.graph;
+  const sourceFiles = production
+    ? new Map([...context.sourceFiles].filter(([repoPath]) => !isTest(repoPath)))
+    : context.sourceFiles;
+  return [...exportFindings(context, graph, isScanned), ...memberFindings(context, graph, sourceFiles, isScanned)];
+}
+
+function findingKey(finding: IUnwiredExport): string {
+  return `${finding.repoPath}\0${finding.kind}\0${finding.name}`;
+}
+
+function byLocation(left: IUnwiredExport, right: IUnwiredExport): number {
+  return left.repoPath.localeCompare(right.repoPath) || left.line - right.line || left.name.localeCompare(right.name);
 }
 
 /** Fallow-parity findings: an export site is unwired when no import resolves to that module and name. */
@@ -684,7 +752,7 @@ async function resolvedParityFindings(
   sourceFiles: ReadonlyMap<string, ts.SourceFile>,
   exportMap: ReadonlyMap<string, readonly IExportSite[]>,
   settings: IUnusedExportsSettings,
-  reports: IMemberReports,
+  options: IParityOptions,
 ): Promise<IUnwiredExport[]> {
   const sites = new Map<string, IParitySite>();
   for (const [name, declared] of exportMap) {
@@ -700,22 +768,12 @@ async function resolvedParityFindings(
     walkSkipPatterns: settings.walkSkipPatterns,
     publicEntries: settings.publicEntries ?? [],
   });
-  const unused = findUnusedCandidates(
-    graph,
-    [...sites.values()].map(({ name, site }) => ({ repoPath: site.repoPath, name })),
-  );
-  const reported = unused.filter(({ repoPath, name }) => {
-    const { site } = sites.get(`${repoPath}\0${name}`)!;
-    return !(site.isTypeDecl && isNamedByOtherExport(sourceFiles.get(repoPath)!, name));
-  });
-  const severity = settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
-  const exports = reported.map(({ repoPath, name }): IUnwiredExport => {
-    const { site } = sites.get(`${repoPath}\0${name}`)!;
-    return { repoPath, line: site.line, name, severity, kind: kindOfSite(site, name) };
-  });
-  return [...exports, ...memberFindings(graph, sourceFiles, settings, reports)].sort((left, right) =>
-    left.repoPath.localeCompare(right.repoPath) || left.line - right.line || left.name.localeCompare(right.name)
-  );
+  const context: IParityContext = { graph, sourceFiles, sites, settings, options };
+  if (!options.production) return parityPass(context, false).sort(byLocation);
+  const unusedAnywhere = new Set(parityPass(context, false).map(findingKey));
+  return parityPass(context, true).map((finding): IUnwiredExport =>
+    unusedAnywhere.has(findingKey(finding)) ? finding : { ...finding, usedBy: TESTS_ONLY }
+  ).sort(byLocation);
 }
 
 function rankDirectories(findings: readonly IUnwiredExport[]): Array<[string, number]> {
@@ -733,7 +791,7 @@ export async function checkRepository(
   includeExempt: boolean,
   settings: IUnusedExportsSettings,
   parity = false,
-  reports: IMemberReports = NO_MEMBER_REPORTS,
+  options: IParityOptions = NO_PARITY_OPTIONS,
 ): Promise<IUnusedExportsReport> {
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
   const exportMap = new Map<string, IExportSite[]>();
@@ -750,7 +808,7 @@ export async function checkRepository(
     if (scanExports) parseExports(sourceFile, repoPath, exportMap, settings, parity);
   }
   if (parity) {
-    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings, reports);
+    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings, options);
     return { includeExempt, findings, topDirectories: [] };
   }
   resolveBarrelReExports(files, cache, exportMap, settings);

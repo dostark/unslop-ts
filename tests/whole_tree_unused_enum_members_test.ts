@@ -31,6 +31,7 @@ async function unusedMembers(root: string, overrides: Partial<IUnusedExportsSett
   const report = await checkRepository(root, false, { ...SETTINGS, ...overrides }, true, {
     enumMembers: true,
     classMembers: false,
+    production: false,
   });
   return report.findings.filter((finding) => finding.kind === "enum-member").map((finding) =>
     `${finding.repoPath}:${finding.name}`
@@ -185,7 +186,11 @@ Deno.test("an enum member finding carries its line and the dotted name", async (
   await withRepo(async (root) => {
     await write(root, "packages/p/src/mode.ts", ENUM_SOURCE);
     await write(root, "packages/p/use.ts", 'import { Mode } from "./src/mode.ts";\nconsole.log(Mode.Fast);\n');
-    const report = await checkRepository(root, false, SETTINGS, true, { enumMembers: true, classMembers: false });
+    const report = await checkRepository(root, false, SETTINGS, true, {
+      enumMembers: true,
+      classMembers: false,
+      production: false,
+    });
     const member = report.findings.find((finding) => finding.name === "Mode.Slow");
     assertEquals([member?.kind, member?.line], ["enum-member", 3]);
   });

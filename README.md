@@ -466,31 +466,33 @@ deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --r
 
 ### Unused exports {#unused-exports}
 
-`--rule=unused-exports` lists exported declarations that no module imports. It has five reports. They differ in
+`--rule=unused-exports` lists exported declarations that no module imports. It has six reports. They differ in
 how an import is matched to an export, and in what they leave out on purpose.
 
-| Report              | Flags                                     | An import matches an export by | Use                                                                 |
-| ------------------- | ----------------------------------------- | ------------------------------ | ------------------------------------------------------------------- |
-| Trusted             | none                                      | the bare name                  | the gate: applies the exemption lists, warns for types              |
-| Broad               | `--all`                                   | the bare name                  | a survey: drops the exemptions that only the trusted report applies |
-| Parity              | `--parity`                                | the module that defines it     | the fallow-aligned audit                                            |
-| Parity with enums   | `--parity --enum-members`                 | the module that defines it     | adds unused enum members, advisory                                  |
-| Parity with members | `--parity --enum-members --class-members` | the module that defines it     | adds unused enum and class members, advisory                        |
+| Report              | Flags                                     | An import matches an export by                  | Use                                                                 |
+| ------------------- | ----------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------- |
+| Trusted             | none                                      | the bare name                                   | the gate: applies the exemption lists, warns for types              |
+| Broad               | `--all`                                   | the bare name                                   | a survey: drops the exemptions that only the trusted report applies |
+| Parity              | `--parity`                                | the module that defines it                      | the fallow-aligned audit                                            |
+| Parity with enums   | `--parity --enum-members`                 | the module that defines it                      | adds unused enum members, advisory                                  |
+| Parity with members | `--parity --enum-members --class-members` | the module that defines it                      | adds unused enum and class members, advisory                        |
+| Production          | `--parity --production`                   | the module that defines it, from non-test files | separates unused code from code that only tests use, advisory       |
 
 ```sh
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=unused-exports
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=unused-exports --parity --fail
 ```
 
-| Flag                     | Effect                                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `--all`                  | Broad report. Drops the trusted-only exemptions, and prints the directories with the most findings.           |
-| `--parity`               | Resolved report. `--all` has no effect with it.                                                               |
-| `--enum-members`         | Adds the enum members that no `Enum.Member` reference reaches. Needs `--parity`.                              |
-| `--class-members`        | Adds the class members that nothing reads (see Class members). Needs `--parity`.                              |
-| `--severity=warn\|error` | Sets every class to a warning or an error for this run.                                                       |
-| `--relaxed`              | Same as `--severity=warn`.                                                                                    |
-| `--fail`                 | Exits with 1 when the run holds an error finding. A warning never fails the run. `--strict` is an older name. |
+| Flag                     | Effect                                                                                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--all`                  | Broad report. Drops the trusted-only exemptions, and prints the directories with the most findings.                                                             |
+| `--parity`               | Resolved report. `--all` has no effect with it.                                                                                                                 |
+| `--enum-members`         | Adds the enum members that no `Enum.Member` reference reaches. Needs `--parity`.                                                                                |
+| `--class-members`        | Adds the class members that nothing reads (see Class members). Needs `--parity`.                                                                                |
+| `--production`           | Test files stop being sources of uses, and each finding says whether only tests use it. Needs `--parity`. Combines with `--enum-members` and `--class-members`. |
+| `--severity=warn\|error` | Sets every class to a warning or an error for this run.                                                                                                         |
+| `--relaxed`              | Same as `--severity=warn`.                                                                                                                                      |
+| `--fail`                 | Exits with 1 when the run holds an error finding. A warning never fails the run. `--strict` is an older name.                                                   |
 
 A finding prints as `WARN [unwired-export] path:line – 'name' …` or, with `--fail`, `ERROR …`, and a summary line
 counts the errors and the warnings. The exit code is 0 unless `--fail` meets an error, and 2 for a usage error such
@@ -595,21 +597,49 @@ A member that a caller can reach without naming it is a contract and is never li
 As for enums, a manifest export does not make a class public. A `publicEntries` file does, and so does a pragma
 above a member or above the class. The report is advisory by design.
 
+#### Production mode
+
+The reports above count a use from a test file as a use, as fallow does. A function that only its own unit test calls
+then stays, although no product code runs it. `--parity --production` asks the other question: which code does the
+non-test code use?
+
+- **Sources of uses.** A file that matches `testSegments` or `testSuffixes` is not a source of uses. Its imports,
+  re-exports, member accesses, and enum references are ignored. Files under `scriptRoot` are production code.
+- **Scope.** A declaration in a test file is test code and is never listed. The files are the same as in the parity
+  report otherwise, and `publicEntries`, pragmas, and contracts work as before.
+- **Two labels.** The report runs once with test uses and once without them. A finding that both runs list is
+  `used by nothing`. A finding that only the second run lists is `used only by test files`. The message says which, and the
+  summary counts both. The second class is the new one: the ordinary parity report never shows it.
+- **Name matching sharpens.** A test that calls `.open()` on one class no longer hides a dead `open` on another class,
+  because the call is not a source of uses.
+- **Advisory.** The report lists more than the ordinary one by design, since a test double or a test seam is test-only
+  on purpose. It is not a gate.
+
+Read the output in this order:
+
+1. A test double or helper defined in production source (a `Mock…` class, a `…ForTest` function): move it to a test
+   helper folder.
+2. A barrel entry that only tests import: remove the entry, or import from the defining file.
+3. Production code that only tests reach: wire it in, or delete it with its tests. Each one is either a feature that is
+   not connected yet or dead code.
+4. A test seam that exists so a test can inspect state (a `get…` or `is…` accessor, or an export of a script helper):
+   keep it and mark it with a pragma, or test through behavior.
+
 #### Options
 
 The `unused-exports` rule takes these options. Every project sets the required ones, and none has a default.
 
-| Option                                     | Used by | Meaning                                                                                           |
-| ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------- |
-| `productionRoots`                          | all     | Path prefixes whose files are scanned for exports.                                                |
-| `testSegments`, `testSuffixes`             | trusted | Path parts and file name endings that mark a test file, which is not scanned for exports.         |
-| `entrypointSuffixes`                       | trusted | File name endings of package entry files, such as a barrel file name.                             |
-| `mainEntrypointSuffixes`                   | trusted | File name endings of program entry files, such as a main file name.                               |
-| `scriptRoot`                               | all     | The directory of wiring scripts. Trusted mode exempts the names they import. Parity scans it.     |
-| `walkSkipPatterns`                         | all     | Regular expressions for the paths that the walk never enters. They match the absolute path.       |
-| `strictSkipPrefixes`, `strictSkipSegments` | trusted | Paths whose exports the trusted report leaves out.                                                |
-| `severity`                                 | all     | `type`, `value`, and `parity`, each `warning` or `error`. The `parity` class covers enum members. |
-| `publicEntries`                            | parity  | Optional globs of files that a tool consumes, so their exports are public API.                    |
+| Option                                     | Used by             | Meaning                                                                                           |
+| ------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
+| `productionRoots`                          | all                 | Path prefixes whose files are scanned for exports.                                                |
+| `testSegments`, `testSuffixes`             | trusted, production | Path parts and file name endings that mark a test file, which is not scanned for exports.         |
+| `entrypointSuffixes`                       | trusted             | File name endings of package entry files, such as a barrel file name.                             |
+| `mainEntrypointSuffixes`                   | trusted             | File name endings of program entry files, such as a main file name.                               |
+| `scriptRoot`                               | all                 | The directory of wiring scripts. Trusted mode exempts the names they import. Parity scans it.     |
+| `walkSkipPatterns`                         | all                 | Regular expressions for the paths that the walk never enters. They match the absolute path.       |
+| `strictSkipPrefixes`, `strictSkipSegments` | trusted             | Paths whose exports the trusted report leaves out.                                                |
+| `severity`                                 | all                 | `type`, `value`, and `parity`, each `warning` or `error`. The `parity` class covers enum members. |
+| `publicEntries`                            | parity              | Optional globs of files that a tool consumes, so their exports are public API.                    |
 
 #### Markers
 
@@ -625,7 +655,7 @@ The `unused-exports` rule takes these options. Every project sets the required o
 #### Running it on this repository
 
 The engine checks its own exports with the parity report. `deno task check:unused-exports` fails on any finding, and
-`deno task check:unused-enum-members` and `deno task check:unused-class-members` list the unused members. Both read the `unused-exports` rule of
+`deno task check:unused-enum-members` and `deno task check:unused-class-members` list the unused members, and `deno task check:unused-production` lists the code that only tests use. Both read the `unused-exports` rule of
 `lint/unslop.config.json`, which scans `src`, `tests`, and `lint`, and lists the bundle entry and the examples as
 `publicEntries`.
 
