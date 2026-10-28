@@ -483,7 +483,12 @@ with `--fail`; an unused exported interface reports as a warning that `--fail` i
 registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never
 reported: the wrapper, the test prefix, and the binding are the exemption markers because a string
 key, a test seam, and a dynamic binding consume them. `--parity` runs the fallow-aligned report:
-re-exports, entry points, tests, scripts, default exports, and namespaces are reported. The
+re-exports, entry points, tests, scripts, default exports, and namespaces are reported. It matches each import to
+the module that defines the export and follows named and star re-exports, so a name that another module imports
+never hides an unused export, and a barrel entry that nobody imports through the barrel is reported. The files that
+a manifest exports (`exports`, `lint.plugins`, `main`, `module`, `bin`) and the `publicEntries` globs are public API,
+with everything they forward. An exported type that another exported declaration of the same file names is part of
+that declaration's API and is not reported. The
 `severity` option sets each class (`type`, `value`, `parity`) to `warning` or `error`;
 `--severity=warn|error` and `--relaxed` override it for one run. `configurable(…)` registrations and
 `__test_*` hooks stay exempt, and `// unslop-ignore-next-line unused-export` marks an intentional
