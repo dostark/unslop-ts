@@ -12,7 +12,8 @@ import ts from "typescript";
 import { walk } from "@std/fs";
 import { dirname, join, normalize } from "@std/path";
 import type { IUnusedExportsSettings } from "./options.ts";
-import { findUnusedCandidates } from "./unused_exports_resolved.ts";
+import { findUnusedEnumMembers } from "./unused_enum_members.ts";
+import { buildModuleGraph, findUnusedCandidates } from "./unused_exports_resolved.ts";
 
 /** One exported declaration site. */
 export interface IExportSite {
@@ -34,7 +35,7 @@ export type TUnwiredSeverity = "warning" | "error";
 const DEFAULT_SEVERITY = { type: "warning", value: "error", parity: "error" } as const;
 
 /** The declaration shape an unwired export finding comes from. */
-export type TUnwiredKind = "export" | "interface" | "type-alias" | "default" | "namespace";
+export type TUnwiredKind = "export" | "interface" | "type-alias" | "default" | "namespace" | "enum-member";
 
 /** One unwired export. */
 export interface IUnwiredExport {
@@ -638,6 +639,7 @@ async function resolvedParityFindings(
   sourceFiles: ReadonlyMap<string, ts.SourceFile>,
   exportMap: ReadonlyMap<string, readonly IExportSite[]>,
   settings: IUnusedExportsSettings,
+  enumMembers: boolean,
 ): Promise<IUnwiredExport[]> {
   const sites = new Map<string, IParitySite>();
   for (const [name, declared] of exportMap) {
@@ -647,27 +649,39 @@ async function resolvedParityFindings(
       if (!site.isConfigurable && !site.hasIgnorePragma && !sites.has(key)) sites.set(key, { name, site });
     }
   }
-  const unused = await findUnusedCandidates({
+  const graph = await buildModuleGraph({
     repoRoot,
     sourceFiles,
-    candidates: [...sites.values()].map(({ name, site }) => ({ repoPath: site.repoPath, name })),
     walkSkipPatterns: settings.walkSkipPatterns,
     publicEntries: settings.publicEntries ?? [],
   });
+  const unused = findUnusedCandidates(
+    graph,
+    [...sites.values()].map(({ name, site }) => ({ repoPath: site.repoPath, name })),
+  );
   const reported = unused.filter(({ repoPath, name }) => {
     const { site } = sites.get(`${repoPath}\0${name}`)!;
     return !(site.isTypeDecl && isNamedByOtherExport(sourceFiles.get(repoPath)!, name));
   });
-  return reported.map(({ repoPath, name }) => {
+  const severity = settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
+  const exports = reported.map(({ repoPath, name }): IUnwiredExport => {
     const { site } = sites.get(`${repoPath}\0${name}`)!;
-    return {
-      repoPath,
-      line: site.line,
-      name,
-      severity: settings.severity?.parity ?? DEFAULT_SEVERITY.parity,
-      kind: kindOfSite(site, name),
-    };
-  }).sort((left, right) =>
+    return { repoPath, line: site.line, name, severity, kind: kindOfSite(site, name) };
+  });
+  const members = (enumMembers
+    ? findUnusedEnumMembers({
+      graph,
+      sourceFiles,
+      isScanned: (repoPath) => isParityScanPath(repoPath, settings),
+    })
+    : []).map((member): IUnwiredExport => ({
+      repoPath: member.repoPath,
+      line: member.line,
+      name: `${member.enumName}.${member.member}`,
+      severity,
+      kind: "enum-member",
+    }));
+  return [...exports, ...members].sort((left, right) =>
     left.repoPath.localeCompare(right.repoPath) || left.line - right.line || left.name.localeCompare(right.name)
   );
 }
@@ -687,6 +701,7 @@ export async function checkRepository(
   includeExempt: boolean,
   settings: IUnusedExportsSettings,
   parity = false,
+  enumMembers = false,
 ): Promise<IUnusedExportsReport> {
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
   const exportMap = new Map<string, IExportSite[]>();
@@ -703,7 +718,7 @@ export async function checkRepository(
     if (scanExports) parseExports(sourceFile, repoPath, exportMap, settings, parity);
   }
   if (parity) {
-    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings);
+    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings, enumMembers);
     return { includeExempt, findings, topDirectories: [] };
   }
   resolveBarrelReExports(files, cache, exportMap, settings);

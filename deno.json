@@ -36,6 +36,7 @@
     "cli:report": "deno run --allow-read --allow-env --allow-run=deno src/cli/unslop.ts",
     "cli:report:write": "deno run --allow-read --allow-write --allow-env --allow-run=deno src/cli/unslop.ts",
     "check:unused-exports": "deno run -A src/cli/whole_tree.ts --descriptor=lint/unslop.project.ts --rule=unused-exports --parity --severity=error --fail",
+    "check:unused-enum-members": "deno run -A src/cli/whole_tree.ts --descriptor=lint/unslop.project.ts --rule=unused-exports --parity --enum-members",
     "check:unused-files": "deno run -A src/cli/whole_tree.ts --descriptor=lint/unslop.project.ts --rule=unused-files",
     "bundle": "deno run --allow-read --allow-write --allow-env --allow-run=deno scripts/bundle.ts",
     "deno-policy": "deno run --allow-read --allow-write --allow-env --allow-run=deno,git src/cli/unslop.ts deno-policy",

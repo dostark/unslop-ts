@@ -40,19 +40,29 @@ interface IForward {
 }
 
 /** The module edges of one file. */
-interface IModuleEdges {
+export interface IModuleEdges {
   readonly forwards: Map<string, IForward>;
   readonly stars: string[];
   readonly imports: Array<{ readonly specifier: string; readonly use: ImportUse }>;
 }
 
-/** The inputs of one resolved run. */
-export interface IResolvedInput {
+/** The inputs of the module graph. */
+export interface IGraphInput {
   readonly repoRoot: string;
   readonly sourceFiles: ReadonlyMap<string, ts.SourceFile>;
-  readonly candidates: readonly IExportCandidate[];
   readonly walkSkipPatterns: readonly string[];
   readonly publicEntries: readonly string[];
+}
+
+/** The resolved import graph of the scanned files. */
+export interface IModuleGraph {
+  readonly edges: ReadonlyMap<string, IModuleEdges>;
+  /** The scanned files that an import specifier of `from` may name. */
+  readonly targetsOf: (from: string, specifier: string) => string[];
+  /** The files that a consumer outside the walk imports: manifest exports and the configured entries. */
+  readonly publicFiles: ReadonlySet<string>;
+  /** The configured `publicEntries` files only, for checks that a manifest export does not exempt. */
+  readonly configuredFiles: ReadonlySet<string>;
 }
 
 /** What the manifests below the root give: import map entries, and the files that they publish as API. */
@@ -165,21 +175,37 @@ function collectEdges(sourceFile: ts.SourceFile): IModuleEdges {
   return edges;
 }
 
-/**
- * Lists the candidates that no import reaches. An import marks the site it names and every site along the
- * re-export chain behind it. A named re-export is not an import, so a barrel entry that nobody imports through the
- * barrel stays unused even when the definition behind it is used elsewhere.
- */
-export async function findUnusedCandidates(input: IResolvedInput): Promise<IExportCandidate[]> {
+/** Builds the import graph: the edges of every file, the specifier resolution, and the public entry files. */
+export async function buildModuleGraph(input: IGraphInput): Promise<IModuleGraph> {
   const manifests = await scanManifests(input.repoRoot, input.walkSkipPatterns);
   const resolveAlias = createImportResolver(manifests.importMap);
   const edges = new Map<string, IModuleEdges>();
   for (const [repoPath, sourceFile] of input.sourceFiles) edges.set(repoPath, collectEdges(sourceFile));
   const known = new Set(edges.keys());
-  const targetsOf = (from: string, specifier: string): string[] =>
-    resolveSpecifier(from, specifier, resolveAlias).filter((target) => known.has(target));
+  const isConfiguredEntry = globMatcher(input.publicEntries);
+  const configuredFiles = new Set([...known].filter(isConfiguredEntry));
+  const publicFiles = new Set([...manifests.publicEntries, ...configuredFiles].filter((path) => known.has(path)));
+  return {
+    edges,
+    publicFiles,
+    configuredFiles,
+    targetsOf: (from, specifier) =>
+      resolveSpecifier(from, specifier, resolveAlias).filter((target) => known.has(target)),
+  };
+}
+
+/**
+ * Lists the candidates that no import reaches. An import marks the site it names and every site along the
+ * re-export chain behind it. A named re-export is not an import, so a barrel entry that nobody imports through the
+ * barrel stays unused even when the definition behind it is used elsewhere.
+ */
+export function findUnusedCandidates(
+  graph: IModuleGraph,
+  candidates: readonly IExportCandidate[],
+): IExportCandidate[] {
+  const { edges, targetsOf } = graph;
   const namesByFile = new Map<string, string[]>();
-  for (const { repoPath, name } of input.candidates) {
+  for (const { repoPath, name } of candidates) {
     namesByFile.set(repoPath, [...(namesByFile.get(repoPath) ?? []), name]);
   }
 
@@ -219,8 +245,6 @@ export async function findUnusedCandidates(input: IResolvedInput): Promise<IExpo
     }
   }
   // A published entry file is consumed from outside the walk, as a namespace import of the whole file.
-  const isConfiguredEntry = globMatcher(input.publicEntries);
-  const publicFiles = new Set([...manifests.publicEntries, ...[...known].filter(isConfiguredEntry)]);
-  for (const entry of publicFiles) if (known.has(entry)) markAll(entry, new Set());
-  return input.candidates.filter(({ repoPath, name }) => !used.has(keyOf(repoPath, name)));
+  for (const entry of graph.publicFiles) markAll(entry, new Set());
+  return candidates.filter(({ repoPath, name }) => !used.has(keyOf(repoPath, name)));
 }

@@ -8,7 +8,7 @@
  *
  * Usage:
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=constant-restatement
- *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity] [--severity=warn|error] [--relaxed] [--fail]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-exports [--all] [--parity [--enum-members]] [--severity=warn|error] [--relaxed] [--fail]
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=unused-files [--manifest | --conventions] [--fail]
  *   `--strict` stays as a deprecated alias of `--fail`.
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=optional-params [--include-tests] [--verbose] [--fail] [--fix] [--staged]
@@ -117,6 +117,9 @@ function unwiredScope(finding: IUnwiredExport, includeExempt: boolean): string {
       ? "is a type alias exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API."
       : "is an interface exported and never imported; add `// unslop-ignore-next-line unused-type` above it if it is intentional API.";
   }
+  if (finding.kind === "enum-member") {
+    return "is an enum member that no reference reaches; add `// unslop-ignore-next-line unused-enum-member` above it if it is part of a closed set.";
+  }
   if (finding.kind === "default") {
     return "is the default export and never imported; add `// unslop-ignore-next-line unused-export` above it if it is intentional API.";
   }
@@ -177,8 +180,9 @@ async function runUnusedExports(
   fail: boolean,
   settings: IUnusedExportsSettings,
   parity: boolean,
+  enumMembers: boolean,
 ): Promise<void> {
-  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings, parity);
+  const report = await checkUnusedExports(Deno.cwd(), includeExempt, settings, parity, enumMembers);
   if (report.findings.length === 0) {
     console.log(includeExempt ? "✅ No unwired exports found." : "✅ No unwired exports found in the broad report.");
     return;
@@ -660,7 +664,9 @@ async function runUnusedRule(settings: IWholeTreeSettings, args: readonly string
     ...settings.unusedExports,
     severity: { type: override, value: override, parity: override },
   };
-  await runUnusedExports(includeExempt, fail, configured, parity);
+  const enumMembers = args.includes("--enum-members");
+  if (enumMembers && !parity) exitWithUsage("--enum-members needs --parity.");
+  await runUnusedExports(includeExempt, fail, configured, parity, enumMembers);
 }
 
 async function main(): Promise<void> {

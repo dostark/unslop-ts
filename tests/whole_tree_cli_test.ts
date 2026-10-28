@@ -476,3 +476,36 @@ Deno.test("unused-files --manifest exits 2 when the catalog has no manifest sect
     assertStringIncludes(result.stderr, "wholeTree.unusedFiles.manifest");
   });
 });
+
+const UNUSED_EXPORTS_SECTION = {
+  productionRoots: ["src/"],
+  testSegments: ["/tests/"],
+  testSuffixes: ["_test.ts"],
+  entrypointSuffixes: ["/mod.ts"],
+  mainEntrypointSuffixes: ["/main.ts"],
+  scriptRoot: "scripts",
+  walkSkipPatterns: ["node_modules"],
+  strictSkipPrefixes: [],
+  strictSkipSegments: [],
+};
+
+Deno.test("unused-exports --enum-members needs --parity and then lists the unused members", async () => {
+  await inTempDir(async (dir) => {
+    await Deno.writeTextFile(
+      join(dir, "catalog.json"),
+      JSON.stringify({ version: "1", wholeTree: { unusedExports: UNUSED_EXPORTS_SECTION } }),
+    );
+    await Deno.mkdir(join(dir, "src"));
+    await Deno.writeTextFile(join(dir, "src/mode.ts"), "export enum Mode {\n  Fast,\n  Slow,\n}\n");
+    await Deno.writeTextFile(join(dir, "src/use.ts"), 'import { Mode } from "./mode.ts";\nconsole.log(Mode.Fast);\n');
+    const args = ["run", "-A", CLI, "--rule=unused-exports", "--catalog=catalog.json"];
+    const refused = await runDeno([...args, "--enum-members"], dir);
+    assertEquals(refused.code, USAGE_EXIT);
+    assertStringIncludes(refused.stderr, "--enum-members needs --parity");
+    const listed = await runDeno([...args, "--parity", "--enum-members"], dir);
+    assertEquals(listed.code, 0, listed.stderr);
+    assertStringIncludes(listed.stdout, "'Mode.Slow' is an enum member");
+    const plain = await runDeno([...args, "--parity"], dir);
+    assertEquals(plain.stdout.includes("Mode.Slow"), false);
+  });
+});

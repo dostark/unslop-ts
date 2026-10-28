@@ -488,7 +488,11 @@ the module that defines the export and follows named and star re-exports, so a n
 never hides an unused export, and a barrel entry that nobody imports through the barrel is reported. The files that
 a manifest exports (`exports`, `lint.plugins`, `main`, `module`, `bin`) and the `publicEntries` globs are public API,
 with everything they forward. An exported type that another exported declaration of the same file names is part of
-that declaration's API and is not reported. The
+that declaration's API and is not reported. `--parity --enum-members` adds the enum members that no `Enum.Member`
+reference reaches. A reference resolves through imports, aliases, barrels, and namespace imports, and an enum used as
+a whole value (`Object.values`, `z.nativeEnum`, `keyof typeof`, a computed access, a `Record` key) uses every member.
+Only a `publicEntries` file makes an enum public API. `// unslop-ignore-next-line unused-enum-member` above a member,
+or above the enum for a closed set, exempts it. The
 `severity` option sets each class (`type`, `value`, `parity`) to `warning` or `error`;
 `--severity=warn|error` and `--relaxed` override it for one run. `configurable(…)` registrations and
 `__test_*` hooks stay exempt, and `// unslop-ignore-next-line unused-export` marks an intentional
