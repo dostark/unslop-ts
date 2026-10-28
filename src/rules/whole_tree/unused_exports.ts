@@ -220,6 +220,7 @@ async function collectProductionFiles(
     files.push(repoPath);
     cache.set(repoPath, { text: await Deno.readTextFile(entry.path), sourceFile: null });
   }
+  files.sort();
   return { files, cache };
 }
 
