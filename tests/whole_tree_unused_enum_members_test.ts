@@ -28,7 +28,10 @@ const ENUM_SOURCE = "export enum Mode {\n  Fast = 'fast',\n  Slow = 'slow',\n  I
 
 /** The unwired enum members of the parity report as `path:Enum.Member`. */
 async function unusedMembers(root: string, overrides: Partial<IUnusedExportsSettings> = {}): Promise<string[]> {
-  const report = await checkRepository(root, false, { ...SETTINGS, ...overrides }, true, true);
+  const report = await checkRepository(root, false, { ...SETTINGS, ...overrides }, true, {
+    enumMembers: true,
+    classMembers: false,
+  });
   return report.findings.filter((finding) => finding.kind === "enum-member").map((finding) =>
     `${finding.repoPath}:${finding.name}`
   );
@@ -182,7 +185,7 @@ Deno.test("an enum member finding carries its line and the dotted name", async (
   await withRepo(async (root) => {
     await write(root, "packages/p/src/mode.ts", ENUM_SOURCE);
     await write(root, "packages/p/use.ts", 'import { Mode } from "./src/mode.ts";\nconsole.log(Mode.Fast);\n');
-    const report = await checkRepository(root, false, SETTINGS, true, true);
+    const report = await checkRepository(root, false, SETTINGS, true, { enumMembers: true, classMembers: false });
     const member = report.findings.find((finding) => finding.name === "Mode.Slow");
     assertEquals([member?.kind, member?.line], ["enum-member", 3]);
   });

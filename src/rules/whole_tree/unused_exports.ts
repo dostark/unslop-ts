@@ -12,8 +12,9 @@ import ts from "typescript";
 import { walk } from "@std/fs";
 import { dirname, join, normalize } from "@std/path";
 import type { IUnusedExportsSettings } from "./options.ts";
+import { findUnusedClassMembers } from "./unused_class_members.ts";
 import { findUnusedEnumMembers } from "./unused_enum_members.ts";
-import { buildModuleGraph, findUnusedCandidates } from "./unused_exports_resolved.ts";
+import { buildModuleGraph, findUnusedCandidates, type IModuleGraph } from "./unused_exports_resolved.ts";
 
 /** One exported declaration site. */
 export interface IExportSite {
@@ -35,7 +36,14 @@ export type TUnwiredSeverity = "warning" | "error";
 const DEFAULT_SEVERITY = { type: "warning", value: "error", parity: "error" } as const;
 
 /** The declaration shape an unwired export finding comes from. */
-export type TUnwiredKind = "export" | "interface" | "type-alias" | "default" | "namespace" | "enum-member";
+export type TUnwiredKind =
+  | "export"
+  | "interface"
+  | "type-alias"
+  | "default"
+  | "namespace"
+  | "enum-member"
+  | "class-member";
 
 /** One unwired export. */
 export interface IUnwiredExport {
@@ -633,13 +641,50 @@ function isNamedByOtherExport(sourceFile: ts.SourceFile, name: string): boolean 
   return owners.length >= 2;
 }
 
+/** The optional member reports of the parity run. Each one is advisory and needs `--parity`. */
+export interface IMemberReports {
+  readonly enumMembers: boolean;
+  readonly classMembers: boolean;
+}
+
+const NO_MEMBER_REPORTS: IMemberReports = { enumMembers: false, classMembers: false };
+
+/** The enum member and class member findings that the run asked for. */
+function memberFindings(
+  graph: IModuleGraph,
+  sourceFiles: ReadonlyMap<string, ts.SourceFile>,
+  settings: IUnusedExportsSettings,
+  reports: IMemberReports,
+): IUnwiredExport[] {
+  const severity = settings.severity?.parity ?? DEFAULT_SEVERITY.parity;
+  const isScanned = (repoPath: string): boolean => isParityScanPath(repoPath, settings);
+  const enums = reports.enumMembers ? findUnusedEnumMembers({ graph, sourceFiles, isScanned }) : [];
+  const classes = reports.classMembers ? findUnusedClassMembers({ graph, sourceFiles, isScanned }) : [];
+  return [
+    ...enums.map((member): IUnwiredExport => ({
+      repoPath: member.repoPath,
+      line: member.line,
+      name: `${member.enumName}.${member.member}`,
+      severity,
+      kind: "enum-member",
+    })),
+    ...classes.map((member): IUnwiredExport => ({
+      repoPath: member.repoPath,
+      line: member.line,
+      name: `${member.className}.${member.member}`,
+      severity,
+      kind: "class-member",
+    })),
+  ];
+}
+
 /** Fallow-parity findings: an export site is unwired when no import resolves to that module and name. */
 async function resolvedParityFindings(
   repoRoot: string,
   sourceFiles: ReadonlyMap<string, ts.SourceFile>,
   exportMap: ReadonlyMap<string, readonly IExportSite[]>,
   settings: IUnusedExportsSettings,
-  enumMembers: boolean,
+  reports: IMemberReports,
 ): Promise<IUnwiredExport[]> {
   const sites = new Map<string, IParitySite>();
   for (const [name, declared] of exportMap) {
@@ -668,20 +713,7 @@ async function resolvedParityFindings(
     const { site } = sites.get(`${repoPath}\0${name}`)!;
     return { repoPath, line: site.line, name, severity, kind: kindOfSite(site, name) };
   });
-  const members = (enumMembers
-    ? findUnusedEnumMembers({
-      graph,
-      sourceFiles,
-      isScanned: (repoPath) => isParityScanPath(repoPath, settings),
-    })
-    : []).map((member): IUnwiredExport => ({
-      repoPath: member.repoPath,
-      line: member.line,
-      name: `${member.enumName}.${member.member}`,
-      severity,
-      kind: "enum-member",
-    }));
-  return [...exports, ...members].sort((left, right) =>
+  return [...exports, ...memberFindings(graph, sourceFiles, settings, reports)].sort((left, right) =>
     left.repoPath.localeCompare(right.repoPath) || left.line - right.line || left.name.localeCompare(right.name)
   );
 }
@@ -701,7 +733,7 @@ export async function checkRepository(
   includeExempt: boolean,
   settings: IUnusedExportsSettings,
   parity = false,
-  enumMembers = false,
+  reports: IMemberReports = NO_MEMBER_REPORTS,
 ): Promise<IUnusedExportsReport> {
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
   const exportMap = new Map<string, IExportSite[]>();
@@ -718,7 +750,7 @@ export async function checkRepository(
     if (scanExports) parseExports(sourceFile, repoPath, exportMap, settings, parity);
   }
   if (parity) {
-    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings, enumMembers);
+    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings, reports);
     return { includeExempt, findings, topDirectories: [] };
   }
   resolveBarrelReExports(files, cache, exportMap, settings);

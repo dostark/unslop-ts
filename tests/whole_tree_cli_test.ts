@@ -489,7 +489,7 @@ const UNUSED_EXPORTS_SECTION = {
   strictSkipSegments: [],
 };
 
-Deno.test("unused-exports --enum-members needs --parity and then lists the unused members", async () => {
+Deno.test("unused-exports --enum-members and --class-members need --parity and then list the unused members", async () => {
   await inTempDir(async (dir) => {
     await Deno.writeTextFile(
       join(dir, "catalog.json"),
@@ -497,15 +497,25 @@ Deno.test("unused-exports --enum-members needs --parity and then lists the unuse
     );
     await Deno.mkdir(join(dir, "src"));
     await Deno.writeTextFile(join(dir, "src/mode.ts"), "export enum Mode {\n  Fast,\n  Slow,\n}\n");
-    await Deno.writeTextFile(join(dir, "src/use.ts"), 'import { Mode } from "./mode.ts";\nconsole.log(Mode.Fast);\n');
+    await Deno.writeTextFile(join(dir, "src/box.ts"), "export class Box {\n  open() {}\n  idle() {}\n}\n");
+    await Deno.writeTextFile(
+      join(dir, "src/use.ts"),
+      'import { Mode } from "./mode.ts";\nimport { Box } from "./box.ts";\nconsole.log(Mode.Fast, new Box().open());\n',
+    );
     const args = ["run", "-A", CLI, "--rule=unused-exports", "--catalog=catalog.json"];
     const refused = await runDeno([...args, "--enum-members"], dir);
     assertEquals(refused.code, USAGE_EXIT);
-    assertStringIncludes(refused.stderr, "--enum-members needs --parity");
+    assertStringIncludes(refused.stderr, "--enum-members and --class-members need --parity");
     const listed = await runDeno([...args, "--parity", "--enum-members"], dir);
     assertEquals(listed.code, 0, listed.stderr);
     assertStringIncludes(listed.stdout, "'Mode.Slow' is an enum member");
+    const classRefused = await runDeno([...args, "--class-members"], dir);
+    assertEquals(classRefused.code, USAGE_EXIT);
+    const classes = await runDeno([...args, "--parity", "--class-members"], dir);
+    assertEquals(classes.code, 0, classes.stderr);
+    assertStringIncludes(classes.stdout, "'Box.idle' is a class member");
+    assertEquals(classes.stdout.includes("Mode.Slow"), false);
     const plain = await runDeno([...args, "--parity"], dir);
-    assertEquals(plain.stdout.includes("Mode.Slow"), false);
+    assertEquals(plain.stdout.includes("Mode.Slow") || plain.stdout.includes("Box.idle"), false);
   });
 });

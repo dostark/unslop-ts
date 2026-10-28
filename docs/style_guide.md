@@ -511,6 +511,10 @@ default exports, and namespaces, and it asks which export each import reaches.
   (`Object.values`, `z.nativeEnum`, `keyof typeof`, a computed access, a `Record` key) uses every member. Only a
   `publicEntries` file makes an enum public API. `// unslop-ignore-next-line unused-enum-member` above a member, or
   above the enum for a closed set, exempts it.
+- `--parity --class-members` adds the class members that nothing reads. A private member is checked inside its class, and
+  a public method or accessor is listed when its name is accessed nowhere. A member that an implemented interface, an
+  extended base, `override`, or the runtime calls is a contract. `// unslop-ignore-next-line unused-class-member`
+  exempts a member, or a class when it sits above the class.
 
 The README holds the reference: flags, the matching rules, the options, the markers, and the limits of the check.
 
