@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { type IProjectDescriptor, TYPESCRIPT_RULE_PACK, WHOLE_TREE_CHECKS } from "../../mod.ts";
+import { type IProjectDescriptor, TYPESCRIPT_RULE_PACK } from "../../mod.ts";
 
 const ROOT_URL = new URL("file:///project/");
 

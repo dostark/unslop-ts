@@ -10,19 +10,10 @@
 import { assertEquals } from "@std/assert";
 import { checkRepository } from "../src/rules/whole_tree/unused_exports.ts";
 import type { IUnusedExportsSettings } from "../src/rules/whole_tree/options.ts";
+import { PARITY_SETTINGS } from "./helpers/parity_settings.ts";
 import { withRepo, write } from "./helpers/temp_repo.ts";
 
-const SETTINGS: IUnusedExportsSettings = {
-  productionRoots: ["packages/"],
-  testSegments: ["/tests/", "/testing/"],
-  testSuffixes: ["_test.ts"],
-  entrypointSuffixes: ["/mod.ts"],
-  mainEntrypointSuffixes: ["/main.ts"],
-  scriptRoot: "scripts",
-  walkSkipPatterns: ["node_modules"],
-  strictSkipPrefixes: [],
-  strictSkipSegments: [],
-};
+const SETTINGS: IUnusedExportsSettings = { ...PARITY_SETTINGS, testSegments: ["/tests/", "/testing/"] };
 
 /** The findings of a parity run as `name (usedBy)`, in report order. */
 async function findings(
