@@ -536,6 +536,11 @@ export, which the name match cannot see.
 - **Import forms.** A named or default import uses that export. `import * as ns` uses the members that the file reads
   as `ns.member`, and every export when `ns` is passed on or indexed. A destructured `await import(…)` uses the names
   it binds, and a property read on its result uses that property. Any other dynamic import uses every export.
+- **An unread binding is not a use.** An import whose local binding the file never reads uses nothing. The idiom
+  `import { type helper as _helper }`, which only silences an unused-import warning, does not keep `helper` alive. A
+  read in a type position or in an export list counts as a read.
+- **Default exports.** A default export is a site like any other and is used by a default import. `export * from`
+  does not carry it, because the language does not re-export a default through a star.
 - **Where a use may come from.** Any walked file counts, including tests and scripts. A file that imports from itself
   does not.
 - **Public API.** The files that a manifest hands to consumers outside the walk are consumed as a whole: `exports`
@@ -560,7 +565,8 @@ its own enum reads a sibling.
 An enum used as a whole value uses every member, because the code can reach any of them: `Object.values(Enum)`,
 `z.nativeEnum(Enum)`, `keyof typeof Enum`, `Enum[key]`, `Enum` passed as an argument, an export under another name, a
 default export, and an enum as the key type of `Record`, `Partial`, `Required`, `Omit`, `Pick`, `Exclude`, `Extract`,
-or a mapped type. An enum named only as a type (`mode: Mode`) uses no member.
+or a mapped type. An enum named only as a type (`mode: Mode`) uses no member. A membership test with a literal key
+(`"Fast" in Mode`) names that one member, and a computed key (`key in Mode`) uses every member.
 
 A manifest export does not make an enum public, because the workspace packages of a repository are often consumed only
 inside it. A `publicEntries` file does, and so does a pragma. The pragma exempts a member when it sits above the member.
@@ -576,10 +582,16 @@ carry can break a cast or the parse of a stored value.
 - **Private members.** A `private` member, a `#name` member, and a private constructor parameter property are checked
   inside the class body, where TypeScript confines them. A member is unused when the class never reads it. A field
   that the class only assigns (`this.x = value`) counts as unused.
-- **Public and protected methods and accessors.** A member is listed only when its name is accessed nowhere in the
-  walked files, tests included. An access is `.name`, `?.name`, `["name"]`, a destructured `{ name }`, or
-  `Type["name"]`. A call inside the class counts. The match is by name, so an unrelated member with the same name
-  hides a dead one. The report never lists a member that a name match finds used.
+- **Public and protected methods and accessors.** A member is listed only when no access of its name can reach its
+  class in the walked files, tests included. An access is `.name`, `?.name`, `["name"]`, a destructured `{ name }`, or
+  `Type["name"]`. A call inside the class counts. The check ties an access to a class from the syntax of its receiver:
+  `this` and `super`; a `new Class()` expression; a name that a parameter, a variable, or a field declares with a class
+  type or a `new` initializer; the return type of a method; `Class.member` for a static; a cast `x as Class`; and a
+  destructuring source. A type or a base also reaches its ancestors and its subclasses, because a call can run an
+  override, and an `instanceof` check narrows to a subclass. A receiver of any other shape, such as a callback
+  parameter without a type, a result of a plain function, or a value typed as an interface, can be any class, so
+  its name hides the member in every class. A class declared in a test file is matched by name alone, because a test
+  double is cast to the class it replaces.
 - **Public fields are not listed.** Serialization, equality checks, and `Object.keys` can read a field without naming it.
 
 A member that a caller can reach without naming it is a contract and is never listed:
@@ -670,7 +682,9 @@ The checks read syntax only. They build no type program, so they do not follow t
 - `export =`, declaration merging, and an ambient or global declaration;
 - a local variable that has the name of an imported binding, because the check does not model scopes;
 - an enum value that code reads as a string, such as `"fast"` from a database column;
-- a method that code calls by a computed name (`obj[name]()`), and a callback that a framework invokes by name.
+- a method that code calls by a computed name (`obj[name]()`), and a callback that a framework invokes by name;
+- a production object that stands in for a class it does not extend or implement, passed through a cast or a structural
+  type, because an access then names the class of the annotation and not the class of the object.
 
 When a result looks wrong, the cause is usually one of these. List the consumer as a `publicEntries` file, add the
 pragma, or add the import map entry.

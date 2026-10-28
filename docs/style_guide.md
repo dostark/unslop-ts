@@ -512,7 +512,7 @@ default exports, and namespaces, and it asks which export each import reaches.
   `publicEntries` file makes an enum public API. `// unslop-ignore-next-line unused-enum-member` above a member, or
   above the enum for a closed set, exempts it.
 - `--parity --class-members` adds the class members that nothing reads. A private member is checked inside its class, and
-  a public method or accessor is listed when its name is accessed nowhere. A member that an implemented interface, an
+  a public method or accessor is listed when no access of its name can reach its class, judged by the type of the receiver. A member that an implemented interface, an
   extended base, `override`, or the runtime calls is a contract. `// unslop-ignore-next-line unused-class-member`
   exempts a member, or a class when it sits above the class.
 - `--parity --production` stops counting test files as sources of uses and labels each finding as used by nothing or used
