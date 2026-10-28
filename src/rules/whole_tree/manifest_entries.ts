@@ -121,6 +121,17 @@ export function readPackageManifest(dir: string, json: unknown): IManifestFacts 
   return factsOf(dir, fieldPaths, commandsOf(dir, json.scripts));
 }
 
+/**
+ * The files that a manifest hands to a consumer outside the walk: `exports` and `lint.plugins` of a deno.json, and
+ * `main`, `module`, `bin`, `exports` of a package.json.
+ */
+export function readPublicEntries(dir: string, json: unknown, isPackageJson: boolean): string[] {
+  if (!isRecord(json)) return [];
+  const plugins = isRecord(json.lint) ? json.lint.plugins : undefined;
+  const fields = isPackageJson ? [json.main, json.module, json.bin, json.exports] : [json.exports, plugins];
+  return fields.flatMap(leafStrings).map((path) => resolveIn(dir, path));
+}
+
 /** True when running `deno test` in the manifest directory is how its tests run: a `test` section or a `deno test` task. */
 export function ownsTestScope(json: unknown): boolean {
   if (!isRecord(json)) return false;
@@ -169,6 +180,15 @@ export function createImportResolver(entries: readonly IImportMapEntry[]): (spec
     }
     return targets;
   };
+}
+
+/** The repository paths that an import specifier may name: relative to the importer, or through the import maps. */
+export function resolveSpecifier(
+  fromPath: string,
+  specifier: string,
+  resolveAlias: (specifier: string) => string[],
+): string[] {
+  return specifier.startsWith(".") ? [resolveIn(dirname(fromPath), specifier)] : resolveAlias(specifier);
 }
 
 /** The code paths that a text names, as written in the text. */

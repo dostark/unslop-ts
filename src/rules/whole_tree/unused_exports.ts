@@ -12,6 +12,7 @@ import ts from "typescript";
 import { walk } from "@std/fs";
 import { dirname, join, normalize } from "@std/path";
 import type { IUnusedExportsSettings } from "./options.ts";
+import { findUnusedCandidates } from "./unused_exports_resolved.ts";
 
 /** One exported declaration site. */
 export interface IExportSite {
@@ -171,7 +172,7 @@ function resolveImport(importerRepoPath: string, importPath: string): string | n
 }
 
 /** Names imported by the repository's own wiring scripts, which are not scanned as production. */
-export async function collectScriptImportedNames(
+async function collectScriptImportedNames(
   repoRoot: string,
   settings: IUnusedExportsSettings,
 ): Promise<Set<string>> {
@@ -294,7 +295,6 @@ function parseImports(
   sourceFile: ts.SourceFile,
   repoPath: string,
   importMap: Map<string, Set<string>>,
-  parity: boolean,
 ): void {
   ts.forEachChild(sourceFile, (node) => {
     if (ts.isImportDeclaration(node) && node.importClause) {
@@ -314,11 +314,7 @@ function parseImports(
       }
       return;
     }
-    // A named re-export forwards a symbol; in parity mode it does not count as a consumer.
-    if (
-      !parity && ts.isExportDeclaration(node) && node.exportClause &&
-      ts.isNamedExports(node.exportClause)
-    ) {
+    if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
       for (const el of node.exportClause.elements) {
         recordImport(el.propertyName?.text ?? el.name.text, repoPath, importMap);
       }
@@ -568,29 +564,6 @@ function kindOfSite(site: IExportSite, name: string): TUnwiredKind {
   return name === "default" ? "default" : "export";
 }
 
-/** Fallow-parity findings: one finding per unwired name, with no exemption list. */
-function collectParityFindings(
-  exportMap: Map<string, IExportSite[]>,
-  importMap: Map<string, Set<string>>,
-  settings: IUnusedExportsSettings,
-): IUnwiredExport[] {
-  const findings: IUnwiredExport[] = [];
-  for (const [name, sites] of exportMap) {
-    if (importMap.has(name)) continue;
-    if (isTestExport(name)) continue;
-    const site = sites.find((entry) => !entry.isBarrelPassThrough) ?? sites[0];
-    if (site === undefined || site.isConfigurable || site.hasIgnorePragma) continue;
-    findings.push({
-      repoPath: site.repoPath,
-      line: site.line,
-      name,
-      severity: settings.severity?.parity ?? DEFAULT_SEVERITY.parity,
-      kind: kindOfSite(site, name),
-    });
-  }
-  return findings;
-}
-
 function collectFindings(
   exportMap: Map<string, IExportSite[]>,
   importMap: Map<string, Set<string>>,
@@ -598,9 +571,7 @@ function collectFindings(
   scriptImportedNames: Set<string>,
   settings: IUnusedExportsSettings,
   includeExempt: boolean,
-  parity: boolean,
 ): IUnwiredExport[] {
-  if (parity) return collectParityFindings(exportMap, importMap, settings);
   const findings: IUnwiredExport[] = [];
   for (const [name, sites] of exportMap) {
     if (importMap.has(name)) continue;
@@ -634,6 +605,73 @@ function collectFindings(
   return findings;
 }
 
+/** One export site of the parity scan, with the declaration facts the finding needs. */
+interface IParitySite {
+  readonly name: string;
+  readonly site: IExportSite;
+}
+
+/** True when the statement mentions the identifier anywhere inside it. */
+function mentions(statement: ts.Node, name: string): boolean {
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (ts.isIdentifier(node) && node.text === name) found = true;
+    else ts.forEachChild(node, visit);
+  };
+  visit(statement);
+  return found;
+}
+
+/**
+ * True when an exported declaration other than the type's own names the type. Such a type is part of that
+ * declaration's API: removing its export would leave a private type in a public signature.
+ */
+function isNamedByOtherExport(sourceFile: ts.SourceFile, name: string): boolean {
+  const owners = sourceFile.statements.filter((statement) => hasExportModifier(statement) && mentions(statement, name));
+  return owners.length >= 2;
+}
+
+/** Fallow-parity findings: an export site is unwired when no import resolves to that module and name. */
+async function resolvedParityFindings(
+  repoRoot: string,
+  sourceFiles: ReadonlyMap<string, ts.SourceFile>,
+  exportMap: ReadonlyMap<string, readonly IExportSite[]>,
+  settings: IUnusedExportsSettings,
+): Promise<IUnwiredExport[]> {
+  const sites = new Map<string, IParitySite>();
+  for (const [name, declared] of exportMap) {
+    if (isTestExport(name)) continue;
+    for (const site of declared) {
+      const key = `${site.repoPath}\0${name}`;
+      if (!site.isConfigurable && !site.hasIgnorePragma && !sites.has(key)) sites.set(key, { name, site });
+    }
+  }
+  const unused = await findUnusedCandidates({
+    repoRoot,
+    sourceFiles,
+    candidates: [...sites.values()].map(({ name, site }) => ({ repoPath: site.repoPath, name })),
+    walkSkipPatterns: settings.walkSkipPatterns,
+    publicEntries: settings.publicEntries ?? [],
+  });
+  const reported = unused.filter(({ repoPath, name }) => {
+    const { site } = sites.get(`${repoPath}\0${name}`)!;
+    return !(site.isTypeDecl && isNamedByOtherExport(sourceFiles.get(repoPath)!, name));
+  });
+  return reported.map(({ repoPath, name }) => {
+    const { site } = sites.get(`${repoPath}\0${name}`)!;
+    return {
+      repoPath,
+      line: site.line,
+      name,
+      severity: settings.severity?.parity ?? DEFAULT_SEVERITY.parity,
+      kind: kindOfSite(site, name),
+    };
+  }).sort((left, right) =>
+    left.repoPath.localeCompare(right.repoPath) || left.line - right.line || left.name.localeCompare(right.name)
+  );
+}
+
 function rankDirectories(findings: readonly IUnwiredExport[]): Array<[string, number]> {
   const byDir = new Map<string, number>();
   for (const finding of findings) {
@@ -653,17 +691,23 @@ export async function checkRepository(
   const { files, cache } = await collectProductionFiles(repoRoot, settings);
   const exportMap = new Map<string, IExportSite[]>();
   const importMap = new Map<string, Set<string>>();
+  const sourceFiles = new Map<string, ts.SourceFile>();
   for (const repoPath of files) {
     const sourceFile = ts.createSourceFile(repoPath, cache.get(repoPath)!.text, ts.ScriptTarget.Latest, true);
     cache.get(repoPath)!.sourceFile = sourceFile;
-    parseImports(sourceFile, repoPath, importMap, parity);
+    sourceFiles.set(repoPath, sourceFile);
+    if (!parity) parseImports(sourceFile, repoPath, importMap);
     const scanExports = parity
       ? isParityScanPath(repoPath, settings)
       : !isTestFilePath(repoPath, settings) && isProductionRoot(repoPath, settings);
     if (scanExports) parseExports(sourceFile, repoPath, exportMap, settings, parity);
   }
-  if (!parity) resolveBarrelReExports(files, cache, exportMap, settings);
-  const publicFiles = parity ? new Set<string>() : collectPublicFiles(files, cache);
+  if (parity) {
+    const findings = await resolvedParityFindings(repoRoot, sourceFiles, exportMap, settings);
+    return { includeExempt, findings, topDirectories: [] };
+  }
+  resolveBarrelReExports(files, cache, exportMap, settings);
+  const publicFiles = collectPublicFiles(files, cache);
   const scriptImportedNames = await collectScriptImportedNames(repoRoot, settings);
   const findings = collectFindings(
     exportMap,
@@ -672,7 +716,6 @@ export async function checkRepository(
     scriptImportedNames,
     settings,
     includeExempt,
-    parity,
   );
   return { includeExempt, findings, topDirectories: includeExempt ? [] : rankDirectories(findings) };
 }

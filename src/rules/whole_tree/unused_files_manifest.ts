@@ -9,7 +9,7 @@
 
 import ts from "typescript";
 import { walk } from "@std/fs";
-import { basename, dirname, extname, join, normalize, relative } from "@std/path";
+import { basename, dirname, extname, join, relative } from "@std/path";
 import type { IUnusedFilesManifestSettings } from "./options.ts";
 import type { IUnusedFilesReport } from "./unused_files.ts";
 import {
@@ -26,12 +26,12 @@ import {
   readDenoManifest,
   readPackageManifest,
   readTestScope,
+  resolveSpecifier,
 } from "./manifest_entries.ts";
 
 const DENO_MANIFEST = "deno.json";
 const PACKAGE_MANIFEST = "package.json";
 const STYLESHEET_EXTENSION = ".css";
-const DOT_PREFIX = ".";
 const ROOT_DIRECTORY = ".";
 const SCANNED_EXTENSIONS: ReadonlySet<string> = new Set([
   ".ts",
@@ -148,10 +148,9 @@ function targetsOf(
 ): Set<string> {
   const targets = new Set<string>();
   for (const specifier of mentions.specifiers) {
-    const candidates = specifier.startsWith(DOT_PREFIX)
-      ? [normalize(join(dirname(repoPath), specifier))]
-      : resolveAlias(specifier);
-    for (const target of knownCandidates(candidates, known)) targets.add(target);
+    for (const target of knownCandidates(resolveSpecifier(repoPath, specifier, resolveAlias), known)) {
+      targets.add(target);
+    }
   }
   for (const literal of mentions.literals) {
     if (!isPathLiteral(literal)) continue;

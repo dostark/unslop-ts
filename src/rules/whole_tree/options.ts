@@ -104,6 +104,8 @@ export interface IUnusedExportsSettings {
   strictSkipPrefixes: string[];
   strictSkipSegments: string[];
   severity?: IUnusedSeverity;
+  /** Globs of files that a tool consumes, such as a bundle entry. The manifest `exports` are public already. */
+  publicEntries?: string[];
 }
 
 /** Per-class enforcement: a justified class can report a warning instead of an error. */
@@ -303,6 +305,7 @@ export const UnusedExportsSettingsSchema: z.ZodType<IUnusedExportsSettings, IUnu
     value: z.enum(["warning", "error"]),
     parity: z.enum(["warning", "error"]),
   }).strict().optional(),
+  publicEntries: z.array(z.string()).optional(),
 }).strict();
 
 /** One module alias as the catalog states it. */
