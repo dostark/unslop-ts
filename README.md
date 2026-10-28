@@ -326,9 +326,9 @@ Statuses describe the configuration, not the host:
 - `not-selected`: a selection excludes the rule for this call.
 
 A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
-reports the trusted exemption set by default, `--all` widens the report, and only `--fail` fails the run;
-`unused-files` warns until `--fail` (it starts the walk at the entry points of `deno.json` and
-`package.json`, see below); `optional-params` warns until `--fail` or `--staged`. An exported
+reports the trusted exemption set by default, `--all` widens the report, and only `--fail` fails the run (see
+[Unused exports](#unused-exports) for the four reports); `unused-files` warns until `--fail` (it starts the walk at
+the entry points of `deno.json` and `package.json`, see [Unused files](#unused-files-manifest)); `optional-params` warns until `--fail` or `--staged`. An exported
 interface that no file imports reports as a warning and never fails the run; put
 `// unslop-ignore-next-line unused-interface` above it when it is intentional API,
 regardless of the configured level shown by the CLI.
@@ -463,6 +463,154 @@ deno task unslop config print > catalog.json
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-exports
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-files
 ```
+
+### Unused exports {#unused-exports}
+
+`--rule=unused-exports` lists exported declarations that no module imports. It has four reports. They differ in
+how an import is matched to an export, and in what they leave out on purpose.
+
+| Report            | Flags                     | An import matches an export by | Use                                                                 |
+| ----------------- | ------------------------- | ------------------------------ | ------------------------------------------------------------------- |
+| Trusted           | none                      | the bare name                  | the gate: applies the exemption lists, warns for types              |
+| Broad             | `--all`                   | the bare name                  | a survey: drops the exemptions that only the trusted report applies |
+| Parity            | `--parity`                | the module that defines it     | the fallow-aligned audit                                            |
+| Parity with enums | `--parity --enum-members` | the module that defines it     | adds unused enum members, advisory                                  |
+
+```sh
+deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=unused-exports
+deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=unused-exports --parity --fail
+```
+
+| Flag                     | Effect                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `--all`                  | Broad report. Drops the trusted-only exemptions, and prints the directories with the most findings.           |
+| `--parity`               | Resolved report. `--all` has no effect with it.                                                               |
+| `--enum-members`         | Adds the enum members that no `Enum.Member` reference reaches. Needs `--parity`.                              |
+| `--severity=warn\|error` | Sets every class to a warning or an error for this run.                                                       |
+| `--relaxed`              | Same as `--severity=warn`.                                                                                    |
+| `--fail`                 | Exits with 1 when the run holds an error finding. A warning never fails the run. `--strict` is an older name. |
+
+A finding prints as `WARN [unwired-export] path:line – 'name' …` or, with `--fail`, `ERROR …`, and a summary line
+counts the errors and the warnings. The exit code is 0 unless `--fail` meets an error, and 2 for a usage error such
+as a catalog without a `wholeTree.unusedExports` section.
+
+#### The trusted report
+
+The trusted report matches by name: an export counts as used when any walked file, tests included, imports that
+name, re-exports it, reads it as `namespace.name`, or binds it from a destructured `await import(…)`. It then exempts
+exports that a bare-name match cannot judge. These exemptions apply to the trusted and to the broad report:
+
+- a `configurable(…)` registration, a name with the `__test_` prefix, and a declaration with a pragma (see Markers);
+- a name that starts with `I` and a capital letter, a file that carries a `@public` JSDoc tag, and a file that matches
+  `mainEntrypointSuffixes`.
+
+Only the trusted report adds these, and `--all` drops them:
+
+- a name that a package entry file re-exports, a file that matches `entrypointSuffixes`, and a path under
+  `strictSkipPrefixes` or `strictSkipSegments`;
+- the provider metadata constants, test double names such as `…Mock`, `…Stub`, and `mock…`, and entry point names such
+  as `run…`, `start…`, and `main…`;
+- a name that a script under `scriptRoot` imports.
+
+An unused interface or type alias is a warning that `--fail` ignores. It is exempt when it sits in an entry file, in a
+skipped path, or when a script imports it.
+
+#### The parity report
+
+The parity report asks which export each import reaches, and it lists an export site that nothing reaches. It exists
+to match a resolving tool such as fallow. A name that another module exports and imports does not hide an unused
+export, which the name match cannot see.
+
+- **Resolution.** An import resolves through relative paths and through the `imports` map of every `deno.json` below the
+  root. An exact key matches only itself, and a key with a trailing slash is a prefix. A specifier that resolves to no
+  scanned file is ignored.
+- **Chains.** Named re-exports and `export *` carry a use down to the definition. An import through a barrel uses the
+  barrel entry and the definition behind it.
+- **A re-export is not a consumer.** A named re-export (`export { x } from "<module>"`) does not use `x`. A barrel entry that nobody
+  imports through the barrel is reported. A file that imports a name and exports it again from a local list is
+  reported when nobody imports it from there, while its own import still uses the definition.
+- **Import forms.** A named or default import uses that export. `import * as ns` uses the members that the file reads
+  as `ns.member`, and every export when `ns` is passed on or indexed. A destructured `await import(…)` uses the names
+  it binds, and a property read on its result uses that property. Any other dynamic import uses every export.
+- **Where a use may come from.** Any walked file counts, including tests and scripts. A file that imports from itself
+  does not.
+- **Public API.** The files that a manifest hands to consumers outside the walk are consumed as a whole: `exports`
+  and `lint.plugins` of a `deno.json`, and `main`, `module`, `bin`, and `exports` of a `package.json`. So are the files
+  that match the `publicEntries` globs, which is the place for a bundle entry or a fixture that a tool loads by name.
+  Everything a public file forwards is public too.
+- **Types in signatures.** An exported interface or type alias that another exported declaration of the same file
+  names stays: removing its export would leave a private type in a public signature.
+- **Scope.** The report scans the files under `productionRoots` and under `scriptRoot`, and skips `/fixtures/`. Every
+  walked file is still a source of uses.
+- **Exemptions.** `configurable(…)` registrations, `__test_` names, and declarations with the pragma are skipped.
+
+Each finding is one site: the same name in two files gives two findings when both are unused.
+
+#### Enum members
+
+`--parity --enum-members` adds a finding for each enum member that no reference reaches. The name of the finding is
+`Enum.Member`. A reference is `Enum.Member`, `Enum["Member"]`, `ns.Enum.Member`, or `Enum.Member` in a type position,
+and it resolves through imports, aliases, and barrels like an export does. A bare member name inside an initializer of
+its own enum reads a sibling.
+
+An enum used as a whole value uses every member, because the code can reach any of them: `Object.values(Enum)`,
+`z.nativeEnum(Enum)`, `keyof typeof Enum`, `Enum[key]`, `Enum` passed as an argument, an export under another name, a
+default export, and an enum as the key type of `Record`, `Partial`, `Required`, `Omit`, `Pick`, `Exclude`, `Extract`,
+or a mapped type. An enum named only as a type (`mode: Mode`) uses no member.
+
+A manifest export does not make an enum public, because the workspace packages of a repository are often consumed only
+inside it. A `publicEntries` file does, and so does a pragma. The pragma exempts a member when it sits above the member.
+Above the enum declaration it exempts the whole enum, which is the answer for a closed set such as protocol codes or
+stored statuses whose values arrive as data. The report is advisory by design: deleting a member that data can still
+carry can break a cast or the parse of a stored value.
+
+#### Options
+
+The `unused-exports` rule takes these options. Every project sets the required ones, and none has a default.
+
+| Option                                     | Used by | Meaning                                                                                           |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------- |
+| `productionRoots`                          | all     | Path prefixes whose files are scanned for exports.                                                |
+| `testSegments`, `testSuffixes`             | trusted | Path parts and file name endings that mark a test file, which is not scanned for exports.         |
+| `entrypointSuffixes`                       | trusted | File name endings of package entry files, such as a barrel file name.                             |
+| `mainEntrypointSuffixes`                   | trusted | File name endings of program entry files, such as a main file name.                               |
+| `scriptRoot`                               | all     | The directory of wiring scripts. Trusted mode exempts the names they import. Parity scans it.     |
+| `walkSkipPatterns`                         | all     | Regular expressions for the paths that the walk never enters. They match the absolute path.       |
+| `strictSkipPrefixes`, `strictSkipSegments` | trusted | Paths whose exports the trusted report leaves out.                                                |
+| `severity`                                 | all     | `type`, `value`, and `parity`, each `warning` or `error`. The `parity` class covers enum members. |
+| `publicEntries`                            | parity  | Optional globs of files that a tool consumes, so their exports are public API.                    |
+
+#### Markers
+
+| Marker                                          | Where                             | Effect                                                                                                        |
+| ----------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `// unslop-ignore-next-line unused-export`      | above a declaration               | Exempts the declaration. `unused-type` and `unused-interface` are the same marker, so use the name that fits. |
+| `// unslop-ignore-next-line unused-enum-member` | above a member, or above the enum | Exempts one member, or all members.                                                                           |
+| `@public`                                       | in a JSDoc tag of a file          | The trusted report skips the file.                                                                            |
+| `configurable(…)`                               | initializer of a constant         | Registers the constant by key, so its export is never reported.                                               |
+| `__test_`                                       | name prefix                       | Marks a test seam, which is never reported.                                                                   |
+
+#### Running it on this repository
+
+The engine checks its own exports with the parity report. `deno task check:unused-exports` fails on any finding, and
+`deno task check:unused-enum-members` lists the unused enum members. Both read the `unused-exports` rule of
+`lint/unslop.config.json`, which scans `src`, `tests`, and `lint`, and lists the bundle entry and the examples as
+`publicEntries`.
+
+#### Limits
+
+The checks read syntax only. They build no type program, so they do not follow these shapes:
+
+- an import path that a `tsconfig` `paths` entry, a `package.json` `exports` condition, or a `node_modules` package
+  resolves, because only relative paths and `deno.json` import maps resolve;
+- a dynamic import with a computed specifier, and a use from a file that is not TypeScript, such as a YAML scenario or
+  a generated file;
+- `export =`, declaration merging, and an ambient or global declaration;
+- a local variable that has the name of an imported binding, because the check does not model scopes;
+- an enum value that code reads as a string, such as `"fast"` from a database column.
+
+When a result looks wrong, the cause is usually one of these. List the consumer as a `publicEntries` file, add the
+pragma, or add the import map entry.
 
 ### Unused files from the manifests {#unused-files-manifest}
 

@@ -477,30 +477,42 @@ limits are checked against the option schemas.
 
 A query status describes the configuration only. `active`, `parked`, `off`, and `not-selected` say
 whether the current selection enables a rule. They never change how a host runs it. Whole-tree checks
-keep their host modes: `unused-exports` reports the trusted set by default (`--all` widens it) and fails only
-with `--fail`; an unused exported interface reports as a warning that `--fail` ignores, and the
-`// unslop-ignore-next-line unused-type` pragma exempts a deliberate one. A `configurable(…)`
-registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never
-reported: the wrapper, the test prefix, and the binding are the exemption markers because a string
-key, a test seam, and a dynamic binding consume them. `--parity` runs the fallow-aligned report:
-re-exports, entry points, tests, scripts, default exports, and namespaces are reported. It matches each import to
-the module that defines the export and follows named and star re-exports, so a name that another module imports
-never hides an unused export, and a barrel entry that nobody imports through the barrel is reported. The files that
-a manifest exports (`exports`, `lint.plugins`, `main`, `module`, `bin`) and the `publicEntries` globs are public API,
-with everything they forward. An exported type that another exported declaration of the same file names is part of
-that declaration's API and is not reported. `--parity --enum-members` adds the enum members that no `Enum.Member`
-reference reaches. A reference resolves through imports, aliases, barrels, and namespace imports, and an enum used as
-a whole value (`Object.values`, `z.nativeEnum`, `keyof typeof`, a computed access, a `Record` key) uses every member.
-Only a `publicEntries` file makes an enum public API. `// unslop-ignore-next-line unused-enum-member` above a member,
-or above the enum for a closed set, exempts it. The
-`severity` option sets each class (`type`, `value`, `parity`) to `warning` or `error`;
-`--severity=warn|error` and `--relaxed` override it for one run. `configurable(…)` registrations and
-`__test_*` hooks stay exempt, and `// unslop-ignore-next-line unused-export` marks an intentional
-value export. `unused-files` and
-`optional-params` warn until
-`--fail` or `--staged`; `unused-files` takes its entry points from `deno.json` and `package.json` (`--conventions` selects the older scan)
-(see the README) and reports every scanned file that no entry reaches. A script rule's configured level does not override a fixed host flag. The CLI
+keep their host modes, and a script rule's configured level does not override a fixed host flag. The CLI
 prints the editable controls and the host modes, so the enforcement owner stays visible.
+
+- `unused-files` and `optional-params` warn until `--fail` or `--staged`.
+- `unused-files` takes its entry points from `deno.json` and `package.json` and reports every scanned file that no
+  entry reaches. `--conventions` selects the older scan. The README describes the manifest mode.
+- `unused-exports` has the reports below. Its `severity` option sets each class (`type`, `value`, `parity`) to `warning`
+  or `error`, and `--severity=warn|error` and `--relaxed` override it for one run.
+
+### Unused export reports {#unused-export-reports}
+
+The trusted report is the default. It reports the trusted set (`--all` widens it) and fails only with `--fail`. It
+matches an import to an export by the bare name, so it leaves out what a name match cannot judge.
+
+- An unused exported interface reports as a warning that `--fail` ignores. The `// unslop-ignore-next-line unused-type`
+  pragma exempts a deliberate one.
+- A `configurable(…)` registration, a `__test_*` export, and a name bound by a destructured `await import(…)` are never
+  reported. The wrapper, the test prefix, and the binding are the exemption markers, because a string key, a test seam,
+  and a dynamic binding consume them. `// unslop-ignore-next-line unused-export` marks an intentional value export.
+
+The parity report (`--parity`) is the fallow-aligned report. It reports re-exports, entry points, tests, scripts,
+default exports, and namespaces, and it asks which export each import reaches.
+
+- It matches each import to the module that defines the export and follows named and star re-exports. A name that
+  another module imports never hides an unused export, and a barrel entry that nobody imports through the barrel is
+  reported.
+- The files that a manifest exports (`exports`, `lint.plugins`, `main`, `module`, `bin`) and the `publicEntries` globs
+  are public API, with everything they forward.
+- An exported type that another exported declaration of the same file names is part of that declaration's API and is
+  not reported.
+- `--parity --enum-members` adds the enum members that no `Enum.Member` reference reaches. An enum used as a whole value
+  (`Object.values`, `z.nativeEnum`, `keyof typeof`, a computed access, a `Record` key) uses every member. Only a
+  `publicEntries` file makes an enum public API. `// unslop-ignore-next-line unused-enum-member` above a member, or
+  above the enum for a closed set, exempts it.
+
+The README holds the reference: flags, the matching rules, the options, the markers, and the limits of the check.
 
 ## Rule authoring for every host {#rule-authoring}
 
