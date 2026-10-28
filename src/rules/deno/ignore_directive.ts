@@ -25,7 +25,7 @@ export interface IIgnoreDirective {
 export const DEFAULT_REASON_SEPARATOR = "--";
 
 /** Every dialect the shared parser understands. */
-export const SUPPRESSION_DIALECTS: readonly SuppressionDialect[] = ["deno", "eslint", "oxlint"];
+const SUPPRESSION_DIALECTS: readonly SuppressionDialect[] = ["deno", "eslint", "oxlint"];
 
 const ID_SEPARATOR = /[\s,]+/;
 
@@ -101,7 +101,7 @@ function splitReason(rest: string, separator: string): { ids: readonly string[];
 }
 
 /** True when the text is a known dialect name. */
-export function isSuppressionDialect(value: string): value is SuppressionDialect {
+function isSuppressionDialect(value: string): value is SuppressionDialect {
   return (SUPPRESSION_DIALECTS as readonly string[]).includes(value);
 }
 

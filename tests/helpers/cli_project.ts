@@ -138,7 +138,7 @@ export async function runCliAt(
 }
 
 /** Runs the report CLI with read, env, and scoped Deno run permissions. */
-export async function runReportCliAt(
+async function runReportCliAt(
   cwd: string,
   args: readonly string[],
   env: Record<string, string> = {},

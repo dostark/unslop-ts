@@ -32,7 +32,7 @@ export interface IDeno {
 }
 
 export const DEMO_PLUGIN_NAME = "demo";
-export const DEMO_TAG = "demo";
+const DEMO_TAG = "demo";
 const ENGINE_ALIAS = "engine";
 const PLUGIN_FILE = "plugin.ts";
 const CONFIG_FILE = "deno.json";
@@ -54,7 +54,7 @@ export function packRuleKeys(): string[] {
 }
 
 /** A catalog that turns every pack rule on under the demo plugin name. */
-export function demoCatalog(): Record<string, JsonValue> {
+function demoCatalog(): Record<string, JsonValue> {
   const rules: Record<string, JsonValue> = {};
   for (const key of packRuleKeys()) {
     rules[`${DEMO_PLUGIN_NAME}/${key}`] = {

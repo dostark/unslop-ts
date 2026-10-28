@@ -35,7 +35,7 @@ export function parseSelection(value: string): Set<string> | null {
 }
 
 /** True when the selection names the rule by id, bare key, or tag. */
-export function isSelected(selection: Set<string>, id: string, key: string, tags: string[]): boolean {
+function isSelected(selection: Set<string>, id: string, key: string, tags: string[]): boolean {
   if (selection.has(id) || selection.has(key)) return true;
   for (const token of selection) {
     if (token.startsWith("tag:") && tags.includes(token.slice("tag:".length))) return true;

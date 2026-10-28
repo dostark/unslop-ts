@@ -25,7 +25,7 @@ export interface IMigrateOptions {
 }
 
 /** Two-space JSON with a trailing newline, matching every other written file. */
-export function serializeJson(value: unknown): string {
+function serializeJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 

@@ -27,7 +27,7 @@ export type LintComment = IRuleComment;
 const LINE_BREAK = /\r?\n/;
 
 /** The offset where the first statement starts, or the text length when the file has no statement. */
-export function firstStatementStart(sourceCode: IRuleSourceCode): number {
+function firstStatementStart(sourceCode: IRuleSourceCode): number {
   const body = asNode(programOf(sourceCode)).body;
   const first = Array.isArray(body) && body.length > 0 ? asNode(body[0]) : undefined;
   return first?.range?.[0] ?? sourceCode.text.length;

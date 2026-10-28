@@ -37,7 +37,7 @@ const TAG_PREFIX = "tag:";
 const SEPARATOR = "/";
 
 /** The bare key of a rule id: the part after the last `/`. */
-export function ruleKey(id: string): string {
+function ruleKey(id: string): string {
   const separator = id.lastIndexOf(SEPARATOR);
   return separator === -1 ? id : id.slice(separator + 1);
 }

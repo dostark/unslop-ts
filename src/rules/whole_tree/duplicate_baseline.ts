@@ -11,7 +11,7 @@ import { z } from "zod";
 import type { IClone, ICloneRange } from "./duplicate_code.ts";
 
 /** The only baseline file format that this version reads and writes. */
-export const BASELINE_VERSION = 1;
+const BASELINE_VERSION = 1;
 
 const FNV_OFFSET = 0xcbf29ce484222325n;
 const FNV_PRIME = 0x100000001b3n;

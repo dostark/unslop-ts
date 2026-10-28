@@ -93,7 +93,7 @@ export function summarizeFiles(
 }
 
 /** Runs `deno lint --json` for one rule over the given roots and returns its diagnostics. The rule id is `<plugin>/<key>`. */
-export async function runDenoLint(rule: string, roots: readonly string[]): Promise<ILintDiagnostic[]> {
+async function runDenoLint(rule: string, roots: readonly string[]): Promise<ILintDiagnostic[]> {
   const command = new Deno.Command(Deno.execPath(), {
     args: ["lint", "--json", ...roots],
     env: { [selectionEnvNameForRule(rule)]: rule },

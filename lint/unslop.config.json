@@ -9,6 +9,21 @@
     "ignore": []
   },
   "rules": {
+    "unused-exports": {
+      "level": "warn",
+      "options": {
+        "productionRoots": ["src/", "tests/", "lint/"],
+        "testSegments": ["/tests/", "/tests_node/"],
+        "testSuffixes": ["_test.ts", ".test.ts"],
+        "entrypointSuffixes": ["/mod.ts"],
+        "mainEntrypointSuffixes": ["/main.ts"],
+        "scriptRoot": "scripts",
+        "walkSkipPatterns": ["node_modules", "/\\.git(/|$)", "/dist(/|$)"],
+        "strictSkipPrefixes": [],
+        "strictSkipSegments": [],
+        "publicEntries": ["src/bundle/engine.ts", "examples/**"]
+      }
+    },
     "unused-files": {
       "level": "warn",
       "options": {

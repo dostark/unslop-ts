@@ -18,7 +18,7 @@ export const INTERNAL_COVERAGE_RULE = "internal-coverage";
 /** The run id used when the trace variable is the literal `1`. */
 export const MANUAL_TRACE_RUN_ID = "manual";
 /** The suffix of the trace variable: `demo` reads `DEMO_LINT_TRACE`. */
-export const TRACE_ENV_SUFFIX = "_LINT_TRACE";
+const TRACE_ENV_SUFFIX = "_LINT_TRACE";
 
 const NON_NAME_CHARS = /[^A-Z0-9]+/g;
 const TRACE_FIELD_SEPARATOR = ":";

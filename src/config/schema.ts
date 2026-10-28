@@ -11,7 +11,7 @@ import { z } from "zod";
 import type { JsonValue, RuleScope } from "../engine/catalog.ts";
 
 /** The plugin name pattern: a lower-case identifier, so a catalog id has one unambiguous prefix. */
-export const PLUGIN_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+const PLUGIN_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 /** A rule severity level. */
 export type RuleLevel = "error" | "warn" | "off";

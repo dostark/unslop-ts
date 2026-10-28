@@ -22,7 +22,7 @@ const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const JSONC_SUFFIX = ".jsonc";
 
 /** The project files the CLI found. */
-export interface IProjectLocation {
+interface IProjectLocation {
   readonly root: string;
   readonly lintConfigPath: string;
   readonly pluginPath: string;
@@ -74,7 +74,7 @@ export async function resolveLocalEntry(value: string, cwd: string): Promise<URL
 }
 
 /** Loads a local module after the scheme check. Local entries are trusted executable project code. */
-export async function loadLocalModule(value: string, cwd: string): Promise<Record<string, unknown>> {
+async function loadLocalModule(value: string, cwd: string): Promise<Record<string, unknown>> {
   const url = await resolveLocalEntry(value, cwd);
   try {
     // deno-lint-ignore self/import-inside-statement -- the plugin entry is a runtime path
@@ -86,7 +86,7 @@ export async function loadLocalModule(value: string, cwd: string): Promise<Recor
 }
 
 /** Finds the nearest JSON lint config, refusing a directory whose only config is JSONC. */
-export async function findLintConfig(cwd: string): Promise<{ root: string; configPath: string }> {
+async function findLintConfig(cwd: string): Promise<{ root: string; configPath: string }> {
   for (let dir = resolve(cwd);; dir = dirname(dir)) {
     const jsonPath = join(dir, LINT_CONFIG);
     if (await isFile(jsonPath)) return { root: dir, configPath: jsonPath };
@@ -135,7 +135,7 @@ async function siblingDescriptor(pluginPath: string, root: string): Promise<stri
 }
 
 /** Finds the project and its single configured local plugin. Several plugins require `--plugin`. */
-export async function locateProject(cwd: string, pluginArg: string | null): Promise<IProjectLocation> {
+async function locateProject(cwd: string, pluginArg: string | null): Promise<IProjectLocation> {
   const lint = await findLintConfig(cwd);
   let pluginPath: string;
   if (pluginArg !== null) {

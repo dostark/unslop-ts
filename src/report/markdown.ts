@@ -10,17 +10,17 @@
 import type { IFinding, IRunReport } from "./model.ts";
 
 /** Escapes one Markdown table cell. */
-export function escapeMarkdownCell(value: string): string {
+function escapeMarkdownCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
 /** Escapes inline Markdown text outside a table cell. */
-export function escapeMarkdownText(value: string): string {
+function escapeMarkdownText(value: string): string {
   return value.replace(/([\\`*_{}[\]()#+.!<>])/g, "\\$1");
 }
 
 /** A link whose display text is escaped and whose target is percent-encoded. */
-export function markdownLink(path: string): string {
+function markdownLink(path: string): string {
   const target = path.split("/").map(encodeURIComponent).join("/");
   return `[${escapeMarkdownCell(escapeMarkdownText(path))}](${target})`;
 }

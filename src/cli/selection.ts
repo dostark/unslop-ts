@@ -77,7 +77,7 @@ export function resolveSelection(
 }
 
 /** True when the selection includes the rule by id or tag. */
-export function isSelected(selection: IResolvedSelection, rule: IResolvedRule): boolean {
+function isSelected(selection: IResolvedSelection, rule: IResolvedRule): boolean {
   return selection.ids.has(rule.id) || rule.tags.some((tag) => selection.tags.has(tag));
 }
 

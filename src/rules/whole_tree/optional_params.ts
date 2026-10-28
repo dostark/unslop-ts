@@ -337,7 +337,7 @@ function callerViolations(decl: IFuncDecl, calls: readonly ICallSite[], param: I
 }
 
 /** Caller-dependent rules (REDUNDANT_OPTIONAL, UNUSED_OPTIONAL). */
-export function analyze(matched: readonly IMatchedFunc[]): IOptionalViolation[] {
+function analyze(matched: readonly IMatchedFunc[]): IOptionalViolation[] {
   const violations: IOptionalViolation[] = [];
   for (const { decl, calls } of matched) {
     if (decl.optionalCount === 0 || calls.length === 0) continue;

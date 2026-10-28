@@ -205,7 +205,7 @@ export interface IConstantRestatementSettings {
 }
 
 /** The catalog `wholeTree` section before defaults apply. */
-export interface IWholeTreeSettingsInput {
+interface IWholeTreeSettingsInput {
   optionalParams?: IOptionalParamsSettings;
   unusedExports?: IUnusedExportsSettings;
   unusedFiles?: IUnusedFilesSettings;

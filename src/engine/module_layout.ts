@@ -41,7 +41,7 @@ function classifyDeclaration(node: ILintNode): StatementKind {
 }
 
 /** What a top-level statement is for the purpose of placement rules. */
-export function classifyStatement(node: ILintNode): StatementKind {
+function classifyStatement(node: ILintNode): StatementKind {
   if (IMPORT_STATEMENTS.has(node.type)) return "import";
   if (node.type === EXPORT_NAMED) {
     if (isNodeLike(node.source)) return "import";

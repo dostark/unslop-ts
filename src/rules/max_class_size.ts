@@ -12,7 +12,7 @@ import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/t
 import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 /** Class-size indicators, matching the check_god_objects.ts metrics. */
-export interface IClassIndicators {
+interface IClassIndicators {
   readonly lineCount: number;
   readonly methodCount: number;
   readonly ctorParams: number;

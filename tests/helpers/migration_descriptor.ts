@@ -13,7 +13,7 @@ import { type IProjectDescriptor, TYPESCRIPT_RULE_PACK, WHOLE_TREE_CHECKS } from
 const ROOT_URL = new URL("file:///project/");
 
 /** A consumer script rule with one defaulted option, so migration must preserve an explicit value. */
-export const PROJECT_CHECK_SCHEMA = z.object({
+const PROJECT_CHECK_SCHEMA = z.object({
   threshold: z.number().int().positive().default(1),
 }).strict();
 
@@ -69,9 +69,4 @@ export function migrationDescriptor(): IProjectDescriptor {
       },
     },
   };
-}
-
-/** The check metadata that a fixture limit must match. */
-export function checkLimit(id: keyof typeof WHOLE_TREE_CHECKS): string | null {
-  return WHOLE_TREE_CHECKS[id].meta.limits;
 }
