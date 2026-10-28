@@ -7,5 +7,32 @@
     "test": ["**/*_test.ts", "**/tests/**"],
     "fixture": ["**/tests/fixtures/**"],
     "ignore": []
+  },
+  "rules": {
+    "unused-files": {
+      "level": "warn",
+      "options": {
+        "productionRoots": ["src/"],
+        "testSegments": ["/tests/", "/tests_node/"],
+        "testSuffixes": ["_test.ts", ".test.ts", ".test.mjs"],
+        "entrypointSuffixes": ["/mod.ts"],
+        "mainEntrypointSuffixes": ["/main.ts"],
+        "scriptRoot": "scripts",
+        "walkSkipPatterns": ["node_modules", "/\\.git(/|$)", "/dist(/|$)"],
+        "aliases": [],
+        "skipPrefixes": [],
+        "skipSegments": [],
+        "manifest": {
+          "walkSkipPatterns": ["/node_modules(/|$)", "/\\.git(/|$)", "/dist(/|$)"],
+          "extraEntries": [
+            "examples/*/eslint.config.mjs",
+            "examples/*/unslop.plugin.mjs",
+            "examples/oxlint/sample.ts",
+            "scripts/generate_overlap_table.mjs"
+          ],
+          "referenceGlobs": []
+        }
+      }
+    }
   }
 }

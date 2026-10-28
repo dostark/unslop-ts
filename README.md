@@ -327,7 +327,8 @@ Statuses describe the configuration, not the host:
 
 A query status never overrides a host flag. A whole-tree check keeps its host mode: `unused-exports`
 reports the trusted exemption set by default, `--all` widens the report, and only `--fail` fails the run;
-`unused-files` warns until `--fail`; `optional-params` warns until `--fail` or `--staged`. An exported
+`unused-files` warns until `--fail` (`--manifest` starts the walk at the entry points of `deno.json` and
+`package.json`, see below); `optional-params` warns until `--fail` or `--staged`. An exported
 interface that no file imports reports as a warning and never fails the run; put
 `// unslop-ignore-next-line unused-interface` above it when it is intentional API,
 regardless of the configured level shown by the CLI.
@@ -462,6 +463,32 @@ deno task unslop config print > catalog.json
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-exports
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-files
 ```
+
+### Unused files from the manifests {#unused-files-manifest}
+
+`--rule=unused-files --manifest` replaces the path conventions of the default mode with the entry points that the
+manifests declare, and it reports every scanned file that no entry reaches. It needs the
+`wholeTree.unusedFiles.manifest` section, which has three fields:
+
+- `walkSkipPatterns`: regular expressions for the absolute paths that the scan never enters.
+- `extraEntries`: globs of files that are entry points although no manifest names them.
+- `referenceGlobs`: globs of text files, such as scenario YAML and HTML pages, whose path mentions count as references.
+
+The entry points are these:
+
+- `deno.json`: `exports`, the code paths in `tasks`, `lint.plugins`, and the files that `deno test` discovers
+  (`*_test.ts`, `*.test.ts`, `test.ts`, limited by `test.include` and `test.exclude`). The nearest manifest that has a
+  `test` section or a `deno test` task owns the test scope of the files below it.
+- `package.json`: `main`, `module`, `bin`, `exports`, and the code paths in `scripts`.
+- A task that runs tests (`deno test`, `node --test`, `bun test`, `vitest`, `jest`, `mocha`) also makes its globs
+  entry points. A leading `cd <dir> &&` moves the base directory of the command.
+
+The walk follows static and dynamic imports, re-exports, and the `imports` maps of every `deno.json`. An exact key
+matches only itself; a key with a trailing slash is a prefix. It also follows a string literal that reads as a path
+to a scanned file, such as the first argument of a `new URL(…, import.meta.url)` call or the path of a spawned script. A mention with a
+variable prefix, such as `$SUITE_HOME/scripts/x.ts`, resolves against each ancestor directory of the file that holds it.
+The scan reads `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, and `.css` files. A `mod.ts` barrel, a
+script, or a file in a `tests` folder is not an entry by name, so an unused one is reported.
 
 The same hint prints after a migration. Phase 232 Step 5 replaces this bridge with a compiled-settings
 adapter, so the separate catalog is temporary.

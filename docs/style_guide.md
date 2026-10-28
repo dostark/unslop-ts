@@ -489,7 +489,8 @@ re-exports, entry points, tests, scripts, default exports, and namespaces are re
 `__test_*` hooks stay exempt, and `// unslop-ignore-next-line unused-export` marks an intentional
 value export. `unused-files` and
 `optional-params` warn until
-`--fail` or `--staged`. A script rule's configured level does not override a fixed host flag. The CLI
+`--fail` or `--staged`; `unused-files --manifest` takes its entry points from `deno.json` and `package.json`
+(see the README) and reports every scanned file that no entry reaches. A script rule's configured level does not override a fixed host flag. The CLI
 prints the editable controls and the host modes, so the enforcement owner stays visible.
 
 ## Rule authoring for every host {#rule-authoring}

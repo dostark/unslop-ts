@@ -119,6 +119,16 @@ export interface IUnusedFilesAlias {
   readonly target: string;
 }
 
+/** Options of the manifest mode of the unused-files check. Every field is project-specific, so none has a default. */
+export interface IUnusedFilesManifestSettings {
+  /** Regular expressions for the paths that the manifest scan never enters. */
+  walkSkipPatterns: string[];
+  /** Globs of files that are entry points although no manifest names them. */
+  extraEntries: string[];
+  /** Globs of text files whose path mentions count as references, such as scenario YAML and HTML pages. */
+  referenceGlobs: string[];
+}
+
 /** Options of the unused-files check. Every field is project-specific, so none has a default. */
 export interface IUnusedFilesSettings {
   productionRoots: string[];
@@ -131,6 +141,7 @@ export interface IUnusedFilesSettings {
   aliases: IUnusedFilesAlias[];
   skipPrefixes: string[];
   skipSegments: string[];
+  manifest?: IUnusedFilesManifestSettings;
 }
 
 /** One scan group of the duplicate-code check: a set of roots, its filters, and the duplication it may carry. */
@@ -300,6 +311,14 @@ const UnusedFilesAliasSchema: z.ZodType<IUnusedFilesAlias, IUnusedFilesAlias> = 
   target: z.string(),
 }).strict();
 
+/** Options of the manifest mode of the unused-files check. */
+const UnusedFilesManifestSettingsSchema: z.ZodType<IUnusedFilesManifestSettings, IUnusedFilesManifestSettings> = z
+  .object({
+    walkSkipPatterns: z.array(z.string()),
+    extraEntries: z.array(z.string()),
+    referenceGlobs: z.array(z.string()),
+  }).strict();
+
 /** Options of the unused-files check. Every field is project-specific, so none has a default. */
 export const UnusedFilesSettingsSchema: z.ZodType<IUnusedFilesSettings, IUnusedFilesSettings> = z.object({
   productionRoots: z.array(z.string()),
@@ -312,6 +331,7 @@ export const UnusedFilesSettingsSchema: z.ZodType<IUnusedFilesSettings, IUnusedF
   aliases: z.array(UnusedFilesAliasSchema),
   skipPrefixes: z.array(z.string()),
   skipSegments: z.array(z.string()),
+  manifest: UnusedFilesManifestSettingsSchema.optional(),
 }).strict();
 
 /** Options of the constant-restatement check. Every field is project-specific, so none has a default. */

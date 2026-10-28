@@ -404,3 +404,57 @@ Deno.test("duplicate-code without a wholeTree.duplicateCode section is a usage e
     assertStringIncludes(result.stderr, "duplicateCode");
   });
 });
+
+const UNUSED_FILES_SECTION = {
+  productionRoots: ["src/"],
+  testSegments: ["/tests/"],
+  testSuffixes: ["_test.ts"],
+  entrypointSuffixes: ["/mod.ts"],
+  mainEntrypointSuffixes: ["/main.ts"],
+  scriptRoot: "scripts",
+  walkSkipPatterns: ["node_modules"],
+  aliases: [],
+  skipPrefixes: [],
+  skipSegments: [],
+};
+
+async function writeManifestProject(dir: string, withManifestSection: boolean): Promise<void> {
+  const unusedFiles = withManifestSection
+    ? {
+      ...UNUSED_FILES_SECTION,
+      manifest: { walkSkipPatterns: ["node_modules"], extraEntries: [], referenceGlobs: [] },
+    }
+    : UNUSED_FILES_SECTION;
+  await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify({ version: "1", wholeTree: { unusedFiles } }));
+  await Deno.writeTextFile(join(dir, "deno.json"), JSON.stringify({ tasks: { run: "deno run src/live.ts" } }));
+  await Deno.mkdir(join(dir, "src"));
+  await Deno.writeTextFile(join(dir, "src/live.ts"), "export const live = 1;\n");
+  await Deno.writeTextFile(join(dir, "src/dead.ts"), "export const dead = 1;\n");
+  await Deno.writeTextFile(join(dir, "src/mod.ts"), 'export * from "./live.ts";\n');
+}
+
+Deno.test("unused-files --manifest exits 2 when the catalog has no manifest section", async () => {
+  await inTempDir(async (dir) => {
+    await writeManifestProject(dir, false);
+    const result = await runDeno(
+      ["run", "-A", CLI, "--rule=unused-files", "--manifest", "--catalog=catalog.json"],
+      dir,
+    );
+    assertEquals(result.code, USAGE_EXIT);
+    assertStringIncludes(result.stderr, "wholeTree.unusedFiles.manifest");
+  });
+});
+
+Deno.test("unused-files --manifest reports the file that the manifest entries miss and --fail exits 1", async () => {
+  await inTempDir(async (dir) => {
+    await writeManifestProject(dir, true);
+    const args = ["run", "-A", CLI, "--rule=unused-files", "--manifest", "--catalog=catalog.json"];
+    const warned = await runDeno(args, dir);
+    assertEquals(warned.code, 0, warned.stderr);
+    assertStringIncludes(warned.stdout, "WARN [unused-file] src/dead.ts");
+    assertStringIncludes(warned.stdout, "WARN [unused-file] src/mod.ts");
+    const failed = await runDeno([...args, "--fail"], dir);
+    assertEquals(failed.code, 1);
+    assertStringIncludes(failed.stdout, "ERROR [unused-file] src/dead.ts");
+  });
+});

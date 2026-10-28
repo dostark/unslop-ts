@@ -7,10 +7,10 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { dirname, join } from "@std/path";
 import { checkRepository } from "../src/rules/whole_tree/unused_files.ts";
 import type { IUnusedFilesSettings } from "../src/rules/whole_tree/options.ts";
 import type { IUnusedFilesAlias } from "../src/rules/whole_tree/options.ts";
+import { withRepo, write } from "./helpers/temp_repo.ts";
 
 function settings(aliases: IUnusedFilesAlias[]): IUnusedFilesSettings {
   return {
@@ -25,21 +25,6 @@ function settings(aliases: IUnusedFilesAlias[]): IUnusedFilesSettings {
     skipPrefixes: [],
     skipSegments: [],
   };
-}
-
-async function withRepo(body: (root: string) => Promise<void>): Promise<void> {
-  const root = await Deno.makeTempDir({ prefix: "unused_files_" });
-  try {
-    await body(root);
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-}
-
-async function write(root: string, repoPath: string, text: string): Promise<void> {
-  const full = join(root, repoPath);
-  await Deno.mkdir(dirname(full), { recursive: true });
-  await Deno.writeTextFile(full, text);
 }
 
 Deno.test("a production file that no entry point reaches is reported", async () => {
