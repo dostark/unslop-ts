@@ -154,6 +154,27 @@ Deno.test("a computed access, a value use, and an export under another name use 
   });
 });
 
+Deno.test("a membership test with a literal key names one member, and a computed key uses every member", async () => {
+  await withRepo(async (root) => {
+    await write(root, "packages/p/src/mode.ts", ENUM_SOURCE);
+    await write(root, "packages/p/src/other.ts", "export enum Other {\n  A = 'a',\n  B = 'b',\n}\n");
+    await write(
+      root,
+      "packages/p/use.ts",
+      [
+        'import { Mode } from "./src/mode.ts";',
+        'import { Other } from "./src/other.ts";',
+        'const named = "Fast" in Mode;',
+        'const key = Math.random() > 0.5 ? "A" : "B";',
+        "const computed = key in Other;",
+        "console.log(named, computed);",
+        "",
+      ].join("\n"),
+    );
+    assertEquals(await unusedMembers(root), ["packages/p/src/mode.ts:Mode.Slow", "packages/p/src/mode.ts:Mode.Idle"]);
+  });
+});
+
 Deno.test("a manifest export does not exempt an enum, a publicEntries file does, and a pragma exempts one member", async () => {
   await withRepo(async (root) => {
     await write(root, "packages/p/deno.json", JSON.stringify({ exports: { ".": "./mod.ts" } }));

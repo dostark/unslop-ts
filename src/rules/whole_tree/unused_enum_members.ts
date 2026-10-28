@@ -152,6 +152,9 @@ function useBinding(id: ts.Identifier, list: readonly IEnumDef[]): void {
     if (isExhaustiveTypeArgument(parent)) escapeAll(list);
     return;
   }
+  if (ts.isBinaryExpression(parent) && parent.right === id && parent.operatorToken.kind === ts.SyntaxKind.InKeyword) {
+    return ts.isStringLiteralLike(parent.left) ? markMember(list, parent.left.text) : escapeAll(list);
+  }
   escapeAll(list);
 }
 
