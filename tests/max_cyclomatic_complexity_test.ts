@@ -122,6 +122,21 @@ Deno.test("cyclomatic-nested-units: descendant decisions are excluded and indepe
   assert(found.some((message) => message.includes("inner") && message.includes("2")), found.join(" | "));
 });
 
+Deno.test("metric-parameter-optional-ownership: optional links in parameter defaults add no decision", () => {
+  const cases: readonly { readonly source: string; readonly extended: number }[] = [
+    { source: "function f(x = value?.field) {\n  return x;\n}", extended: 1 },
+    { source: "const f = ({ a = b?.c }) => a;", extended: 1 },
+    { source: "class A {\n  run(x = value?.field) {\n    return x?.y;\n  }\n}", extended: 2 },
+    { source: "function f(x = value?.field) {\n  return x?.y ?? 0;\n}", extended: 3 },
+  ];
+  for (const entry of cases) {
+    assertEquals(measureAll(entry.source)[0].cyclomatic, entry.extended, entry.source);
+    assertEquals(measureAll(entry.source, CLASSIC_OPTIONS)[0].cyclomatic, 1, entry.source);
+  }
+  const found = messages("export function f(x = value?.field) { return x; }", { max: 1 });
+  assertEquals(found, []);
+});
+
 Deno.test("cyclomatic-contributions: exact kind, weight and UTF-16 position keep the sum invariant", () => {
   const metrics = measureAll(CONTRIBUTIONS)[0];
   assertEquals(metrics.cyclomatic, 7);

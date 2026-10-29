@@ -140,6 +140,14 @@ Deno.test("health-findings-shape: named fields, worst severity and the full aggr
   });
 });
 
+Deno.test("health-parameter-optional-ownership: health reports the body-only cyclomatic value", async () => {
+  const source = "export function withDefault(x = value?.field): number {\n  return x?.y ? 1 : 0;\n}\n";
+  await withHealthProject({ "packages/x/src/default.ts": source }, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json", "--variant=extended"])).stdout);
+    assertEquals(report.findings.find((finding) => finding.name === "withDefault")?.cyclomatic, 3);
+  });
+});
+
 Deno.test("health-unit-size-profile: four bands sum to one hundred or stay zero", async () => {
   await withHealthProject(MAIN_FILES, async (dir) => {
     const report = parseReport((await health(dir, ["--format=json"])).stdout);

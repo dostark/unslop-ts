@@ -100,12 +100,10 @@ function declaredNames(fn: ILintNode): Set<string> {
   const names = new Set<string>();
   for (const param of valuesOf(fn.params)) bindingNames(param, names);
   const visit = (node: ILintNode): void => {
-    if (node !== fn && FUNCTION_KINDS.has(node.type)) return;
     if (node.type === "VariableDeclarator") bindingNames(node.id, names);
-    if (node.type === "FunctionDeclaration" || node.type === "ClassDeclaration") {
-      const id = node.id;
-      if (isNodeLike(id) && typeof asNode(id).name === "string") names.add(String(asNode(id).name));
-    }
+    if (node.type === "CatchClause") bindingNames(node.param, names);
+    if (node.type === "FunctionDeclaration" || node.type === "ClassDeclaration") bindingNames(node.id, names);
+    if (node !== fn && FUNCTION_KINDS.has(node.type)) return;
     forEachChildNode(node, visit);
   };
   const body = fn.body;

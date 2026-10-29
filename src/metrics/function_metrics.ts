@@ -260,9 +260,11 @@ function cyclomaticContributions(
   return contributions;
 }
 
-/** Every optional link in the unit, counted once per `?.` token outside descendant functions. */
+/** Every optional link in the unit body, counted once per `?.` token outside descendant functions. */
 function optionalContributionOffsets(unit: IFunctionUnit, context: IMeasurementContext): number[] {
-  const [start, end] = unit.range;
+  const body = asNode(unit.node).body;
+  if (!isNodeLike(body)) return [];
+  const [start, end] = rangeOf(asNode(body));
   return context.optionalChainOffsets.filter((offset) => {
     if (offset < start || offset >= end) return false;
     return !unit.descendantRanges.some(([from, to]) => offset >= from && offset < to);

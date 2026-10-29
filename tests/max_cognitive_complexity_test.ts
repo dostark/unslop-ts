@@ -153,6 +153,16 @@ Deno.test("cognitive-jumps-and-recursion: labeled jump, single recursion, and ex
   assertEquals(cognitiveOf("const fib = (n) => n < 2 ? n : fib(n - 1) + fib(n - 2);"), 2);
 });
 
+Deno.test("cognitive-shadowed-declaration: nested declarations and catch bindings are not self-recursion", () => {
+  assertEquals(cognitiveOf("function f() {\n  function f() {}\n  return f();\n}"), 0);
+  assertEquals(cognitiveOf("function f() {\n  class f {}\n  return f;\n}"), 0);
+  assertEquals(cognitiveOf("function f() {\n  try {\n    throw 1;\n  } catch (f) {\n    f();\n  }\n}"), 1);
+  assertEquals(cognitiveOf("function f() {\n  try {\n    throw 1;\n  } catch ({ f }) {\n    f();\n  }\n}"), 1);
+  assertEquals(cognitiveOf("const g = () => {\n  function g() {}\n  return g();\n};"), 0);
+  assertEquals(cognitiveOf("function f() {\n  const g = function f() {};\n  return f();\n}"), 1);
+  assertEquals(cognitiveOf("function f() {\n  return f();\n}"), 1);
+});
+
 Deno.test("cognitive-nested-function: callbacks score alone and the parent excludes them", () => {
   const source = "function outer(a) {\n" +
     "  const top = (x) => { if (x) { return 1; } return 0; };\n" +
