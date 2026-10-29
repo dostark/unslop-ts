@@ -23,7 +23,15 @@ export {
   type IHealthGraph,
   resolveSpecifier,
 } from "./graph.ts";
-export { collectHealth, type HealthSortKey, type ICollectHealthInput, type IHealthSettings } from "./health.ts";
+export {
+  collectFunctionRows,
+  collectHealth,
+  type HealthSortKey,
+  type ICollectHealthInput,
+  type IFunctionRowCollection,
+  type IHealthSettings,
+  type IMeasuredFunction,
+} from "./health.ts";
 export {
   type IMaintainabilityInput,
   type MaintainabilityBand,

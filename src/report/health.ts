@@ -19,6 +19,7 @@ import { buildHealthGraph } from "./graph.ts";
 import {
   HEALTH_FORMULA_VERSION,
   HEALTH_SCHEMA_VERSION,
+  type IHealthContribution,
   type IHealthDeadFiles,
   type IHealthError,
   type IHealthFileScore,
@@ -192,31 +193,57 @@ interface IFileFacts {
   readonly lines: number;
 }
 
-/** Measures one parsed file into findings and unit-size bands. */
-function measureFile(
-  file: IParsedHealthFile,
-  input: ICollectHealthInput,
-  findings: IMeasuredFinding[],
-  bands: Record<UnitSizeBand, number>,
-): IFileFacts {
-  const options: IMetricOptions = { variant: input.settings.variant, countNullish: input.settings.countNullish };
-  let cyclomatic = 0;
-  for (const unit of file.units) {
-    const metrics = measureFunction(unit, options, file.context);
-    cyclomatic += metrics.cyclomatic;
-    bands[bandOf(metrics.lines)]++;
-    const values: IFindingValues = {
-      cyclomatic: metrics.cyclomatic,
-      cognitive: metrics.cognitive,
-      lines: metrics.lines,
-    };
-    const severity = worstSeverity(values, input.settings);
-    if (severity === null) continue;
-    findings.push({
+/** One measured function row: the facts the calibration compares with another tool. */
+export interface IMeasuredFunction {
+  readonly path: string;
+  readonly name: string;
+  readonly line: number;
+  /** Zero-based UTF-16 column, matching the engine positions. */
+  readonly col: number;
+  /** Zero-based UTF-8 byte column, matching the external report's column base. */
+  readonly byte_col: number;
+  readonly cyclomatic: number;
+  readonly cognitive: number;
+  readonly line_count: number;
+  readonly param_count: number;
+  readonly contributions: readonly IHealthContribution[];
+}
+
+/** The UTF-8 byte length of the line before an offset, which is how the external report counts columns. */
+function byteColumnAt(text: string, offset: number): number {
+  const lineStart = text.lastIndexOf("\n", Math.max(offset - 1, 0)) + 1;
+  let bytes = 0;
+  for (let index = lineStart; index < offset; index++) {
+    const code = text.charCodeAt(index);
+    if (code < 0x80) {
+      bytes += 1;
+    } else if (code < 0x800) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      bytes += 4;
+      index++;
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
+}
+
+/** The counting options one measurement reads. */
+function metricOptions(settings: IHealthSettings): IMetricOptions {
+  return { variant: settings.variant, countNullish: settings.countNullish };
+}
+
+/** Every measured function of one parsed file, in source order. */
+function measuredRowsOf(file: IParsedHealthFile, settings: IHealthSettings): IMeasuredFunction[] {
+  return file.units.map((unit) => {
+    const metrics = measureFunction(unit, metricOptions(settings), file.context);
+    return {
       path: file.path,
       name: metrics.name,
       line: metrics.line,
       col: metrics.column - 1,
+      byte_col: byteColumnAt(file.text, unit.range[0]),
       cyclomatic: metrics.cyclomatic,
       cognitive: metrics.cognitive,
       line_count: metrics.lines,
@@ -229,9 +256,30 @@ function measureFile(
         weight: entry.weight,
         nesting: entry.nesting,
       })),
-      severity,
-      values,
-    });
+    };
+  });
+}
+
+/** Measures one parsed file into findings and unit-size bands. */
+function measureFile(
+  file: IParsedHealthFile,
+  input: ICollectHealthInput,
+  findings: IMeasuredFinding[],
+  bands: Record<UnitSizeBand, number>,
+): IFileFacts {
+  let cyclomatic = 0;
+  for (const row of measuredRowsOf(file, input.settings)) {
+    cyclomatic += row.cyclomatic;
+    bands[bandOf(row.line_count)]++;
+    const values: IFindingValues = {
+      cyclomatic: row.cyclomatic,
+      cognitive: row.cognitive,
+      lines: row.line_count,
+    };
+    const severity = worstSeverity(values, input.settings);
+    if (severity === null) continue;
+    const { byte_col: _byteCol, ...findingRow } = row;
+    findings.push({ ...findingRow, severity, values });
   }
   return { functions: file.units.length, cyclomatic, lines: uniqueLinesOf(file) };
 }
@@ -295,23 +343,54 @@ async function deadFilesOf(rootPath: string, measured: ReadonlySet<string>): Pro
   }
 }
 
-/** Collects the report for one descriptor root. */
-export async function collectHealth(input: ICollectHealthInput): Promise<IHealthReport> {
+/** The parsed files of one root, with the failures attributed. */
+interface ISnapshot {
+  readonly parsed: Map<string, IParsedHealthFile>;
+  readonly errors: IHealthError[];
+  readonly excluded: number;
+}
+
+/** Parses every measured file once, attributing each failure. */
+async function parseSnapshot(input: ICollectHealthInput): Promise<ISnapshot> {
   const { files, excluded } = await sourceFiles(input);
-  const findings: IMeasuredFinding[] = [];
-  const errors: IHealthError[] = [];
-  const bands: Record<UnitSizeBand, number> = { low: 0, medium: 0, high: 0, very_high: 0 };
   const parsed = new Map<string, IParsedHealthFile>();
-  const facts = new Map<string, IFileFacts>();
+  const errors: IHealthError[] = [];
   for (const relativePath of files) {
     try {
-      const file = await parseHealthFile(platformJoin(input.rootPath, relativePath), relativePath);
-      parsed.set(relativePath, file);
-      facts.set(relativePath, measureFile(file, input, findings, bands));
+      parsed.set(
+        relativePath,
+        await parseHealthFile(platformJoin(input.rootPath, relativePath), relativePath),
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push({ path: relativePath, message });
+      errors.push({ path: relativePath, message: error instanceof Error ? error.message : String(error) });
     }
+  }
+  return { parsed, errors, excluded };
+}
+
+/** Every measured function of one root, with the failures and exclusions attributed. */
+export interface IFunctionRowCollection {
+  readonly rows: readonly IMeasuredFunction[];
+  readonly errors: readonly IHealthError[];
+  readonly excluded: number;
+}
+
+/** Every measured function of one root, for calibration against another tool. */
+export async function collectFunctionRows(input: ICollectHealthInput): Promise<IFunctionRowCollection> {
+  const { parsed, errors, excluded } = await parseSnapshot(input);
+  const rows: IMeasuredFunction[] = [];
+  for (const file of parsed.values()) rows.push(...measuredRowsOf(file, input.settings));
+  return { rows, errors, excluded };
+}
+
+/** Collects the report for one descriptor root. */
+export async function collectHealth(input: ICollectHealthInput): Promise<IHealthReport> {
+  const { parsed, errors, excluded } = await parseSnapshot(input);
+  const findings: IMeasuredFinding[] = [];
+  const bands: Record<UnitSizeBand, number> = { low: 0, medium: 0, high: 0, very_high: 0 };
+  const facts = new Map<string, IFileFacts>();
+  for (const [relativePath, file] of parsed) {
+    facts.set(relativePath, measureFile(file, input, findings, bands));
   }
   const graph = buildHealthGraph(parsed, await readAliases(input.rootPath));
   const exports = exportPopulationOf(parsed);
