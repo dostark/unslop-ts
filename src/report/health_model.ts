@@ -61,6 +61,32 @@ export type CoverageReason = "measured" | "no_input" | "file_missing" | "no_exec
 /** The precision a measured coverage sample claims. */
 export type CoveragePrecision = "line" | "line_ambiguous";
 
+/** The measurement state of one score signal. */
+export type HealthScoreSignalStatus = "measured" | "not_measured" | "unavailable";
+
+/** The completeness of one project score. */
+export type HealthScoreStatus = "complete" | "partial";
+
+/** One attributed penalty of the project score. */
+export interface IHealthScoreSignal {
+  readonly signal: string;
+  readonly status: HealthScoreSignalStatus;
+  readonly raw: number | null;
+  readonly numerator: number | null;
+  readonly denominator: number | null;
+  readonly penalty: number;
+  readonly source: string;
+  readonly reason: string | null;
+}
+
+/** The project score and its signal ledger. */
+export interface IHealthScore {
+  readonly value: number;
+  readonly grade: "A" | "B" | "C" | "D" | "F" | null;
+  readonly status: HealthScoreStatus;
+  readonly signals: readonly IHealthScoreSignal[];
+}
+
 /** One file hotspot: the qualified churn and density normalized over the population. */
 export interface IHealthHotspot {
   readonly path: string;
@@ -199,6 +225,7 @@ export interface IHealthReport {
   readonly file_scores: readonly IHealthFileScore[];
   readonly hotspots: readonly IHealthHotspot[];
   readonly hotspot_summary: IHealthHotspotSummary;
+  readonly health_score: IHealthScore;
   readonly summary: IHealthSummary;
   readonly vital_signs: IHealthVitalSigns;
   readonly errors: readonly IHealthError[];
@@ -313,6 +340,26 @@ export const HealthGraphSummarySchema: z.ZodType<IHealthGraphSummary, IHealthGra
   complete: z.boolean(),
 }).strict();
 
+/** One score signal. */
+const HealthScoreSignalSchema: z.ZodType<IHealthScoreSignal, IHealthScoreSignal> = z.object({
+  signal: z.string().min(1),
+  status: z.enum(["measured", "not_measured", "unavailable"]),
+  raw: z.number().finite().nullable(),
+  numerator: z.number().finite().nullable(),
+  denominator: z.number().finite().nullable(),
+  penalty: finite,
+  source: z.string().min(1),
+  reason: z.string().min(1).nullable(),
+}).strict();
+
+/** The project score. */
+const HealthScoreSchema: z.ZodType<IHealthScore, IHealthScore> = z.object({
+  value: finite,
+  grade: z.enum(["A", "B", "C", "D", "F"]).nullable(),
+  status: z.enum(["complete", "partial"]),
+  signals: z.array(HealthScoreSignalSchema),
+}).strict();
+
 /** One file hotspot. */
 const HealthHotspotSchema: z.ZodType<IHealthHotspot, IHealthHotspot> = z.object({
   path: z.string().min(1),
@@ -380,6 +427,7 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   file_scores: z.array(HealthFileScoreSchema),
   hotspots: z.array(HealthHotspotSchema),
   hotspot_summary: HealthHotspotSummarySchema,
+  health_score: HealthScoreSchema,
   summary: HealthSummarySchema,
   vital_signs: HealthVitalSignsSchema,
   errors: z.array(HealthErrorSchema),

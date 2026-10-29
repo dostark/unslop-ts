@@ -13,13 +13,24 @@ import { matchesAnyGlob } from "../engine/glob.ts";
 import { join as posixJoin } from "../engine/posix_path.ts";
 import { measureFunction, ownedLineNumbers } from "../metrics/function_metrics.ts";
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
+import type { IDuplicateCodeSettings } from "../rules/whole_tree/options.ts";
+import type { TJscpdRunner } from "../rules/whole_tree/duplicate_code.ts";
 import { couplingSignalOf, runtimeCyclesOf } from "../rules/whole_tree/import_cycles.ts";
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
 import { deadRatioOf, exportPopulationOf } from "./exports.ts";
 import { MAX_GIT_HISTORY_BYTES } from "./constants.ts";
+import { type IDuplicationMeasurement, measureDuplication } from "./duplication.ts";
 import { type ILcovCoverage, MAX_LCOV_BYTES, parseLcov } from "./lcov.ts";
+import {
+  CRITICAL_COMPLEXITY,
+  CRITICAL_UNIT_LINES,
+  healthScoreOf,
+  type IScoreInput,
+  LOW_MAINTAINABILITY,
+  scoreSignalsOf,
+} from "./health_score.ts";
 import { buildHealthGraph, type IHealthGraph } from "./graph.ts";
 import {
   HEALTH_FORMULA_VERSION,
@@ -32,6 +43,7 @@ import {
   type IHealthFinding,
   type IHealthHotspotSummary,
   type IHealthReport,
+  type IHealthScore,
   type IHealthVitalSigns,
 } from "./health_model.ts";
 import { maintainabilityIndexOf } from "./maintainability.ts";
@@ -99,6 +111,10 @@ export interface ICollectHealthInput {
   readonly minCommits: number;
   /** The captured UTC clock of this run, in epoch seconds. */
   readonly nowEpoch: number;
+  /** The compiled duplication settings, or null when the catalog has no duplicate-code rule. */
+  readonly duplication: IDuplicateCodeSettings | null;
+  /** The validated local jscpd runner, or null when it is unavailable. */
+  readonly duplicateRunner: TJscpdRunner | null;
 }
 
 /** The measured values a finding reports. */
@@ -215,15 +231,20 @@ async function sourceFiles(input: ICollectHealthInput): Promise<{ files: string[
   return { files, excluded };
 }
 
-/** The unique code-token lines of one file. */
-function uniqueLinesOf(file: IParsedHealthFile): number {
+/** The code-token line numbers of one file. */
+function tokenLinesOf(file: IParsedHealthFile): Set<number> {
   const lines = new Set<number>();
   for (const token of file.context.tokens) {
     const first = file.context.positionAt(token.start).line;
     const last = token.end > token.start ? file.context.positionAt(token.end - 1).line : first;
     for (let line = first; line <= last; line++) lines.add(line);
   }
-  return lines.size;
+  return lines;
+}
+
+/** The unique code-token lines of one file. */
+function uniqueLinesOf(file: IParsedHealthFile): number {
+  return tokenLinesOf(file).size;
 }
 
 /** The measured facts of one file that the file score reads. */
@@ -231,6 +252,8 @@ interface IFileFacts {
   readonly functions: number;
   readonly cyclomatic: number;
   readonly lines: number;
+  readonly critical: number;
+  readonly overSize: number;
 }
 
 /** The coverage facts of one file that its units inherit. */
@@ -317,10 +340,14 @@ function measureFile(
   coverage: IFileCoverage,
 ): IFileFacts {
   let cyclomatic = 0;
+  let critical = 0;
+  let overSize = 0;
   const rows = measuredRowsOf(file, input.settings);
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
     cyclomatic += row.cyclomatic;
+    if (row.cyclomatic > CRITICAL_COMPLEXITY) critical++;
+    if (row.line_count > CRITICAL_UNIT_LINES) overSize++;
     bands[bandOf(row.line_count)]++;
     const sample = coverageOfUnit(
       ownedLineNumbers(file.units[index], file.context),
@@ -348,7 +375,7 @@ function measureFile(
       coverage_precision: sample.precision,
     });
   }
-  return { functions: file.units.length, cyclomatic, lines: uniqueLinesOf(file) };
+  return { functions: file.units.length, cyclomatic, lines: uniqueLinesOf(file), critical, overSize };
 }
 
 /** The severity order used by the severity sort. */
@@ -409,14 +436,28 @@ function sharedLinesOf(file: IParsedHealthFile): Set<number> {
   return new Set([...counts].filter(([, count]) => count > 1).map(([line]) => line));
 }
 
+/** The lowercase hex form of a SHA-256 digest. */
+function hexOf(digest: ArrayBuffer): string {
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 /** The aggregate SHA-256 of the measured snapshot, so a report can cite its exact source bytes. */
 async function snapshotSha256(parsed: ReadonlyMap<string, IParsedHealthFile>): Promise<string> {
   const text = [...parsed]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([path, file]) => `${path}:${file.sha256}`)
     .join("\n");
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return hexOf(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+}
+
+/** The aggregate SHA-256 of the source bytes on disk, read again after a child scan. */
+async function digestOfRoot(rootPath: string, paths: Iterable<string>): Promise<string> {
+  const parts: string[] = [];
+  for (const path of [...paths].sort()) {
+    const bytes = await Deno.readFile(platformJoin(rootPath, path));
+    parts.push(`${path}:${hexOf(await crypto.subtle.digest("SHA-256", bytes))}`);
+  }
+  return hexOf(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.join("\n"))));
 }
 
 /** The alias map of the project's root Deno configuration, used to resolve import specifiers. */
@@ -532,6 +573,74 @@ function fileScoresOf(
   return { scores, functions };
 }
 
+/** The duplication measurement, or the attributed reason it is absent. */
+async function duplicationOf(
+  input: ICollectHealthInput,
+  parsed: ReadonlyMap<string, IParsedHealthFile>,
+  tokenLines: ReadonlyMap<string, ReadonlySet<number>>,
+): Promise<IDuplicationMeasurement> {
+  if (input.duplication === null) {
+    return { available: false, reason: "no-duplication-settings", lines: 0, total_lines: 0 };
+  }
+  if (input.duplicateRunner === null) {
+    return { available: false, reason: "duplication-runner-unavailable", lines: 0, total_lines: 0 };
+  }
+  return await measureDuplication({
+    rootPath: input.rootPath,
+    settings: input.duplication,
+    runner: input.duplicateRunner,
+    tokenLines,
+    snapshotDigest: () => digestOfRoot(input.rootPath, parsed.keys()),
+  });
+}
+
+/** The project score of one collected report. */
+async function scoreReportOf(
+  input: ICollectHealthInput,
+  parsed: ReadonlyMap<string, IParsedHealthFile>,
+  facts: ReadonlyMap<string, IFileFacts>,
+  fileScores: readonly IHealthFileScore[],
+  graph: IHealthGraph,
+  hotspotReport: { hotspots: readonly IHotspotScore[]; summary: IHealthHotspotSummary },
+  deadFiles: IHealthDeadFiles,
+  exports: { readonly unused: number; readonly total: number },
+  functions: number,
+  failedFiles: number,
+  cycles: { readonly sccs: number; readonly files: number },
+  couplingHigh: number,
+): Promise<IHealthScore> {
+  const tokenLines = new Map([...parsed].map(([path, file]) => [path, tokenLinesOf(file)]));
+  const duplication = await duplicationOf(input, parsed, tokenLines);
+  const functionFiles = [...facts.values()].filter((fact) => fact.functions > 0).length;
+  const lowMaintainability =
+    fileScores.filter((score) => (facts.get(score.path)?.functions ?? 0) > 0 && score.mi < LOW_MAINTAINABILITY).length;
+  const critical = [...facts.values()].reduce((sum, fact) => sum + fact.critical, 0);
+  const overSize = [...facts.values()].reduce((sum, fact) => sum + fact.overSize, 0);
+  const scoreInput: IScoreInput = {
+    deadFiles: { count: deadFiles.count, population: deadFiles.population, available: deadFiles.available },
+    deadExports: { unused: exports.unused, total: exports.total },
+    complexity: { critical, units: functions, parseFailed: failedFiles > 0 },
+    maintainability: { low: lowMaintainability, files: functionFiles },
+    hotspots: {
+      count: hotspotReport.hotspots.filter((hotspot) => hotspot.score >= 50).length,
+      files: parsed.size,
+      available: hotspotReport.summary.available && !hotspotReport.summary.shallow,
+      reason: hotspotReport.summary.reason ??
+        (hotspotReport.summary.shallow ? "shallow-history" : "history-unavailable"),
+    },
+    cycles: { sccs: cycles.sccs, files: cycles.files, complete: graph.complete },
+    unitSize: { over: overSize, units: functions, parseFailed: failedFiles > 0 },
+    coupling: { high: couplingHigh, files: parsed.size, complete: graph.complete },
+    duplication: {
+      lines: duplication.lines,
+      total: duplication.total_lines,
+      available: duplication.available,
+      reason: duplication.reason,
+    },
+  };
+  return healthScoreOf(scoreSignalsOf(scoreInput));
+}
+
 /** The hotspot scores and their history status. */
 async function hotspotReportOf(
   input: ICollectHealthInput,
@@ -617,6 +726,21 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
   const deadFiles = await deadFilesOf(input.rootPath, new Set(parsed.keys()));
   const coverageSummary = await coverageSummaryOf(input, coverage, parsed);
   const hotspotReport = await hotspotReportOf(input, parsed, facts);
+  const vitalSigns = vitalSignsOf(bands, functions, graph, parsed.size);
+  const scoreReport = await scoreReportOf(
+    input,
+    parsed,
+    facts,
+    fileScores,
+    graph,
+    hotspotReport,
+    deadFiles,
+    exports,
+    functions,
+    errors.length,
+    vitalSigns.cycles,
+    vitalSigns.coupling.high_files,
+  );
   return {
     schema_version: HEALTH_SCHEMA_VERSION,
     formula_version: HEALTH_FORMULA_VERSION,
@@ -625,6 +749,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
     file_scores: fileScores,
     hotspots: hotspotReport.hotspots,
     hotspot_summary: hotspotReport.summary,
+    health_score: scoreReport,
     summary: {
       analyzed_files: parsed.size,
       excluded_files: excluded,
@@ -652,7 +777,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
         count_nullish: input.settings.countNullish,
       },
     },
-    vital_signs: vitalSignsOf(bands, functions, graph, parsed.size),
+    vital_signs: vitalSigns,
     errors,
     limits: {
       source_bytes: MAX_SOURCE_BYTES,

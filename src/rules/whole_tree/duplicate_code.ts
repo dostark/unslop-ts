@@ -86,6 +86,11 @@ export interface IDuplicateCodeReport {
 /** Runs jscpd with the given arguments and leaves its JSON report in the output directory. */
 export type TJscpdRunner = (args: readonly string[], outputDir: string) => Promise<void>;
 
+/** The optional placement of the report temporary directory. */
+export interface IDuplicateRunOptions {
+  readonly tempRoot?: string;
+}
+
 interface IRawRange {
   readonly name: string;
   readonly start: number;
@@ -223,8 +228,12 @@ async function scan(
   label: string,
   buildArgs: (outputDir: string) => string[],
   run: TJscpdRunner,
+  runOptions: IDuplicateRunOptions,
 ): Promise<{ total: IRawTotal; clones: IClone[] }> {
-  const outputDir = await Deno.makeTempDir({ prefix: "unslop_duplicate_code_" });
+  const outputDir = await Deno.makeTempDir({
+    prefix: "unslop_duplicate_code_",
+    ...(runOptions.tempRoot === undefined ? {} : { dir: runOptions.tempRoot }),
+  });
   try {
     await run(buildArgs(outputDir), outputDir);
     const report = await readReport(outputDir, label);
@@ -245,8 +254,15 @@ async function measureGroup(
   group: IDuplicateCodeGroup,
   run: TJscpdRunner,
   baseline: IDuplicateBaseline | null,
+  runOptions: IDuplicateRunOptions,
 ): Promise<IDuplicateCodeGroupResult> {
-  const { total, clones } = await scan(repoRoot, group.name, (dir) => buildJscpdArgs(settings, group, dir), run);
+  const { total, clones } = await scan(
+    repoRoot,
+    group.name,
+    (dir) => buildJscpdArgs(settings, group, dir),
+    run,
+    runOptions,
+  );
   const fresh = baseline === null ? [] : newClones(clones, baseline, group.name);
   const involvedLines = involvedLineCount(clones);
   const totalLines = total.lines ?? 0;
@@ -270,12 +286,14 @@ async function measureCross(
   settings: IDuplicateCodeSettings,
   run: TJscpdRunner,
   baseline: IDuplicateBaseline | null,
+  runOptions: IDuplicateRunOptions,
 ): Promise<ICrossGroupResult> {
   const { clones: all } = await scan(
     repoRoot,
     CROSS_GROUP_NAME,
     (dir) => buildUnionJscpdArgs(settings, settings.groups, dir),
     run,
+    runOptions,
   );
   const clones = crossGroupClones(all, settings.groups, settings.minLines);
   const fresh = baseline === null ? [] : newClones(clones, baseline, CROSS_GROUP_NAME);
@@ -333,12 +351,15 @@ export async function checkRepository(
   repoRoot: string,
   settings: IDuplicateCodeSettings,
   run: TJscpdRunner = npxRunner(settings.jscpdVersion, repoRoot),
+  runOptions: IDuplicateRunOptions = {},
 ): Promise<IDuplicateCodeReport> {
   const baseline = await loadBaseline(repoRoot, settings);
   const groups: IDuplicateCodeGroupResult[] = [];
-  for (const group of settings.groups) groups.push(await measureGroup(repoRoot, settings, group, run, baseline));
+  for (const group of settings.groups) {
+    groups.push(await measureGroup(repoRoot, settings, group, run, baseline, runOptions));
+  }
   const cross = settings.crossGroups && settings.groups.length > 1
-    ? await measureCross(repoRoot, settings, run, baseline)
+    ? await measureCross(repoRoot, settings, run, baseline, runOptions)
     : null;
   return { groups, cross };
 }

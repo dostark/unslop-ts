@@ -30,6 +30,9 @@ import {
   DEFAULT_SINCE_DAYS,
 } from "../../report/constants.ts";
 import { parseSince } from "../../report/churn.ts";
+import { localJscpdRunner } from "../../report/duplication.ts";
+import { DuplicateCodeSettingsSchema, type IDuplicateCodeSettings } from "../../rules/whole_tree/options.ts";
+import type { TJscpdRunner } from "../../rules/whole_tree/duplicate_code.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
 import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
 import type { IHealthReport } from "../../report/health_model.ts";
@@ -54,6 +57,7 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   "sort",
   "since",
   "min-commits",
+  "min-score",
 ]);
 
 /** The formats the command writes. */
@@ -91,6 +95,15 @@ function flagValues(args: readonly string[]): Map<string, string> {
 function positiveInteger(name: string, value: string): number {
   if (!/^\d+$/.test(value) || Number(value) <= 0) throw usage(`--${name} needs a positive integer`);
   return Number(value);
+}
+
+/** Reads a score threshold in the closed zero-to-one-hundred range. */
+function scoreThreshold(name: string, value: string): number {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > 100) {
+    throw usage(`--${name} needs a finite number in [0, 100]`);
+  }
+  return number;
 }
 
 /** Reads a positive finite number flag. */
@@ -244,6 +257,8 @@ function renderText(report: IHealthReport, top: number): string {
     `findings: ${report.summary.findings_population}`,
     `maxima: cyclomatic ${options.max_cyclomatic}, cognitive ${options.max_cognitive}, lines ${options.max_lines}, ` +
     `crap ${options.max_crap} (variant ${options.variant}, count-nullish ${options.count_nullish})`,
+    `score: ${report.health_score.value.toFixed(1)} ` +
+    `(${report.health_score.grade ?? "no-grade"}, ${report.health_score.status})`,
     `hotspots: ${
       report.hotspot_summary.available
         ? `${report.hotspot_summary.qualified} qualified of ${report.hotspot_summary.population} file(s), ` +
@@ -280,20 +295,85 @@ function renderText(report: IHealthReport, top: number): string {
         `(${finding.coverage_source}/${finding.coverage_reason}, ${finding.severity})`,
     );
   }
+  for (const signal of report.health_score.signals) {
+    if (signal.status === "measured") continue;
+    lines.push(`  signal ${signal.signal}: ${signal.status} (${signal.reason ?? "no reason"})`);
+  }
   return lines.join("\n");
 }
 
-/** Runs the health command and returns its exit code. */
-export async function runHealth(args: readonly string[]): Promise<number> {
-  const values = flagValues(args);
+/** The output format, validated against the accepted set. */
+function formatOf(values: Map<string, string>): string {
   const format = values.get("format") ?? DEFAULT_HEALTH_FORMAT;
   if (!FORMATS.has(format)) throw usage(`unknown format '${format}'`);
+  return format;
+}
+
+/** The sort key, validated against the accepted set. */
+function sortOf(values: Map<string, string>): HealthSortKey {
   const sort = (values.get("sort") ?? DEFAULT_HEALTH_SORT) as HealthSortKey;
   if (!SORT_KEYS.has(sort)) throw usage(`unknown sort '${sort}'`);
   if (values.has("variant") && !VARIANTS.has(values.get("variant") ?? "")) {
     throw usage(`unknown variant '${values.get("variant")}'`);
   }
+  return sort;
+}
+
+/** The canonical root that matches the descriptor, from the optional flag. */
+async function resolveRoot(descriptorRoot: string, values: Map<string, string>): Promise<string> {
+  const rootFlag = values.get("root");
+  const rootPath = rootFlag === undefined ? descriptorRoot : await canonicalRoot(toFileUrl(join(Deno.cwd(), rootFlag)));
+  if (rootPath !== descriptorRoot) throw usage(`--root must equal the descriptor root '${descriptorRoot}'`);
+  return rootPath;
+}
+
+/** The duplication settings and the validated local runner. */
+async function duplicationSetupOf(
+  compiled: ICompiledConfig,
+  rootPath: string,
+): Promise<{ duplication: IDuplicateCodeSettings | null; duplicateRunner: TJscpdRunner | null }> {
+  const rule = compiled.rules["duplicate-code"];
+  const options = rule?.effectiveOptions ?? rule?.defaultOptions ?? null;
+  if (options === null) return { duplication: null, duplicateRunner: null };
+  const parsed = DuplicateCodeSettingsSchema.safeParse(options);
+  if (!parsed.success) return { duplication: null, duplicateRunner: null };
+  try {
+    return { duplication: parsed.data, duplicateRunner: await localJscpdRunner(rootPath, parsed.data.jscpdVersion) };
+  } catch {
+    return { duplication: parsed.data, duplicateRunner: null };
+  }
+}
+
+/** Prints the report in the requested format. */
+function renderReport(report: IHealthReport, format: string, top: number): void {
+  if (format === "json") {
+    print(`${JSON.stringify({ ...report, findings: report.findings.slice(0, top) }, null, 2)}\n`);
+    return;
+  }
+  print(`${renderText(report, top)}\n`);
+}
+
+/** Applies the requested score gate and returns its exit code. */
+function gateOf(report: IHealthReport, minScore: number | null): number {
+  if (minScore === null) return 0;
+  if (report.health_score.status !== "complete") {
+    printError(`health score is partial; the ${minScore} gate cannot pass\n`);
+    return FAILURE_EXIT;
+  }
+  if (report.health_score.value < minScore) {
+    printError(`health score ${report.health_score.value.toFixed(1)} is below the ${minScore} gate\n`);
+    return FAILURE_EXIT;
+  }
+  return 0;
+}
+
+/** Runs the health command and returns its exit code. */
+export async function runHealth(args: readonly string[]): Promise<number> {
+  const values = flagValues(args);
+  const format = formatOf(values);
+  const sort = sortOf(values);
   const top = values.has("top") ? positiveInteger("top", values.get("top") ?? "") : DEFAULT_HEALTH_TOP;
+  const minScore = values.has("min-score") ? scoreThreshold("min-score", values.get("min-score") ?? "") : null;
   const now = new Date();
   const { sinceEpoch, minCommits } = historyWindowOf(values, now);
 
@@ -303,12 +383,9 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     values.get("plugin") ?? null,
   );
   const compiled = await readAndCompile(descriptor);
-  const descriptorRoot = await canonicalRoot(descriptor.rootUrl);
-  const rootFlag = values.get("root");
-  const rootPath = rootFlag === undefined ? descriptorRoot : await canonicalRoot(toFileUrl(join(Deno.cwd(), rootFlag)));
-  if (rootPath !== descriptorRoot) throw usage(`--root must equal the descriptor root '${descriptorRoot}'`);
-
+  const rootPath = await resolveRoot(await canonicalRoot(descriptor.rootUrl), values);
   const settings = settingsOf(compiled, descriptor.pluginName, values);
+  const { duplication, duplicateRunner } = await duplicationSetupOf(compiled, rootPath);
   const coverage = await coverageInputOf(values.get("coverage"), rootPath);
   const report = await reportOrFail({
     rootPath,
@@ -323,13 +400,13 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     sinceEpoch,
     minCommits,
     nowEpoch: Math.floor(now.getTime() / 1000),
+    duplication,
+    duplicateRunner,
   });
 
-  if (format === "json") {
-    print(`${JSON.stringify({ ...report, findings: report.findings.slice(0, top) }, null, 2)}\n`);
-  } else {
-    print(`${renderText(report, top)}\n`);
-  }
+  renderReport(report, format, top);
+  const gate = gateOf(report, minScore);
+  if (gate !== 0) return gate;
   for (const error of report.errors) printError(`${error.path}: ${error.message}\n`);
   return report.errors.length > 0 ? FAILURE_EXIT : 0;
 }

@@ -30,7 +30,11 @@ const MIXED = "export function wide(value: number | null): number {\n" +
   "}\n\n" +
   "export function small(): number {\n  return 1;\n}\n";
 
-const DESCRIPTOR = `import { type IProjectDescriptor, TYPESCRIPT_RULE_PACK } from "@dostark/unslop-ts";
+const DESCRIPTOR = `import {
+  type IProjectDescriptor,
+  TYPESCRIPT_RULE_PACK,
+  WHOLE_TREE_CHECKS,
+} from "@dostark/unslop-ts";
 
 const rootUrl = new URL("./", import.meta.url);
 
@@ -42,12 +46,17 @@ export const descriptor: IProjectDescriptor = {
   pluginUrl: new URL("plugin.ts", rootUrl),
   packs: [TYPESCRIPT_RULE_PACK],
   scriptRules: {},
-  wholeTreeHosts: {},
+  wholeTreeHosts: {
+    "duplicate-code": {
+      controls: WHOLE_TREE_CHECKS["duplicate-code"].controls,
+      command: ["deno", "task", "duplicate-code"],
+    },
+  },
 };
 `;
 
 /** A version 2 configuration that pins non-default maxima and keeps every gate scope outside the fixture paths. */
-function catalog(): Record<string, unknown> {
+function catalog(extraRules: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     version: 2,
     plugin: "demo",
@@ -58,6 +67,7 @@ function catalog(): Record<string, unknown> {
       "demo/max-cyclomatic-complexity": { level: "error", options: { max: 1, variant: "classic" } },
       "demo/max-cognitive-complexity": { level: "error", options: { max: 1, countNullish: false } },
       "demo/max-function-lines": { level: "error", options: { max: 2 } },
+      ...extraRules,
     },
   };
 }
@@ -66,6 +76,7 @@ function catalog(): Record<string, unknown> {
 async function withHealthProject<T>(
   files: Readonly<Record<string, string>>,
   body: (dir: string) => Promise<T>,
+  extraRules: Record<string, unknown> = {},
 ): Promise<T> {
   const dir = await Deno.makeTempDir({ prefix: "unslop_health_" });
   try {
@@ -74,7 +85,7 @@ async function withHealthProject<T>(
       JSON.stringify({ imports: { "@dostark/unslop-ts": ENGINE, ...(await enginePins()) } }),
     );
     await Deno.writeTextFile(join(dir, "unslop.project.ts"), DESCRIPTOR);
-    await Deno.writeTextFile(join(dir, "unslop.config.json"), JSON.stringify(catalog(), null, 2));
+    await Deno.writeTextFile(join(dir, "unslop.config.json"), JSON.stringify(catalog(extraRules), null, 2));
     await Deno.writeTextFile(join(dir, "plugin.ts"), "export {};\n");
     for (const [path, source] of Object.entries(files)) {
       await Deno.mkdir(join(dir, path, ".."), { recursive: true });
@@ -354,5 +365,80 @@ Deno.test("health-cycle-cli: the command exposes the exact cycle and coupling po
     assertEquals(report.vital_signs.coupling.fan_in_limit, 20);
     assertEquals(report.vital_signs.coupling.fan_out_limit, 15);
     assertEquals(report.summary.graph.runtime_edges, 2);
+  });
+});
+
+/** The fake local jscpd package with a zero-duplication report. */
+const FAKE_JSCPD: Readonly<Record<string, string>> = {
+  "node_modules/jscpd/package.json": JSON.stringify({ name: "jscpd", version: "5.4.2", bin: "bin/jscpd.js" }),
+  "node_modules/jscpd/bin/jscpd.js": 'const fs = require("node:fs");\n' +
+    'const out = process.argv[process.argv.indexOf("--output") + 1];\n' +
+    'fs.writeFileSync(out + "/jscpd-report.json", JSON.stringify({ statistics: { total: ' +
+    "{ percentage: 0, duplicatedLines: 0, sources: 1, lines: 30 } }, duplicates: [] }));\n",
+};
+
+/** The duplicate-code rule options that make the fixture run the local fake runner. */
+const DUPLICATE_RULE: Record<string, unknown> = {
+  "duplicate-code": {
+    level: "error",
+    options: {
+      jscpdVersion: "5.4.2",
+      minLines: 5,
+      minTokens: 50,
+      maxGapLines: 0,
+      baseline: null,
+      crossGroups: false,
+      groups: [{
+        name: "src",
+        paths: ["packages/x/src"],
+        ignore: [],
+        threshold: 100,
+        minLines: 5,
+        maxGapLines: 0,
+        pattern: null,
+      }],
+    },
+  },
+};
+
+Deno.test("health-min-score-exit: the gate passes equality only on a complete score", async () => {
+  const files: Readonly<Record<string, string>> = {
+    "packages/x/src/a.ts": "export function a(flag: boolean): number {\n  return flag ? 1 : 2;\n}\n",
+  };
+  await withHealthProject({ ...files, ...FAKE_JSCPD }, async (dir) => {
+    await gitIn(dir, ["init", "-b", "main"]);
+    await gitIn(dir, ["add", "-A"]);
+    await gitIn(dir, ["commit", "-m", "first"]);
+
+    const raw = await health(dir, ["--format=json"]);
+    assertEquals(raw.code, 0, raw.stderr);
+    const complete = parseReport(raw.stdout);
+    assertEquals(complete.health_score.status, "complete");
+    const value = complete.health_score.value;
+    const failed = complete.health_score.signals.filter((signal) => signal.status === "unavailable");
+    assertEquals(failed.map((signal) => `${signal.signal}:${signal.reason}`), []);
+
+    const equal = await health(dir, ["--min-score=" + String(value)]);
+    assertEquals(equal.code, 0, equal.stderr);
+    const above = await health(dir, ["--min-score=" + String(value - 1)]);
+    assertEquals(above.code, 0, above.stderr);
+    const below = await health(dir, ["--min-score=" + String(Math.min(value + 1, 100))]);
+    assertEquals(below.code, 1);
+    const invalid = await health(dir, ["--min-score=101"]);
+    assertEquals(invalid.code, 2);
+  }, DUPLICATE_RULE);
+});
+
+Deno.test("health-min-score-exit: a partial score never passes a gate", async () => {
+  await withHealthProject(MAIN_FILES, async (dir) => {
+    const partial = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(partial.health_score.status, "partial");
+    assertEquals(partial.health_score.grade, null);
+    const gated = await health(dir, ["--min-score=0"]);
+    assertEquals(gated.code, 1);
+    const negative = await health(dir, ["--min-score=-1"]);
+    assertEquals(negative.code, 2);
+    const text = await health(dir, []);
+    assertStringIncludes(text.stdout, "partial");
   });
 });

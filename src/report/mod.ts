@@ -67,6 +67,14 @@ export {
   parseHistory,
   parseSince,
 } from "./churn.ts";
+export {
+  duplicatedLinesOf,
+  type IDuplicationInput,
+  type IDuplicationMeasurement,
+  localJscpdRunner,
+  measureDuplication,
+} from "./duplication.ts";
+export { gradeOf, healthScoreOf, type IScoreInput, scoreSignalsOf, scoreValueOf } from "./health_score.ts";
 export { type ILcovCoverage, type ILcovFileCoverage, parseLcov } from "./lcov.ts";
 export {
   HEALTH_FORMULA_VERSION,
