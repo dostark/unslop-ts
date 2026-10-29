@@ -67,8 +67,8 @@ function isScript(filename: string): boolean {
   return SCRIPT_EXTENSIONS.has(extensionOf(filename));
 }
 
-/** Parses the file once, naming the file when the parser rejects it. */
-function parseSource(text: string, filename: string): ParseResult {
+/** Parses one source text with the pinned parser, naming the file when the parser rejects it. */
+export function parseSourceText(text: string, filename: string): ParseResult {
   try {
     return parse(text, {
       sourceType: isScript(filename) ? "script" : "module",
@@ -125,14 +125,10 @@ function positionOf(starts: readonly number[], offset: number): IMetricPosition 
   return { line: low + 1, column: offset - starts[low] + 1 };
 }
 
-/** Parses the source text once and returns its tokens and position lookup. */
-export function createMeasurementContext(
-  sourceCode: IMeasurementSource,
-  filename: string,
-): IMeasurementContext {
-  const tree = parseSource(sourceCode.text, filename);
-  const collected = collectTokens(tree, sourceCode.text);
-  const lineStarts = lineStartsOf(sourceCode.text);
+/** Builds the tokens and position lookup of an already parsed source text. */
+export function measurementContextOf(tree: ParseResult, text: string): IMeasurementContext {
+  const collected = collectTokens(tree, text);
+  const lineStarts = lineStartsOf(text);
   return {
     syntaxTree: tree,
     tokens: collected.tokens,
@@ -141,4 +137,12 @@ export function createMeasurementContext(
       return positionOf(lineStarts, offset);
     },
   };
+}
+
+/** Parses the source text once and returns its tokens and position lookup. */
+export function createMeasurementContext(
+  sourceCode: IMeasurementSource,
+  filename: string,
+): IMeasurementContext {
+  return measurementContextOf(parseSourceText(sourceCode.text, filename), sourceCode.text);
 }

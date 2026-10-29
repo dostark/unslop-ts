@@ -27,6 +27,7 @@ import { renderEslintFragment, renderOxlintFragment, toHostConfig } from "../con
 import { parseFormat, parseReportFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
 import { buildDenoPolicy, DenoPolicyError } from "./commands/deno_policy.ts";
+import { runHealth } from "./commands/health.ts";
 import { runMigrate } from "./commands/migrate.ts";
 import { renderReport, reportExitCode, runReport } from "./commands/report.ts";
 import { type IRuleEditRequest, runRuleEdit } from "./commands/rules_write.ts";
@@ -56,6 +57,7 @@ const USAGE = [
   "  unslop config export --host=eslint|oxlint --out=<path> [--overwrite] [--descriptor=<entry>]",
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
   "  unslop deno-policy --config=<file> --out=<dir> [--packs=typescript[,deno]]",
+  "  unslop health [--format=text|json] [--descriptor=<entry>] [--root=<dir>]",
   "  unslop report [--format=table|json|markdown|sarif] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
@@ -374,6 +376,7 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "migrate") return await migrateCommand(rest);
     if (command === "deno-policy") return await denoPolicyCommand(rest);
     if (command === "report") return await reportCommand(rest);
+    if (command === "health") return await runHealth(rest);
     throw new CliError(USAGE_EXIT, `${command === undefined ? "" : `unknown command '${command}'\n`}${USAGE}`);
   } catch (error) {
     if (error instanceof CliError) {

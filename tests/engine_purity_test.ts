@@ -234,9 +234,31 @@ Deno.test("engine_suite_and_public_exports", async () => {
     "NOT_ENABLED_REASON",
   ];
   for (const name of exported) assert(name in api, name);
-  for (const name of ["createLintPlugin", "runPlugin", "createUnslopProject", "collectRunReport", "failingFindings"]) {
+  for (
+    const name of [
+      "createLintPlugin",
+      "runPlugin",
+      "createUnslopProject",
+      "collectRunReport",
+      "failingFindings",
+      "parseHealthFile",
+      "collectHealth",
+    ]
+  ) {
     assertFalse(name in api, name);
   }
+});
+
+Deno.test("health-parser-package: the report entry owns the parser and the pin stays exact", async () => {
+  const report = await import("../src/report/mod.ts");
+  assertEquals(typeof report.parseHealthFile, "function");
+  assertEquals(typeof report.collectHealth, "function");
+  assertEquals(typeof report.HealthReportSchema.safeParse, "function");
+  const config = JSON.parse(await Deno.readTextFile(new URL("../deno.json", import.meta.url)));
+  assert(/^npm:@babel\/parser@\d+\.\d+\.\d+$/.test(config.imports["@babel/parser"]), config.imports["@babel/parser"]);
+  assertEquals(config.exports["./report"], "./src/report/mod.ts");
+  const parser = await Deno.readTextFile(new URL("../src/report/parse.ts", import.meta.url));
+  assertFalse(parser.includes('from "@babel/parser"'), "the report parser reuses the metric context parse");
 });
 
 Deno.test("the import closure of the root export uses no Deno global and only zod", async () => {

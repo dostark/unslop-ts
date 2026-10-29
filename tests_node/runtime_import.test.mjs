@@ -21,6 +21,14 @@ test("mod.ts imports in-process on the running runtime", () => {
   assert.equal(typeof api.compileConfig, "function");
 });
 
+test("the Deno-only health parser never enters the portable root API", () => {
+  assert.equal("parseHealthFile" in api, false);
+  assert.equal("collectHealth" in api, false);
+  const deno = JSON.parse(readFileSync(join(ROOT, "deno.json"), "utf8"));
+  assert.match(deno.imports["@babel/parser"], /^npm:@babel\/parser@\d+\.\d+\.\d+$/);
+  assert.equal(deno.exports["./report"], "./src/report/mod.ts");
+});
+
 test("zod resolves from the package install at the pinned version", () => {
   // Node and Bun canonicalize the root link to its hosts/ target, so check both
   // the resolved location and the link that makes the root the nearest install.
