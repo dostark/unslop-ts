@@ -9,6 +9,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
+import { canRun } from "./helpers/permissions.ts";
 import { checkRepository, type TJscpdRunner } from "../src/rules/whole_tree/duplicate_code.ts";
 import type { IDuplicateCodeSettings } from "../src/rules/whole_tree/options.ts";
 import {
@@ -169,7 +170,12 @@ Deno.test("health-duplication-union: overlapping copies union once and a changed
   assertEquals(changed.reason, "source-changed-during-scan");
 });
 
-Deno.test("health-runner-security: the local bin is version and containment checked, and failures clean up", async () => {
+const NODE_RUNNABLE = canRun("node");
+if (!NODE_RUNNABLE) console.warn("the jscpd runner tests are ignored: the process may not spawn node");
+
+Deno.test("health-runner-security: the local bin is version and containment checked, and failures clean up", {
+  ignore: !NODE_RUNNABLE,
+}, async () => {
   const root = await Deno.makeTempDir({ prefix: "unslop_jscpd_" });
   const tempRoot = await Deno.makeTempDir({ prefix: "unslop_jscpd_temp_" });
   try {
@@ -353,7 +359,9 @@ Deno.test("health-clone-finite-ranges: invalid ranges become attributed absences
   assertEquals(accepted.available, true, accepted.reason ?? "");
 });
 
-Deno.test("health-runner-stream-bounds: a runner that floods stderr or stalls is killed and rejected", async () => {
+Deno.test("health-runner-stream-bounds: a runner that floods stderr or stalls is killed and rejected", {
+  ignore: !NODE_RUNNABLE,
+}, async () => {
   const root = await Deno.makeTempDir({ prefix: "unslop_jscpd_flood_" });
   try {
     await Deno.mkdir(join(root, "node_modules/jscpd/bin"), { recursive: true });

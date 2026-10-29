@@ -9,6 +9,7 @@
 
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { join } from "@std/path";
+import { canRead } from "./helpers/permissions.ts";
 import { coverageOfUnit, crapBandOf, crapOf, estimatedCoverageOf } from "../src/report/crap.ts";
 import { assertCoverageManifest, coverageRevisionOf } from "../src/report/health.ts";
 import { LcovError, MAX_LCOV_RECORD_BYTES, parseLcov } from "../src/report/lcov.ts";
@@ -16,6 +17,7 @@ import { BoundedReadError, readFileBounded } from "../src/report/bounded_io.ts";
 import { parseHealthFile } from "../src/report/parse.ts";
 
 const ROOT = "/root";
+const ENDLESS_DEVICE = "/dev/zero";
 const SNAPSHOT: ReadonlySet<string> = new Set(["packages/x/src/a.ts", "packages/x/src/b.ts"]);
 
 /** One LCOV fixture with the supported record kinds. */
@@ -242,8 +244,10 @@ Deno.test("health-input-stream-bounds: oversized and endless inputs reject durin
     await Deno.writeFile(sized, new Uint8Array(2048));
     assertEquals((await readFileBounded(sized, 2048)).byteLength, 2048);
     await assertRejects(() => readFileBounded(sized, 2047), BoundedReadError, "2047");
-    await assertRejects(() => readFileBounded("/dev/zero", 1024 * 1024), BoundedReadError);
-    await assertRejects(() => parseHealthFile("/dev/zero", "endless.ts"), Error, "source bound");
+    if (canRead(ENDLESS_DEVICE)) {
+      await assertRejects(() => readFileBounded(ENDLESS_DEVICE, 1024 * 1024), BoundedReadError);
+      await assertRejects(() => parseHealthFile(ENDLESS_DEVICE, "endless.ts"), Error, "source bound");
+    }
 
     const record = `SF:packages/x/src/a.ts\n${"DA:1,".repeat(MAX_LCOV_RECORD_BYTES / 4)}`;
     assertThrows(() => parseLcov(record, ROOT, SNAPSHOT), LcovError, "byte bound");
