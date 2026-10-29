@@ -392,6 +392,44 @@ Deno.test("health-malformed-lcov-cli: malformed coverage cannot produce a succes
   }
 });
 
+Deno.test("health-freshness-cli: only a complete matching manifest emits revision verified", async () => {
+  const sources: Readonly<Record<string, string>> = {
+    "packages/x/src/a.ts": "export function a(): number {\n  return 1;\n}\n",
+    "packages/x/src/b.ts": "export function b(): number {\n  return 2;\n}\n",
+  };
+  const hashOf = async (text: string): Promise<string> =>
+    [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))]
+      .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const a = await hashOf(sources["packages/x/src/a.ts"]);
+  const b = await hashOf(sources["packages/x/src/b.ts"]);
+  const lcov = Object.keys(sources).map((path) => `SF:${path}\nDA:1,1\nend_of_record\n`).join("");
+  const cases: readonly {
+    readonly files: Record<string, string>;
+    readonly code: number;
+    readonly revision?: string;
+  }[] = [
+    { files: { "packages/x/src/a.ts": a, "packages/x/src/b.ts": b }, code: 0, revision: "verified" },
+    { files: {}, code: 0, revision: "unverified" },
+    { files: { "packages/x/src/a.ts": a }, code: 0, revision: "unverified" },
+    { files: { "packages/x/src/a.ts": a, "packages/x/src/b.ts": "0".repeat(64) }, code: 1 },
+    { files: { "packages/x/src/a.ts": a, "packages/x/src/b.ts": b, "packages/x/src/gone.ts": a }, code: 1 },
+    { files: { "packages/x/src/a.ts": "nothex", "packages/x/src/b.ts": b }, code: 1 },
+  ];
+  for (const entry of cases) {
+    await withHealthProject({
+      ...sources,
+      "coverage.lcov": lcov,
+      "coverage.lcov.manifest.json": JSON.stringify({ files: entry.files }),
+    }, async (dir) => {
+      const result = await health(dir, ["--format=json", "--coverage=coverage.lcov"]);
+      assertEquals(result.code, entry.code, `${JSON.stringify(entry.files)} ${result.stderr}`);
+      if (entry.revision !== undefined) {
+        assertEquals(parseReport(result.stdout).summary.coverage.revision, entry.revision, JSON.stringify(entry.files));
+      }
+    });
+  }
+});
+
 Deno.test("health-cycle-cli: the command exposes the exact cycle and coupling populations", async () => {
   const files: Readonly<Record<string, string>> = {
     "packages/x/src/a.ts": 'import type { IThing } from "./types.ts";\n' +

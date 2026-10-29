@@ -91,6 +91,8 @@ export interface IHealthSettings {
   readonly countNullish: boolean;
 }
 
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
 /** Everything one collection run reads. */
 export interface ICollectHealthInput {
   readonly rootPath: string;
@@ -658,23 +660,37 @@ async function coverageSummaryOf(
     source: coverage === null ? "none" : "lcov",
     file_sha256: input.coverageSha256,
     snapshot_sha256: await snapshotSha256(parsed),
-    revision: input.coverageManifest === null ? "unverified" : "verified",
+    revision: coverageRevisionOf(input.coverageManifest, coverage, parsed),
     matched_files: coverage?.files.size ?? 0,
     unmatched_files: coverage?.unmatched.length ?? 0,
   };
 }
 
-/** Rejects a supplied coverage manifest that disagrees with the measured snapshot hashes. */
+/** Rejects a supplied coverage manifest with a malformed hash, an unknown path or a changed source. */
 export function assertCoverageManifest(
   manifest: Record<string, string> | null,
   parsed: ReadonlyMap<string, IParsedHealthFile>,
 ): void {
   for (const [path, hash] of Object.entries(manifest ?? {})) {
+    if (!SHA256_HEX.test(hash)) throw new Error(`the coverage manifest hash of '${path}' is not a SHA-256 digest`);
     const file = parsed.get(path);
     if (file === undefined || file.sha256 !== hash) {
       throw new Error(`the coverage manifest disagrees with the measured source hash of '${path}'`);
     }
   }
+}
+
+/** Verified only when the manifest names every covered source and each hash matches the measured bytes. */
+export function coverageRevisionOf(
+  manifest: Record<string, string> | null,
+  coverage: ILcovCoverage | null,
+  parsed: ReadonlyMap<string, IParsedHealthFile>,
+): "verified" | "unverified" {
+  if (manifest === null || coverage === null || coverage.files.size === 0) return "unverified";
+  for (const path of coverage.files.keys()) {
+    if (!Object.hasOwn(manifest, path) || manifest[path] !== parsed.get(path)?.sha256) return "unverified";
+  }
+  return "verified";
 }
 
 /** The raw export population of the snapshot, resolved against the project import graph. */

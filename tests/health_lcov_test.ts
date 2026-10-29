@@ -10,7 +10,7 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { join } from "@std/path";
 import { coverageOfUnit, crapBandOf, crapOf, estimatedCoverageOf } from "../src/report/crap.ts";
-import { assertCoverageManifest } from "../src/report/health.ts";
+import { assertCoverageManifest, coverageRevisionOf } from "../src/report/health.ts";
 import { LcovError, MAX_LCOV_RECORD_BYTES, parseLcov } from "../src/report/lcov.ts";
 import { parseHealthFile } from "../src/report/parse.ts";
 
@@ -172,6 +172,63 @@ Deno.test("lcov-ownership-and-errors: a manifest is accepted when it matches the
       "disagrees",
     );
     assertThrows(() => assertCoverageManifest({ "packages/x/src/missing.ts": "b".repeat(64) }, parsed), Error);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("coverage-manifest-population: empty, partial, unknown and changed-source maps cannot certify covered files", async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    const sources = { "packages/x/src/a.ts": "export const a = 1;\n", "packages/x/src/b.ts": "export const b = 2;\n" };
+    const parsed = new Map<string, Awaited<ReturnType<typeof parseHealthFile>>>();
+    for (const [path, text] of Object.entries(sources)) {
+      await Deno.writeTextFile(join(dir, "f.ts"), text);
+      parsed.set(path, await parseHealthFile(join(dir, "f.ts"), path));
+    }
+    const hashOf = (path: string): string => parsed.get(path)?.sha256 ?? "";
+    const lcov = (paths: readonly string[]) =>
+      parseLcov(paths.map((path) => `SF:${path}\nDA:1,1\nend_of_record`).join("\n"), ROOT, new Set(parsed.keys()));
+    const both = lcov(Object.keys(sources));
+    const complete = {
+      "packages/x/src/a.ts": hashOf("packages/x/src/a.ts"),
+      "packages/x/src/b.ts": hashOf("packages/x/src/b.ts"),
+    };
+
+    assertEquals(coverageRevisionOf(complete, both, parsed), "verified");
+    assertEquals(coverageRevisionOf(null, both, parsed), "unverified");
+    assertEquals(coverageRevisionOf({}, both, parsed), "unverified");
+    assertEquals(
+      coverageRevisionOf({ "packages/x/src/a.ts": complete["packages/x/src/a.ts"] }, both, parsed),
+      "unverified",
+    );
+    assertEquals(coverageRevisionOf(complete, lcov([]), parsed), "unverified");
+    assertEquals(coverageRevisionOf(complete, null, parsed), "unverified");
+
+    assertThrows(
+      () => assertCoverageManifest({ ...complete, "packages/x/src/unknown.ts": "a".repeat(64) }, parsed),
+      Error,
+    );
+    assertThrows(
+      () => assertCoverageManifest({ ...complete, "packages/x/src/a.ts": "b".repeat(64) }, parsed),
+      Error,
+      "disagrees",
+    );
+    assertThrows(
+      () => assertCoverageManifest({ ...complete, "packages/x/src/a.ts": "not-a-hash" }, parsed),
+      Error,
+      "SHA-256",
+    );
+    assertThrows(
+      () =>
+        assertCoverageManifest(
+          { ...complete, "packages/x/src/a.ts": complete["packages/x/src/a.ts"].toUpperCase() },
+          parsed,
+        ),
+      Error,
+      "SHA-256",
+    );
+    assertCoverageManifest(complete, parsed);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
