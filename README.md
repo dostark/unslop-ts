@@ -422,6 +422,37 @@ schemes before import, and it refuses a JSONC lint configuration instead of pars
 and their transitive imports are trusted executable project code, not a sandbox; the CLI itself does
 not request, store, or print credentials.
 
+## Health report
+
+`unslop health` measures the whole project and prints one report with the `unslop-health-v1` schema.
+
+```bash
+deno run --allow-read --allow-env --allow-run=git,node src/cli/unslop.ts health --format=json
+```
+
+The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, `--max-cyclomatic`,
+`--max-cognitive`, `--max-lines`, `--max-crap`, `--coverage`, `--variant=classic|extended`, `--count-nullish`,
+`--top`, `--sort`, `--since`, `--min-commits` and `--min-score`.
+
+- **Permissions:** the command reads the project and the environment, and it runs `git` and `node`. The
+  duplication signal needs a local `jscpd` package. Without that package the signal is `not_measured`, and a
+  run without `--coverage` leaves coverage `not_measured`.
+- **Coverage:** `--coverage` takes an LCOV file inside the project root. Without it, CRAP uses the documented
+  reachability fallbacks.
+- **History:** `--since` accepts a day count, a month count or an ISO date, and `--min-commits` sets the
+  history floor.
+- **Score:** the project score starts at 100 and subtracts one capped penalty per signal. Grades are A at 85,
+  B at 70, C at 55 and D at 40. A partial report prints no grade, and `--min-score` fails on a partial score.
+
+The `./metrics` entry exports the measurement API: `createMeasurementContext`, `functionUnits`,
+`measureFunction`, `METRIC_CONTRIBUTION_KINDS` and the metric types. The `./report` entry exports the report
+schemas and the collection functions. The formulas, the construct tables and the calibration record are in
+[docs/metrics_methodology.md](docs/metrics_methodology.md).
+
+**Compatibility:** the engine default variant is `extended` with `countNullish: true`. A consumer that pins
+`variant: "classic"` keeps the legacy counts. A consumer can pin classic during its transition and remove the
+pin at its measured cutover.
+
 ## Editing
 
 `rules enable`, `disable`, `set`, and `unset` re-read the file on every call, validate the result by

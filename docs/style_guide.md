@@ -368,12 +368,16 @@ Keep functions and classes small enough to read in one pass.
 - **Parameters:** a function, method, or constructor takes at most 7 parameters. For more, pass a parameter
   object (an interface that describes the arguments), pass a shared context object, or split the function.
 - **Cyclomatic complexity:** a function scores 1 plus one for each `if`, loop, `catch`, conditional
-  expression, `case` with a test, and `&&` or `||` operator. The default limit is 15. Nested functions are
-  scored on their own.
+  expression, `case` with a test, and `&&` or `||` operator. This is the `classic` variant. The `extended`
+  variant also counts each `??`, each optional-chain link (`?.`) and each logical assignment (`&&=`, `||=`,
+  `??=`); `countNullish` controls whether `??` counts. The default limit is 15, the engine default variant is
+  `extended` and nested functions are scored on their own. The construct tables and the fallow comparison are
+  in [Metrics methodology](metrics_methodology.md).
 - **Cognitive complexity:** a function scores one for each `if`, loop, `switch`, `catch`, conditional
   expression, and logical operator run, plus one per level of nesting. `else if` and `else` add one without a
   nesting surcharge. A labeled jump and a direct recursive call add one each. The default limit is 15, and
-  each function starts at nesting zero.
+  each function starts at nesting zero. The weight table and the paper, SonarJS and fallow differences are in
+  [Metrics methodology](metrics_methodology.md).
 - **Function size:** a function owns at most 60 code-token lines by default. Comments and blank lines never
   count, and a nested function body belongs to that function, not to its parent.
 - **Class size:** a class of at least 200 lines gets a score from its method count, constructor parameters,

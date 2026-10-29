@@ -442,3 +442,37 @@ Deno.test("health-min-score-exit: a partial score never passes a gate", async ()
     assertStringIncludes(text.stdout, "partial");
   });
 });
+
+Deno.test("the_readme_documents_every_health_flag", async () => {
+  const readme = await Deno.readTextFile(new URL("../README.md", import.meta.url));
+  const start = readme.indexOf("## Health report");
+  assert(start >= 0);
+  const section = readme.slice(start, readme.indexOf("## Editing", start));
+  for (
+    const flag of [
+      "--root",
+      "--descriptor",
+      "--plugin",
+      "--format",
+      "--max-cyclomatic",
+      "--max-cognitive",
+      "--max-lines",
+      "--max-crap",
+      "--coverage",
+      "--variant",
+      "--count-nullish",
+      "--top",
+      "--sort",
+      "--since",
+      "--min-commits",
+      "--min-score",
+    ]
+  ) {
+    assertStringIncludes(section, flag);
+  }
+  assertStringIncludes(section, "unslop-health-v1");
+  assertStringIncludes(section, "--allow-run=git,node");
+  assertStringIncludes(section, "jscpd");
+  assertStringIncludes(section, "./metrics");
+  assertStringIncludes(section, "./report");
+});

@@ -156,3 +156,15 @@ Deno.test("engine_guide_claims_still_pass", () => {
   assert(GUIDE.includes("reports"));
   assert(GUIDE.includes("unslop"));
 });
+
+Deno.test("complexity_section_names_both_variants_and_the_methodology", () => {
+  const start = GUIDE.indexOf("## Function & Method Complexity");
+  assert(start >= 0);
+  const section = GUIDE.slice(start, GUIDE.indexOf("## Optional Parameters", start));
+  for (const construct of ["`classic`", "`extended`", "`??`", "`?.`", "`&&=`", "`countNullish`"]) {
+    assertStringIncludes(section, construct);
+  }
+  assertStringIncludes(section, "[Metrics methodology](metrics_methodology.md)");
+  assertStringIncludes(section, "default limit is 15");
+  assertStringIncludes(section, "60 code-token lines");
+});
