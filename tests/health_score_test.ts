@@ -12,6 +12,7 @@ import { join } from "@std/path";
 import { checkRepository, type TJscpdRunner } from "../src/rules/whole_tree/duplicate_code.ts";
 import type { IDuplicateCodeSettings } from "../src/rules/whole_tree/options.ts";
 import {
+  collectHealth,
   duplicatedLinesOf,
   gradeOf,
   healthScoreOf,
@@ -248,3 +249,51 @@ async function assertThrowsAsync(call: () => Promise<unknown>, fragment: string)
 function assertStringIncludes(actual: string, expected: string): void {
   assert(actual.includes(expected), `'${actual}' does not include '${expected}'`);
 }
+
+const POPULATION_FILES = 100;
+const CYCLE_FILES = 2;
+
+Deno.test("health-cycle-score-population: one two-file cycle among 100 files scores over all measured files", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "unslop_cycle_score_" });
+  try {
+    await Deno.mkdir(join(dir, "src"));
+    await Deno.writeTextFile(join(dir, "src/a.ts"), 'import { b } from "./b.ts";\nexport const a = b;\n');
+    await Deno.writeTextFile(join(dir, "src/b.ts"), 'import { a } from "./a.ts";\nexport const b = () => a;\n');
+    for (let index = 0; index < POPULATION_FILES - CYCLE_FILES; index++) {
+      await Deno.writeTextFile(join(dir, `src/f${index}.ts`), `export const f${index} = ${index};\n`);
+    }
+    const report = await collectHealth({
+      rootPath: dir,
+      ignoreGlobs: [],
+      scopes: { test: [], fixture: [] },
+      settings: {
+        maxCyclomatic: 15,
+        maxCognitive: 15,
+        maxLines: 60,
+        maxCrap: 30,
+        variant: "extended",
+        countNullish: true,
+      },
+      sort: "severity",
+      coverageText: null,
+      testGlobs: [],
+      coverageSha256: null,
+      coverageManifest: null,
+      sinceEpoch: 0,
+      minCommits: 1,
+      nowEpoch: 0,
+      duplication: null,
+      duplicateRunner: null,
+      publicEntries: [],
+    });
+    const signal = report.health_score.signals.find((entry) => entry.signal === "cycles");
+    assertEquals(signal?.numerator, 1);
+    assertEquals(signal?.denominator, POPULATION_FILES);
+    assertEquals(signal?.raw, 10);
+    assertEquals(signal?.penalty, 5);
+    assertEquals(report.vital_signs.cycles.per_thousand, signal?.raw);
+    assertEquals(report.vital_signs.cycles.files, CYCLE_FILES);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

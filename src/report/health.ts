@@ -587,7 +587,7 @@ async function scoreReportOf(
   exports: { readonly unused: number; readonly total: number },
   functions: number,
   failedFiles: number,
-  cycles: { readonly sccs: number; readonly files: number },
+  cycles: { readonly sccs: number },
   couplingHigh: number,
 ): Promise<IHealthScore> {
   const tokenLines = new Map([...parsed].map(([path, file]) => [path, tokenLinesOf(file)]));
@@ -609,7 +609,7 @@ async function scoreReportOf(
       reason: hotspotReport.summary.reason ??
         (hotspotReport.summary.shallow ? "shallow-history" : "history-unavailable"),
     },
-    cycles: { sccs: cycles.sccs, files: cycles.files, complete: graph.complete },
+    cycles: { sccs: cycles.sccs, files: parsed.size, complete: graph.complete },
     unitSize: { over: overSize, units: functions, parseFailed: failedFiles > 0 },
     coupling: { high: couplingHigh, files: parsed.size, complete: graph.complete },
     duplication: {
