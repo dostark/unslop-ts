@@ -3,6 +3,7 @@
     "./unslop.plugin.mjs"
   ],
   "rules": {
+    "demo/barrel-only-reexports": "off",
     "demo/no-chained-type-assertions": [
       "error",
       {
@@ -37,6 +38,7 @@
     "demo/dynamic-import": "off",
     "demo/inline-type-import": "error",
     "demo/re-export-imported": "off",
+    "demo/prefer-named-imports": "off",
     "demo/import-placement": "off",
     "demo/exported-interface-placement": "off",
     "demo/promise-response-alias": "error",
@@ -106,6 +108,7 @@
       "ignoreGlobs": [],
       "docsBase": "https://github.com/dostark/unslop-ts/blob/main/docs/style_guide.md",
       "docs": {
+        "demo/barrel-only-reexports": "docs/style_guide.md#barrel-only-reexports",
         "demo/no-chained-type-assertions": "docs/style_guide.md#strict-type-safety",
         "demo/no-explicit-unknown": "docs/style_guide.md#strict-type-safety",
         "demo/no-unsafe-dictionary": "docs/style_guide.md#strict-type-safety",
@@ -125,6 +128,7 @@
         "demo/dynamic-import": "docs/style_guide.md#dynamic-imports",
         "demo/inline-type-import": "docs/style_guide.md#no-inline-type-imports",
         "demo/re-export-imported": "docs/style_guide.md#no-re-exporting",
+        "demo/prefer-named-imports": "docs/style_guide.md#prefer-named-imports",
         "demo/import-placement": "docs/style_guide.md#imports-at-the-top",
         "demo/exported-interface-placement": "docs/style_guide.md#interface-conventions",
         "demo/promise-response-alias": "docs/style_guide.md#strict-type-safety",
