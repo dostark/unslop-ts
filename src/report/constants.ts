@@ -45,3 +45,11 @@ export const COUPLING_FAN_IN_LIMIT = 20;
 
 /** The structural fan-out above which a file reads as highly coupled. */
 export const COUPLING_FAN_OUT_LIMIT = 15;
+
+/** The path patterns the manifest and export scans never enter. */
+export const HEALTH_WALK_SKIP_PATTERNS: readonly string[] = [
+  "/node_modules(/|$)",
+  "/\\.git(/|$)",
+  "/dist(/|$)",
+  "/tests_node(/|$)",
+];

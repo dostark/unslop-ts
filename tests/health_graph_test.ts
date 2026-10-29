@@ -14,6 +14,7 @@ import {
   exportPopulationOf,
   maintainabilityBandOf,
   maintainabilityIndexOf,
+  moduleGraphOf,
   parseHealthFile,
   valueExportSitesOf,
 } from "../src/report/mod.ts";
@@ -93,7 +94,7 @@ Deno.test("health-graph-projections: unresolved, external and nonliteral specifi
 });
 
 Deno.test("health-export-population: suppressed sites stay, type exports leave, and zero exports give zero", async () => {
-  const snapshot = await snapshotOf({
+  await withAliasProject({
     "src/exports.ts": "// unslop-ignore-next-line unused-export\n" +
       "export const suppressed = 1;\n" +
       "export const dead = 2;\n" +
@@ -104,18 +105,74 @@ Deno.test("health-export-population: suppressed sites stay, type exports leave, 
     "src/other.ts": "export const thing = 1;\n",
     "src/uses.ts": 'import { suppressed } from "./exports.ts";\nexport const used = suppressed;\n',
     "src/types_only.ts": "export type Only = string;\nexport interface Other { a: number }\n",
+  }, async (root, snapshot) => {
+    const exportFile = snapshot.get("src/exports.ts");
+    assert(exportFile !== undefined);
+    const sites = valueExportSitesOf(exportFile);
+    assertEquals(sites.map((site) => site.name).sort(), ["dead", "default", "suppressed", "thing"]);
+    const population = exportPopulationOf(
+      snapshot,
+      await moduleGraphOf(snapshot, { rootPath: root, publicEntries: [] }),
+    );
+    assertEquals(population.total, 6);
+    assertEquals(population.unused, 5);
+    assertEquals(population.byPath.get("src/exports.ts")?.unused, 3);
+    assertEquals(population.byPath.get("src/types_only.ts")?.total ?? 0, 0);
   });
-  const exportFile = snapshot.get("src/exports.ts");
-  assert(exportFile !== undefined);
-  const sites = valueExportSitesOf(exportFile);
-  assertEquals(sites.map((site) => site.name).sort(), ["dead", "default", "suppressed", "thing"]);
-  const population = exportPopulationOf(snapshot);
-  assertEquals(population.total, 6);
-  assertEquals(population.unused, 2);
-  assertEquals(population.byPath.get("src/exports.ts")?.unused, 1);
-  assertEquals(population.byPath.get("src/types_only.ts")?.total ?? 0, 0);
   assertEquals(deadRatioOf(0, 0), 0);
   assertEquals(deadRatioOf(6, 2), 1 / 3);
+});
+
+Deno.test("health-export-binding-identity: unrelated local names and local-only references cannot make an export live", async () => {
+  await withAliasProject({
+    "src/a.ts": "export const x = 1;\n",
+    "src/b.ts": "export function f(): number {\n  const x = 2;\n  return x;\n}\n",
+    "src/c.ts": "export const z = 1;\nexport const w = z;\n",
+  }, async (root, snapshot) => {
+    const population = exportPopulationOf(
+      snapshot,
+      await moduleGraphOf(snapshot, { rootPath: root, publicEntries: [] }),
+    );
+    assertEquals(population.total, 4);
+    assertEquals(population.unused, 4);
+    assertEquals(population.byPath.get("src/a.ts")?.unused, 1);
+  });
+});
+
+Deno.test("health-export-resolved-population: default, star, alias, suppressed and public sites have exact values", async () => {
+  const files: Readonly<Record<string, string>> = {
+    "src/lib.ts": "export const live = 1;\nexport const dead = 2;\n// unslop-ignore-next-line unused-export\n" +
+      "export const suppressed = 3;\nconst inner = 4;\nexport { inner as renamed };\nexport default 5;\n",
+    "src/barrel.ts": 'export * from "./star_target.ts";\nexport { live as again } from "./lib.ts";\n',
+    "src/star_target.ts": "export const starred = 1;\n",
+    "src/lonely.ts": 'export * from "./star_target.ts";\n',
+    "src/dflt.ts": "export default 9;\n",
+    "src/user.ts": 'import dflt, { live, renamed } from "./lib.ts";\nexport const out = [dflt, live, renamed];\n',
+    "src/user2.ts": 'import { starred } from "./barrel.ts";\nexport const out2 = starred;\n',
+    "src/public.ts": "export const api = 1;\n",
+  };
+  await withAliasProject(files, async (root, snapshot) => {
+    const graph = await moduleGraphOf(snapshot, { rootPath: root, publicEntries: ["src/public.ts"] });
+    const population = exportPopulationOf(snapshot, graph);
+    assertEquals(population.total, 13);
+    assertEquals(population.unused, 7);
+    const unusedByPath = Object.fromEntries([...population.byPath].map(([path, entry]) => [path, entry.unused]));
+    assertEquals(unusedByPath, {
+      "src/barrel.ts": 1,
+      "src/dflt.ts": 1,
+      "src/lib.ts": 2,
+      "src/lonely.ts": 1,
+      "src/public.ts": 0,
+      "src/star_target.ts": 0,
+      "src/user.ts": 1,
+      "src/user2.ts": 1,
+    });
+    const unconfigured = exportPopulationOf(
+      snapshot,
+      await moduleGraphOf(snapshot, { rootPath: root, publicEntries: [] }),
+    );
+    assertEquals(unconfigured.byPath.get("src/public.ts")?.unused, 1);
+  });
 });
 
 Deno.test("import-cycles: a three-file loop is one SCC and disconnected cycles count separately", () => {

@@ -13,7 +13,9 @@ export {
   deadRatioOf,
   exportPopulationOf,
   type IExportPopulation,
+  type IModuleGraphInput,
   type IValueExportSite,
+  moduleGraphOf,
   valueExportSitesOf,
 } from "./exports.ts";
 export {

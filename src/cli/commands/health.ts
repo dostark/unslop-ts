@@ -31,7 +31,11 @@ import {
 } from "../../report/constants.ts";
 import { parseSince } from "../../report/churn.ts";
 import { localJscpdRunner } from "../../report/duplication.ts";
-import { DuplicateCodeSettingsSchema, type IDuplicateCodeSettings } from "../../rules/whole_tree/options.ts";
+import {
+  DuplicateCodeSettingsSchema,
+  type IDuplicateCodeSettings,
+  UnusedExportsSettingsSchema,
+} from "../../rules/whole_tree/options.ts";
 import type { TJscpdRunner } from "../../rules/whole_tree/duplicate_code.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
 import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
@@ -344,6 +348,14 @@ async function duplicationSetupOf(
   }
 }
 
+/** The declared public-entry globs of the unused-exports policy, or none when the catalog has no such rule. */
+function publicEntriesOf(compiled: ICompiledConfig): readonly string[] {
+  const rule = compiled.rules["unused-exports"];
+  const options = rule?.effectiveOptions ?? rule?.defaultOptions ?? null;
+  const parsed = UnusedExportsSettingsSchema.safeParse(options);
+  return parsed.success ? parsed.data.publicEntries ?? [] : [];
+}
+
 /** Prints the report in the requested format. */
 function renderReport(report: IHealthReport, format: string, top: number): void {
   if (format === "json") {
@@ -397,6 +409,7 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     coverageSha256: coverage.sha256,
     coverageManifest: coverage.manifest,
     testGlobs: compiled.catalog.scopes.test,
+    publicEntries: publicEntriesOf(compiled),
     sinceEpoch,
     minCommits,
     nowEpoch: Math.floor(now.getTime() / 1000),

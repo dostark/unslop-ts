@@ -7,8 +7,15 @@
  * @related-files [src/report/parse.ts, src/report/health.ts, src/rules/whole_tree/unused_exports_resolved.ts]
  */
 
+import ts from "typescript";
 import { asNode, type ILintNode, isNodeLike } from "../engine/type_environment.ts";
-import { forEachChildNode } from "../metrics/estree.ts";
+import {
+  buildModuleGraph,
+  findUnusedCandidates,
+  type IExportCandidate,
+  type IModuleGraph,
+} from "../rules/whole_tree/unused_exports_resolved.ts";
+import { HEALTH_WALK_SKIP_PATTERNS } from "./constants.ts";
 import type { IParsedHealthFile } from "./parse.ts";
 
 /** One raw value export site, including suppressed and re-exported values. */
@@ -132,46 +139,78 @@ export function valueExportSitesOf(file: IParsedHealthFile): IValueExportSite[] 
   return sites;
 }
 
-/** Every identifier occurrence of the snapshot, used by the raw value-use scan. */
-function identifierCounts(files: ReadonlyMap<string, IParsedHealthFile>): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const file of files.values()) {
-    const visit = (node: ILintNode): void => {
-      if (node.type === "Identifier" && typeof node.name === "string") {
-        counts.set(node.name, (counts.get(node.name) ?? 0) + 1);
-      }
-      forEachChildNode(node, visit);
-    };
-    visit(asNode(file.tree.program));
-  }
-  return counts;
+const STAR_EXPORT = "*";
+
+/** What the export liveness analysis reads from the project besides the snapshot. */
+export interface IModuleGraphInput {
+  readonly rootPath: string;
+  /** Globs of files that a tool consumes, from the declared public-entry policy. */
+  readonly publicEntries: readonly string[];
 }
 
-/** The raw export population of the snapshot. Star and default sites stay in the denominator. */
-export function exportPopulationOf(files: ReadonlyMap<string, IParsedHealthFile>): IExportPopulation {
-  const references = identifierCounts(files);
-  const declarations = new Map<string, number>();
-  const all = [...files.values()].flatMap(valueExportSitesOf);
-  for (const site of all) {
-    if (site.kind === "value" || site.kind === "re-export") {
-      if (site.name === "*") continue;
-      declarations.set(site.name, (declarations.get(site.name) ?? 0) + 1);
+/** The resolved import graph of the snapshot, with the manifest and configured public entries. */
+export function moduleGraphOf(
+  files: ReadonlyMap<string, IParsedHealthFile>,
+  input: IModuleGraphInput,
+): Promise<IModuleGraph> {
+  const sourceFiles = new Map<string, ts.SourceFile>();
+  for (const [path, file] of files) {
+    sourceFiles.set(path, ts.createSourceFile(path, file.text, ts.ScriptTarget.Latest, true));
+  }
+  return buildModuleGraph({
+    repoRoot: input.rootPath,
+    sourceFiles,
+    walkSkipPatterns: HEALTH_WALK_SKIP_PATTERNS,
+    publicEntries: input.publicEntries,
+  });
+}
+
+/** The files that any import, named re-export or star re-export of the snapshot names. */
+function consumedFilesOf(graph: IModuleGraph): Set<string> {
+  const consumed = new Set<string>();
+  for (const [from, edges] of graph.edges) {
+    const specifiers = [
+      ...edges.imports.map((entry) => entry.specifier),
+      ...[...edges.forwards.values()].map((forward) => forward.specifier),
+      ...edges.stars,
+    ];
+    for (const specifier of specifiers) {
+      for (const target of graph.targetsOf(from, specifier)) consumed.add(target);
     }
   }
+  return consumed;
+}
+
+/**
+ * The raw export population of the snapshot. Liveness follows the resolved import graph, never a spelling count.
+ * A star site is live when a consumer names its file or a public entry does.
+ */
+export function exportPopulationOf(
+  files: ReadonlyMap<string, IParsedHealthFile>,
+  graph: IModuleGraph,
+): IExportPopulation {
+  const all = [...files.values()].flatMap(valueExportSitesOf);
+  const candidates: IExportCandidate[] = [];
+  for (const site of all) {
+    if (site.name !== STAR_EXPORT) candidates.push({ repoPath: site.path, name: site.name });
+  }
+  const unused = new Set(findUnusedCandidates(graph, candidates).map((entry) => `${entry.repoPath}\0${entry.name}`));
+  const consumed = consumedFilesOf(graph);
   const byPath = new Map<string, { total: number; unused: number }>();
-  let unused = 0;
+  let unusedTotal = 0;
   for (const site of all) {
     const entry = byPath.get(site.path) ?? { total: 0, unused: 0 };
     entry.total++;
-    const resolvable = site.kind !== "default" && site.name !== "*";
-    const dead = resolvable && (references.get(site.name) ?? 0) <= (declarations.get(site.name) ?? 0);
+    const dead = site.name === STAR_EXPORT
+      ? !consumed.has(site.path) && !graph.publicFiles.has(site.path)
+      : unused.has(`${site.path}\0${site.name}`);
     if (dead) {
       entry.unused++;
-      unused++;
+      unusedTotal++;
     }
     byPath.set(site.path, entry);
   }
-  return { total: all.length, unused, byPath };
+  return { total: all.length, unused: unusedTotal, byPath };
 }
 
 /** The dead-export ratio, zero for an empty population. */
