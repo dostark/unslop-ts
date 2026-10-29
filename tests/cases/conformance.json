@@ -197,6 +197,41 @@
         "line": 1,
         "column": 8,
         "message": "Function run has cyclomatic complexity 2 (limit 1)."
+      },
+      {
+        "code": "export function run(a) { return a && (a ?? 1); }\n",
+        "options": [
+          {
+            "max": 1,
+            "variant": "classic"
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has cyclomatic complexity 2 (limit 1)."
+      },
+      {
+        "code": "export function run(a) { return a && (a ?? 1); }\n",
+        "options": [
+          {
+            "max": 1,
+            "variant": "extended"
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has cyclomatic complexity 3 (limit 1)."
+      },
+      {
+        "code": "export function run(a) { return a?.b ?? 0; }\n",
+        "options": [
+          {
+            "max": 1
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has cyclomatic complexity 3 (limit 1)."
       }
     ]
   },

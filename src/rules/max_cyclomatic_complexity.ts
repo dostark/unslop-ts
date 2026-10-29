@@ -1,70 +1,44 @@
 /**
  * @module MaxCyclomaticComplexity
  * @path src/rules/max_cyclomatic_complexity.ts
- * @description Cyclomatic-complexity limit as a plugin rule on the Deno ESTree.
+ * @description Cyclomatic-complexity limit as a plugin rule on the host ESTree.
  * @architectural-layer Shared
  * @dependencies []
- * @related-files [src/rules/mod.ts, tests/max_cyclomatic_complexity_test.ts]
+ * @related-files [src/rules/mod.ts, src/metrics/function_metrics.ts, tests/max_cyclomatic_complexity_test.ts]
  */
 
-import { asNode, type ILintNode, isNodeLike, walk } from "../engine/type_environment.ts";
+import { programOf } from "../engine/type_environment.ts";
+import type { JsonValue } from "../engine/catalog.ts";
+import { DEFAULT_MAX_CYCLOMATIC, DEFAULT_METRIC_VARIANT } from "../metrics/constants.ts";
+import { createMeasurementContext } from "../metrics/context.ts";
+import { functionUnits, measureFunction } from "../metrics/function_metrics.ts";
+import type { IFunctionUnit, IMetricOptions, MetricVariant } from "../metrics/types.ts";
 import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
-const FUNCTION_NODES = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
-const DECISION_NODES = new Set([
-  "IfStatement",
-  "ForStatement",
-  "ForInStatement",
-  "ForOfStatement",
-  "WhileStatement",
-  "DoWhileStatement",
-  "CatchClause",
-  "ConditionalExpression",
-]);
-
-/** True when a node is one decision point, matching `scripts/measure_complexity.ts`.
- *  A `SwitchCase` counts only with a test. A `LogicalExpression` counts only for `||` and `&&`. */
-function isDecision(node: ILintNode): boolean {
-  if (node.type === "SwitchCase") return node.test !== null && node.test !== undefined;
-  if (node.type === "LogicalExpression") return node.operator === "||" || node.operator === "&&";
-  return DECISION_NODES.has(node.type);
+/** The counting variant a catalog pins, or the engine default. */
+function variantOf(options: Record<string, JsonValue>): MetricVariant {
+  return options.variant === "classic" ? "classic" : DEFAULT_METRIC_VARIANT;
 }
 
-/** Cyclomatic complexity of one function, excluding nested function bodies. */
-function complexityOf(fn: ILintNode): number {
-  let complexity = 1;
-  const body = fn.body;
-  if (!isNodeLike(body)) return complexity;
-  const root = asNode(body);
-  walk(root, (node) => {
-    if (node !== root && FUNCTION_NODES.has(node.type)) return false;
-    if (isDecision(node)) complexity++;
-    return true;
-  });
-  return complexity;
-}
-
-/** The declared name of a function node, or a fallback label. */
-function nameOf(node: ILintNode): string {
-  const id = node.id;
-  if (isNodeLike(id)) return (asNode(id).name as string) ?? "<anonymous>";
-  const parent = node.parent;
-  if (isNodeLike(parent)) {
-    const key = asNode(parent).key;
-    if (isNodeLike(key) && asNode(key).type === "Identifier") return asNode(key).name as string;
-  }
-  return "<anonymous>";
-}
-
+/** Builds the rule that reports each function above the cyclomatic limit. */
 export function createMaxCyclomaticComplexity(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
-  const max = typeof ctx.options.max === "number" ? ctx.options.max : 15;
+  const max = typeof ctx.options.max === "number" ? ctx.options.max : DEFAULT_MAX_CYCLOMATIC;
+  const options: IMetricOptions = {
+    variant: variantOf(ctx.options),
+    countNullish: ctx.options.countNullish !== false,
+  };
+  const measurement = createMeasurementContext(context.sourceCode, context.filename);
+  const units = new Map<IRuleNode, IFunctionUnit>(
+    functionUnits(programOf(context.sourceCode), measurement).map((unit) => [unit.node, unit]),
+  );
   const check = (rawNode: IRuleNode): void => {
-    const node = asNode(rawNode);
-    const complexity = complexityOf(node);
-    if (complexity <= max) return;
+    const unit = units.get(rawNode);
+    if (unit === undefined) return;
+    const metrics = measureFunction(unit, options, measurement);
+    if (metrics.cyclomatic <= max) return;
     context.report({
       node: rawNode,
-      message: `Function ${nameOf(node)} has cyclomatic complexity ${complexity} (limit ${max}).`,
+      message: `Function ${metrics.name} has cyclomatic complexity ${metrics.cyclomatic} (limit ${max}).`,
       hint: "Split the function into smaller, named helpers.",
     });
   };

@@ -10,6 +10,7 @@
 import { assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { canWriteTo } from "./helpers/permissions.ts";
+import { enginePins } from "./helpers/demo_project.ts";
 
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
 const CORPUS = {
@@ -73,7 +74,7 @@ Deno.test(
       );
       await Deno.writeTextFile(
         join(dir, "deno.json"),
-        JSON.stringify({ imports: { zod: "npm:zod@^4.4.3" }, lint: { plugins: ["./plugin.ts"] } }),
+        JSON.stringify({ imports: await enginePins(), lint: { plugins: ["./plugin.ts"] } }),
       );
       const withPlugin = builtins(await lint(dir, true));
       assertEquals(withPlugin, baseline);

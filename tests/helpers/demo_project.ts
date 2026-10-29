@@ -87,13 +87,21 @@ function pluginSource(options: IDemoProjectOptions): string {
   ].join("\n");
 }
 
-async function configSource(options: IDemoProjectOptions): Promise<string> {
+/** The pinned remote packages the engine imports, so a temp project resolves them like the engine. */
+export async function enginePins(): Promise<Record<string, string>> {
   const ownConfig = JSON.parse(await Deno.readTextFile(new URL("../../deno.json", import.meta.url)));
+  const imports = ownConfig.imports as Record<string, string>;
+  return Object.fromEntries(
+    Object.entries(imports).filter(([, value]) => value.startsWith("npm:") || value.startsWith("jsr:")),
+  );
+}
+
+async function configSource(options: IDemoProjectOptions): Promise<string> {
   return JSON.stringify({
     imports: {
       [ENGINE_ALIAS]: new URL("../../mod.ts", import.meta.url).href,
       [`${ENGINE_ALIAS}/deno`]: new URL("../../deno.ts", import.meta.url).href,
-      zod: ownConfig.imports.zod,
+      ...(await enginePins()),
     },
     lint: { plugins: [`./${PLUGIN_FILE}`], rules: { tags: ["recommended"], ...options.lintRules } },
   });

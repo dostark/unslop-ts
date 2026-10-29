@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { compilesAsRegex, RegexFlagsSchema, RegexSourceSchema } from "../engine/regex_option.ts";
+import { DEFAULT_MAX_CYCLOMATIC, DEFAULT_METRIC_VARIANT, METRIC_VARIANTS } from "../metrics/constants.ts";
 import { DEFAULT_REASON_SEPARATOR } from "./deno/ignore_directive.ts";
 import { DEFAULT_FORBIDDEN_IGNORES } from "./deno/no_forbidden_lint_ignore.ts";
 import { DEFAULT_DENO_SHEBANG } from "./deno/require_deno_shebang.ts";
@@ -59,8 +60,11 @@ const NoConstantSubstringAssertOptions = z.object({
   constantPattern: z.string().default("^[A-Z][A-Z0-9_]*$"),
 }).strict();
 
+const MetricVariantSchema = z.enum(METRIC_VARIANTS);
+
 const MaxCyclomaticComplexityOptions = z.object({
-  max: z.number().int().positive().default(15),
+  max: z.number().int().positive().default(DEFAULT_MAX_CYCLOMATIC),
+  variant: MetricVariantSchema.default(DEFAULT_METRIC_VARIANT),
 }).strict();
 
 const MaxClassSizeOptions = z.object({

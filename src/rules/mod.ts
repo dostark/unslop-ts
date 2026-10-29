@@ -228,7 +228,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
         docs: "#complexity-rules",
         preset: "recommended",
         limits:
-          "A switch case counts only with a test, and a logical expression only for || and &&. Nested functions are scored alone.",
+          "Classic counts if, loop, catch, ternary, switch case, && and ||. Extended adds ??, optional chains and logical assignments. Nested functions are scored alone.",
       },
       requiresTestGlobs: false,
       create: createMaxCyclomaticComplexity,

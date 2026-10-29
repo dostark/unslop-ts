@@ -9,6 +9,7 @@
 
 import { assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { enginePins } from "./helpers/demo_project.ts";
 import { runDenoHost } from "./hosts/deno.ts";
 
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
@@ -55,7 +56,7 @@ Deno.test("the Deno runner matches a direct deno lint run", async () => {
     await Deno.writeTextFile(
       join(dir, "deno.json"),
       JSON.stringify({
-        imports: { zod: "npm:zod@^4.4.3" },
+        imports: await enginePins(),
         lint: { plugins: ["./plugin.ts"] },
       }),
     );

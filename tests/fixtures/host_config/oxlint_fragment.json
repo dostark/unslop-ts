@@ -24,7 +24,8 @@
     "demo/max-cyclomatic-complexity": [
       "error",
       {
-        "max": 15
+        "max": 15,
+        "variant": "extended"
       }
     ],
     "demo/max-class-size": "off",

@@ -72,7 +72,7 @@ export default [
       "demo/no-boolean-assert": "off",
       "demo/no-repeated-assert-call": "off",
       "demo/no-constant-substring-assert": "off",
-      "demo/max-cyclomatic-complexity": ["error",{"max":15}],
+      "demo/max-cyclomatic-complexity": ["error",{"max":15,"variant":"extended"}],
       "demo/max-class-size": "off",
       "demo/require-optional-wrapper": "off",
       "demo/import-inside-statement": ["error",{"allowDynamicImports":[]}],

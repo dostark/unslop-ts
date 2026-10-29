@@ -36,6 +36,9 @@ const EXAMPLE_HOST_PACKAGES = [
 ];
 /** Exact-pinned schema validators that only the test suite needs. */
 const TEST_ONLY_PACKAGES = ["ajv", "ajv-draft-04", "ajv-formats"];
+/** The syntax parser the metric core may use, and the only prefixes that may import it. */
+const PARSER_PACKAGES = ["@babel/parser"];
+const PARSER_ALLOWED_PREFIXES = ["src/metrics/", "tests/"];
 // The words are joined here so that this file does not contain them.
 const FORBIDDEN_WORDS = [
   ["ex", "aix"].join(""),
@@ -47,6 +50,9 @@ const IMPORT_PATTERN = /^(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^imp
 
 function isAllowedImport(specifier: string, path: string): boolean {
   if (specifier.startsWith(".") || specifier.startsWith("node:")) return true;
+  if (PARSER_PACKAGES.includes(specifier)) {
+    return PARSER_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
+  }
   if (path.startsWith("examples/") && EXAMPLE_HOST_PACKAGES.some((allowed) => specifier.startsWith(allowed))) {
     return true;
   }
@@ -93,6 +99,8 @@ const CLOSURE_ROOT = "mod.ts";
 /** Files that the Deno host needs by design: the closure walk does not inspect them. */
 const DENO_ONLY = ["deno.ts", "src/engine/run_plugin.ts", "src/report/", "src/rules/whole_tree/", "src/cli/"];
 const CLOSURE_BARE_ALLOWED = ["zod"];
+/** The metric-context files that may import the syntax parser, the only bare import they may add. */
+const CLOSURE_PARSER_PATHS = ["src/metrics/context.ts", "src/metrics/types.ts"];
 const DENO_TOKEN_PATTERN = /\bDeno\./;
 
 function isDenoOnly(path: string): boolean {
@@ -137,7 +145,9 @@ function closureViolations(closure: readonly ISourceFile[]): string[] {
         if (target.startsWith("src/cli/")) violations.push(`${file.path}: imports '${specifier}' from the CLI`);
         continue;
       }
-      if (!CLOSURE_BARE_ALLOWED.includes(specifier)) violations.push(`${file.path}: imports '${specifier}'`);
+      if (CLOSURE_BARE_ALLOWED.includes(specifier)) continue;
+      if (specifier === "@babel/parser" && CLOSURE_PARSER_PATHS.includes(file.path)) continue;
+      violations.push(`${file.path}: imports '${specifier}'`);
     }
   }
   return violations;
@@ -205,6 +215,7 @@ Deno.test("engine_suite_and_public_exports", async () => {
   assertEquals(config.exports["./cli"], "./src/cli/unslop.ts");
   assertEquals(config.exports["./deno"], "./deno.ts");
   assertEquals(config.exports["./report"], "./src/report/mod.ts");
+  assertEquals(config.exports["./metrics"], "./src/metrics/mod.ts");
   assert(typeof config.tasks.cli === "string" && config.tasks.cli.length > 0);
   assertEquals(typeof main, "function");
   const exported = [
@@ -240,6 +251,14 @@ Deno.test("the closure check rejects a Deno global, a foreign import, and a CLI 
   ]);
   assertEquals(closureViolations([{ path: "src/engine/seeded.ts", text: 'import eslint from "eslint";\n' }]), [
     "src/engine/seeded.ts: imports 'eslint'",
+  ]);
+  const parserImport = 'import { parse } from "@babel/parser";\n';
+  assertEquals(closureViolations([{ path: "src/metrics/context.ts", text: parserImport }]), []);
+  assertEquals(closureViolations([{ path: "src/metrics/function_metrics.ts", text: parserImport }]), [
+    "src/metrics/function_metrics.ts: imports '@babel/parser'",
+  ]);
+  assertEquals(closureViolations([{ path: "src/engine/seeded.ts", text: parserImport }]), [
+    "src/engine/seeded.ts: imports '@babel/parser'",
   ]);
   const cliImport = 'import type { IResolvedSelection } from "../cli/selection.ts";\n';
   assertEquals(closureViolations([{ path: "src/report/collect.ts", text: cliImport }]), [

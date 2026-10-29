@@ -9,6 +9,13 @@
     "ignore": []
   },
   "rules": {
+    "self/max-cyclomatic-complexity": {
+      "level": "error",
+      "options": {
+        "max": 15,
+        "variant": "classic"
+      }
+    },
     "unused-exports": {
       "level": "warn",
       "options": {
