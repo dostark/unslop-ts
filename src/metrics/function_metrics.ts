@@ -288,6 +288,11 @@ function ownedLines(unit: IFunctionUnit, context: IMeasurementContext): Set<numb
   return lines;
 }
 
+/** The code-token line numbers one unit owns, excluding every descendant function. */
+export function ownedLineNumbers(unit: IFunctionUnit, context: IMeasurementContext): Set<number> {
+  return ownedLines(unit, context);
+}
+
 /** True when the parameter is the TypeScript `this` parameter, which is not a caller argument. */
 function isThisParameter(value: unknown): boolean {
   if (!isNodeLike(value)) return false;

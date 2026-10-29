@@ -6,7 +6,7 @@
  * @related-files [src/cli/commands/health.ts, src/report/health.ts, src/report/health_model.ts]
  */
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { HealthReportSchema, type IHealthReport } from "../src/report/mod.ts";
 import { enginePins, runDeno } from "./helpers/demo_project.ts";
@@ -180,6 +180,7 @@ Deno.test("health-config-resolution: the real descriptor supplies options and a 
       max_cyclomatic: 1,
       max_cognitive: 1,
       max_lines: 2,
+      max_crap: 30,
       variant: "classic",
       count_nullish: false,
     });
@@ -231,5 +232,56 @@ Deno.test("health-graph-cli: the real command emits file scores and graph limita
     assertEquals(side?.fan_in, 1);
     const sorted = report.file_scores.map((score) => score.path);
     assertEquals(sorted, [...sorted].sort((left, right) => left.localeCompare(right)));
+  });
+});
+
+Deno.test("health-real-lcov: real Deno coverage changes the CRAP value and the source label", async () => {
+  const files: Readonly<Record<string, string>> = {
+    "packages/x/src/math.ts": "export function both(flag: boolean): number {\n" +
+      "  if (flag) {\n" +
+      "    return 1;\n" +
+      "  }\n" +
+      "  return 2;\n" +
+      "}\n",
+    "packages/x/tests/math_test.ts": 'import { both } from "../src/math.ts";\n\n' +
+      'Deno.test("both", () => {\n' +
+      '  if (both(true) !== 1) throw new Error("bad true");\n' +
+      '  if (both(false) !== 2) throw new Error("bad false");\n' +
+      "});\n",
+  };
+  await withHealthProject(files, async (dir) => {
+    // A dedicated DENO_DIR keeps the transpiled sources that `deno coverage` needs to map lines.
+    const cache = await Deno.makeTempDir({ prefix: "unslop_coverage_cache_" });
+    try {
+      const coverageDir = join(dir, "coverage-data");
+      const test = await runDeno(
+        ["test", "--allow-all", `--coverage=${coverageDir}`, "packages/x/tests/math_test.ts"],
+        dir,
+        { DENO_DIR: cache },
+      );
+      assertEquals(test.code, 0, test.stderr);
+      const lcov = join(dir, "coverage.lcov");
+      const convert = await runDeno(["coverage", coverageDir, "--lcov", `--output=${lcov}`], dir, {
+        DENO_DIR: cache,
+      });
+      assertEquals(convert.code, 0, convert.stderr);
+
+      const without = parseReport((await health(dir, ["--format=json"])).stdout);
+      const measured = parseReport((await health(dir, ["--format=json", "--coverage=coverage.lcov"])).stdout);
+      const before = without.findings.find((finding) => finding.name === "both");
+      const after = measured.findings.find((finding) => finding.name === "both");
+      assert(before !== undefined && after !== undefined);
+      assertEquals(after.coverage_source, "lcov");
+      assertEquals(after.coverage_reason, "measured");
+      assertEquals(after.coverage_precision, "line");
+      assertEquals(after.crap < before.crap, true);
+      assertEquals(without.findings[0].coverage_source, "estimated");
+      assertEquals(measured.summary.coverage.source, "lcov");
+      assertEquals(measured.summary.coverage.revision, "unverified");
+      assert(measured.summary.coverage.file_sha256 !== null);
+      assertEquals(measured.summary.coverage.matched_files > 0, true);
+    } finally {
+      await Deno.remove(cache, { recursive: true });
+    }
   });
 });

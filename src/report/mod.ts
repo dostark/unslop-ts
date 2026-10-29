@@ -24,6 +24,7 @@ export {
   resolveSpecifier,
 } from "./graph.ts";
 export {
+  assertCoverageManifest,
   collectFunctionRows,
   collectHealth,
   type HealthSortKey,
@@ -40,6 +41,21 @@ export {
   MI_GOOD,
   MI_MODERATE,
 } from "./maintainability.ts";
+export {
+  coverageOfUnit,
+  type CoveragePrecision,
+  type CoverageReason,
+  type CoverageSource,
+  crapBandOf,
+  crapOf,
+  DIRECT_COVERAGE_PERCENT,
+  estimatedCoverageOf,
+  type ICoverageSample,
+  INDIRECT_COVERAGE_PERCENT,
+  type RuntimeReach,
+  UNREACHABLE_COVERAGE_PERCENT,
+} from "./crap.ts";
+export { type ILcovCoverage, type ILcovFileCoverage, parseLcov } from "./lcov.ts";
 export {
   HEALTH_FORMULA_VERSION,
   HEALTH_SCHEMA_VERSION,

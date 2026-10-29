@@ -11,15 +11,18 @@ import { join as platformJoin } from "@std/path";
 import { classifyPath, type ICatalogScopes } from "../engine/catalog.ts";
 import { matchesAnyGlob } from "../engine/glob.ts";
 import { join as posixJoin } from "../engine/posix_path.ts";
-import { measureFunction } from "../metrics/function_metrics.ts";
+import { measureFunction, ownedLineNumbers } from "../metrics/function_metrics.ts";
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
+import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { deadRatioOf, exportPopulationOf } from "./exports.ts";
-import { buildHealthGraph } from "./graph.ts";
+import { type ILcovCoverage, MAX_LCOV_BYTES, parseLcov } from "./lcov.ts";
+import { buildHealthGraph, type IHealthGraph } from "./graph.ts";
 import {
   HEALTH_FORMULA_VERSION,
   HEALTH_SCHEMA_VERSION,
   type IHealthContribution,
+  type IHealthCoverageSummary,
   type IHealthDeadFiles,
   type IHealthError,
   type IHealthFileScore,
@@ -66,6 +69,7 @@ export interface IHealthSettings {
   readonly maxCyclomatic: number;
   readonly maxCognitive: number;
   readonly maxLines: number;
+  readonly maxCrap: number;
   readonly variant: MetricVariant;
   readonly countNullish: boolean;
 }
@@ -77,6 +81,14 @@ export interface ICollectHealthInput {
   readonly scopes: ICatalogScopes;
   readonly settings: IHealthSettings;
   readonly sort: HealthSortKey;
+  /** The raw LCOV text, or null when the run has no coverage input. */
+  readonly coverageText: string | null;
+  /** The descriptor test globs, which decide the direct and indirect coverage fallback. */
+  readonly testGlobs: readonly string[];
+  /** The SHA-256 of the coverage input file, or null. */
+  readonly coverageSha256: string | null;
+  /** The optional adjacent manifest of measured source hashes, or null. */
+  readonly coverageManifest: Record<string, string> | null;
 }
 
 /** The measured values a finding reports. */
@@ -84,6 +96,7 @@ interface IFindingValues {
   readonly cyclomatic: number;
   readonly cognitive: number;
   readonly lines: number;
+  readonly crap: number;
 }
 
 /** The severity a measured value earns under its limit. */
@@ -99,6 +112,10 @@ function worstSeverity(values: IFindingValues, settings: IHealthSettings): "mode
   if (values.cyclomatic > settings.maxCyclomatic) bands.push(severityOf(values.cyclomatic, settings.maxCyclomatic));
   if (values.cognitive > settings.maxCognitive) bands.push(severityOf(values.cognitive, settings.maxCognitive));
   if (values.lines > settings.maxLines) bands.push(severityOf(values.lines, settings.maxLines));
+  if (values.crap >= settings.maxCrap) {
+    const band = crapBandOf(values.crap);
+    bands.push(band === "critical" ? "critical" : band === "high" ? "high" : "moderate");
+  }
   if (bands.length === 0) return null;
   const order = { moderate: 0, high: 1, critical: 2 };
   return bands.reduce((worst, band) => (order[band] > order[worst] ? band : worst));
@@ -193,6 +210,14 @@ interface IFileFacts {
   readonly lines: number;
 }
 
+/** The coverage facts of one file that its units inherit. */
+interface IFileCoverage {
+  readonly file: { readonly lines: ReadonlyMap<number, number> } | undefined;
+  readonly hasInput: boolean;
+  readonly reach: RuntimeReach;
+  readonly shared: ReadonlySet<number>;
+}
+
 /** One measured function row: the facts the calibration compares with another tool. */
 export interface IMeasuredFunction {
   readonly path: string;
@@ -266,20 +291,39 @@ function measureFile(
   input: ICollectHealthInput,
   findings: IMeasuredFinding[],
   bands: Record<UnitSizeBand, number>,
+  coverage: IFileCoverage,
 ): IFileFacts {
   let cyclomatic = 0;
-  for (const row of measuredRowsOf(file, input.settings)) {
+  const rows = measuredRowsOf(file, input.settings);
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
     cyclomatic += row.cyclomatic;
     bands[bandOf(row.line_count)]++;
+    const sample = coverageOfUnit(
+      ownedLineNumbers(file.units[index], file.context),
+      coverage.file,
+      coverage.hasInput,
+      coverage.reach,
+      coverage.shared,
+    );
     const values: IFindingValues = {
       cyclomatic: row.cyclomatic,
       cognitive: row.cognitive,
       lines: row.line_count,
+      crap: crapOf(row.cyclomatic, sample.percent),
     };
     const severity = worstSeverity(values, input.settings);
     if (severity === null) continue;
     const { byte_col: _byteCol, ...findingRow } = row;
-    findings.push({ ...findingRow, severity, values });
+    findings.push({
+      ...findingRow,
+      severity,
+      values,
+      crap: values.crap,
+      coverage_source: sample.source,
+      coverage_reason: sample.reason,
+      coverage_precision: sample.precision,
+    });
   }
   return { functions: file.units.length, cyclomatic, lines: uniqueLinesOf(file) };
 }
@@ -301,6 +345,55 @@ function comparatorOf(sort: HealthSortKey): (left: IMeasuredFinding, right: IMea
     return left.path.localeCompare(right.path) || left.line - right.line || left.col - right.col ||
       left.name.localeCompare(right.name);
   };
+}
+
+/** The runtime reach of every module from the descriptor test globs. */
+function reachabilityOf(graph: IHealthGraph, testGlobs: readonly string[]): Map<string, RuntimeReach> {
+  const adjacency = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    if (edge.kind !== "runtime") continue;
+    const targets = adjacency.get(edge.from) ?? [];
+    targets.push(edge.to);
+    adjacency.set(edge.from, targets);
+  }
+  const reach = new Map<string, RuntimeReach>();
+  const queue: string[] = [];
+  for (const [from, targets] of adjacency) {
+    if (!matchesAnyGlob(from, testGlobs)) continue;
+    for (const target of targets) {
+      if (reach.has(target)) continue;
+      reach.set(target, "direct");
+      queue.push(target);
+    }
+  }
+  while (queue.length > 0) {
+    const from = queue.shift() ?? "";
+    for (const target of adjacency.get(from) ?? []) {
+      if (reach.has(target)) continue;
+      reach.set(target, "indirect");
+      queue.push(target);
+    }
+  }
+  return reach;
+}
+
+/** The lines more than one unit owns in one file, so a shared DA sample reports ambiguous precision. */
+function sharedLinesOf(file: IParsedHealthFile): Set<number> {
+  const counts = new Map<number, number>();
+  for (const unit of file.units) {
+    for (const line of ownedLineNumbers(unit, file.context)) counts.set(line, (counts.get(line) ?? 0) + 1);
+  }
+  return new Set([...counts].filter(([, count]) => count > 1).map(([line]) => line));
+}
+
+/** The aggregate SHA-256 of the measured snapshot, so a report can cite its exact source bytes. */
+async function snapshotSha256(parsed: ReadonlyMap<string, IParsedHealthFile>): Promise<string> {
+  const text = [...parsed]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([path, file]) => `${path}:${file.sha256}`)
+    .join("\n");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** The alias map of the project's root Deno configuration, used to resolve import specifiers. */
@@ -383,17 +476,59 @@ export async function collectFunctionRows(input: ICollectHealthInput): Promise<I
   return { rows, errors, excluded };
 }
 
+/** The coverage input facts of one report, with the freshness limits stated. */
+async function coverageSummaryOf(
+  input: ICollectHealthInput,
+  coverage: ILcovCoverage | null,
+  parsed: ReadonlyMap<string, IParsedHealthFile>,
+): Promise<IHealthCoverageSummary> {
+  return {
+    source: coverage === null ? "none" : "lcov",
+    file_sha256: input.coverageSha256,
+    snapshot_sha256: await snapshotSha256(parsed),
+    revision: input.coverageManifest === null ? "unverified" : "verified",
+    matched_files: coverage?.files.size ?? 0,
+    unmatched_files: coverage?.unmatched.length ?? 0,
+  };
+}
+
+/** Rejects a supplied coverage manifest that disagrees with the measured snapshot hashes. */
+export function assertCoverageManifest(
+  manifest: Record<string, string> | null,
+  parsed: ReadonlyMap<string, IParsedHealthFile>,
+): void {
+  for (const [path, hash] of Object.entries(manifest ?? {})) {
+    const file = parsed.get(path);
+    if (file === undefined || file.sha256 !== hash) {
+      throw new Error(`the coverage manifest disagrees with the measured source hash of '${path}'`);
+    }
+  }
+}
+
 /** Collects the report for one descriptor root. */
 export async function collectHealth(input: ICollectHealthInput): Promise<IHealthReport> {
   const { parsed, errors, excluded } = await parseSnapshot(input);
+  assertCoverageManifest(input.coverageManifest, parsed);
+  const coverage: ILcovCoverage | null = input.coverageText === null
+    ? null
+    : parseLcov(input.coverageText, input.rootPath, new Set(parsed.keys()));
+  const graph = buildHealthGraph(parsed, await readAliases(input.rootPath));
+  const exports = exportPopulationOf(parsed);
+  const reach = reachabilityOf(graph, input.testGlobs);
   const findings: IMeasuredFinding[] = [];
   const bands: Record<UnitSizeBand, number> = { low: 0, medium: 0, high: 0, very_high: 0 };
   const facts = new Map<string, IFileFacts>();
   for (const [relativePath, file] of parsed) {
-    facts.set(relativePath, measureFile(file, input, findings, bands));
+    facts.set(
+      relativePath,
+      measureFile(file, input, findings, bands, {
+        file: coverage?.files.get(relativePath),
+        hasInput: coverage !== null,
+        reach: reach.get(relativePath) ?? "none",
+        shared: sharedLinesOf(file),
+      }),
+    );
   }
-  const graph = buildHealthGraph(parsed, await readAliases(input.rootPath));
-  const exports = exportPopulationOf(parsed);
   let functions = 0;
   const fileScores: IHealthFileScore[] = [];
   for (const [path, measured] of facts) {
@@ -421,6 +556,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
   findings.sort(comparatorOf(input.sort));
   const reportFindings: IHealthFinding[] = findings.map(({ values: _values, ...finding }) => finding);
   const deadFiles = await deadFilesOf(input.rootPath, new Set(parsed.keys()));
+  const coverageSummary = await coverageSummaryOf(input, coverage, parsed);
   return {
     schema_version: HEALTH_SCHEMA_VERSION,
     formula_version: HEALTH_FORMULA_VERSION,
@@ -444,16 +580,18 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
         nonliteral_dynamic_imports: graph.limitations.nonliteral_dynamic,
         complete: graph.complete,
       },
+      coverage: coverageSummary,
       options: {
         max_cyclomatic: input.settings.maxCyclomatic,
         max_cognitive: input.settings.maxCognitive,
         max_lines: input.settings.maxLines,
+        max_crap: input.settings.maxCrap,
         variant: input.settings.variant,
         count_nullish: input.settings.countNullish,
       },
     },
     vital_signs: vitalSignsOf(bands, functions),
     errors,
-    limits: { source_bytes: MAX_SOURCE_BYTES },
+    limits: { source_bytes: MAX_SOURCE_BYTES, coverage_bytes: MAX_LCOV_BYTES },
   };
 }

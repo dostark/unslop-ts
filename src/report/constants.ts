@@ -15,3 +15,6 @@ export const DEFAULT_HEALTH_SORT = "cyclomatic";
 
 /** The output format the command writes by default. */
 export const DEFAULT_HEALTH_FORMAT = "text";
+
+/** The CRAP limit the report applies by default. */
+export const DEFAULT_MAX_CRAP = 30;

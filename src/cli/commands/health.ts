@@ -21,8 +21,14 @@ import {
   DEFAULT_METRIC_VARIANT,
 } from "../../metrics/constants.ts";
 import type { MetricVariant } from "../../metrics/types.ts";
-import { DEFAULT_HEALTH_FORMAT, DEFAULT_HEALTH_SORT, DEFAULT_HEALTH_TOP } from "../../report/constants.ts";
+import {
+  DEFAULT_HEALTH_FORMAT,
+  DEFAULT_HEALTH_SORT,
+  DEFAULT_HEALTH_TOP,
+  DEFAULT_MAX_CRAP,
+} from "../../report/constants.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
+import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
 import type { IHealthReport } from "../../report/health_model.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { print, printError } from "../output.ts";
@@ -37,6 +43,8 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   "max-cyclomatic",
   "max-cognitive",
   "max-lines",
+  "max-crap",
+  "coverage",
   "variant",
   "count-nullish",
   "top",
@@ -80,6 +88,67 @@ function positiveInteger(name: string, value: string): number {
   return Number(value);
 }
 
+/** Reads a positive finite number flag. */
+function positiveFinite(name: string, value: string): number {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) throw usage(`--${name} needs a positive number`);
+  return number;
+}
+
+/** The adjacent manifest of measured source hashes, when the coverage fixture supplies one. */
+async function coverageManifestOf(coveragePath: string): Promise<Record<string, string> | null> {
+  const manifestPath = `${coveragePath}.manifest.json`;
+  let text: string;
+  try {
+    text = await Deno.readTextFile(manifestPath);
+  } catch {
+    return null;
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new CliError(FAILURE_EXIT, `the coverage manifest is not JSON: '${manifestPath}'`);
+  }
+  const files = (value as { files?: unknown } | null)?.files;
+  if (files === null || typeof files !== "object" || Array.isArray(files)) {
+    throw new CliError(FAILURE_EXIT, "the coverage manifest needs a 'files' object of path to sha256");
+  }
+  const parsed: Record<string, string> = {};
+  for (const [path, hash] of Object.entries(files as Record<string, unknown>)) {
+    if (typeof hash !== "string") {
+      throw new CliError(FAILURE_EXIT, `the coverage manifest hash for '${path}' is not a string`);
+    }
+    parsed[path] = hash;
+  }
+  return parsed;
+}
+
+/** Reads and validates the coverage input before the snapshot is parsed. */
+async function coverageInputOf(
+  value: string | undefined,
+  rootPath: string,
+): Promise<{ text: string | null; sha256: string | null; manifest: Record<string, string> | null }> {
+  if (value === undefined) return { text: null, sha256: null, manifest: null };
+  const path = join(Deno.cwd(), value);
+  let stat: Deno.FileInfo;
+  try {
+    stat = await Deno.lstat(path);
+  } catch {
+    throw usage(`--coverage file is not readable: '${value}'`);
+  }
+  if (stat.isSymlink || !stat.isFile) throw usage("--coverage must be a regular file inside the project root");
+  const real = await Deno.realPath(path);
+  if (real !== rootPath && !real.startsWith(`${rootPath}/`)) {
+    throw usage("--coverage must be inside the project root");
+  }
+  if (stat.size > MAX_LCOV_BYTES) throw usage(`--coverage exceeds the ${MAX_LCOV_BYTES} byte bound`);
+  const bytes = await Deno.readFile(real);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return { text: new TextDecoder().decode(bytes), sha256, manifest: await coverageManifestOf(real) };
+}
+
 /** The compiled option record of one rule, or undefined when the catalog does not list it. */
 function optionsOf(compiled: ICompiledConfig, pluginName: string, bareId: string): Record<string, JsonValue> | null {
   const rule = compiled.rules[`${pluginName}/${bareId}`];
@@ -105,6 +174,7 @@ function settingsOf(compiled: ICompiledConfig, pluginName: string, values: Map<s
   const flagVariant = values.get("variant") ?? configuredVariant;
   const flagNullish = values.has("count-nullish") ? values.get("count-nullish") === "true" : configuredNullish;
   return {
+    maxCrap: values.has("max-crap") ? positiveFinite("max-crap", values.get("max-crap") ?? "") : DEFAULT_MAX_CRAP,
     maxCyclomatic: values.has("max-cyclomatic")
       ? positiveInteger("max-cyclomatic", values.get("max-cyclomatic") ?? "")
       : numberOption(cyclomatic, "max", DEFAULT_MAX_CYCLOMATIC),
@@ -139,8 +209,11 @@ function renderText(report: IHealthReport, top: number): string {
     `files: ${report.summary.analyzed_files} analyzed, ${report.summary.excluded_files} excluded, ` +
     `${report.summary.failed_files} failed | functions: ${report.summary.functions} | ` +
     `findings: ${report.summary.findings_population}`,
-    `maxima: cyclomatic ${options.max_cyclomatic}, cognitive ${options.max_cognitive}, lines ${options.max_lines} ` +
-    `(variant ${options.variant}, count-nullish ${options.count_nullish})`,
+    `maxima: cyclomatic ${options.max_cyclomatic}, cognitive ${options.max_cognitive}, lines ${options.max_lines}, ` +
+    `crap ${options.max_crap} (variant ${options.variant}, count-nullish ${options.count_nullish})`,
+    `coverage: ${report.summary.coverage.source} ` +
+    `(${report.summary.coverage.matched_files} matched, ${report.summary.coverage.unmatched_files} unmatched, ` +
+    `revision ${report.summary.coverage.revision})`,
     `unit size: low ${band("low")}, medium ${band("medium")}, high ${band("high")}, very high ${band("very_high")}`,
     `graph: ${report.summary.graph.internal_edges} internal edge(s), ` +
     `${report.summary.graph.runtime_edges} runtime, ${report.summary.graph.external_specifiers} external, ` +
@@ -154,7 +227,8 @@ function renderText(report: IHealthReport, top: number): string {
   for (const finding of report.findings.slice(0, top)) {
     lines.push(
       `  ${finding.path}:${finding.line} ${finding.name} — cyclomatic ${finding.cyclomatic}, ` +
-        `cognitive ${finding.cognitive}, lines ${finding.line_count} (${finding.severity})`,
+        `cognitive ${finding.cognitive}, lines ${finding.line_count}, crap ${finding.crap.toFixed(1)} ` +
+        `(${finding.coverage_source}/${finding.coverage_reason}, ${finding.severity})`,
     );
   }
   return lines.join("\n");
@@ -184,13 +258,24 @@ export async function runHealth(args: readonly string[]): Promise<number> {
   if (rootPath !== descriptorRoot) throw usage(`--root must equal the descriptor root '${descriptorRoot}'`);
 
   const settings = settingsOf(compiled, descriptor.pluginName, values);
-  const report = await collectHealth({
-    rootPath,
-    ignoreGlobs: (compiled.catalog.ignore ?? []).map((entry) => entry.glob),
-    scopes: compiled.catalog.scopes,
-    settings,
-    sort,
-  });
+  const coverage = await coverageInputOf(values.get("coverage"), rootPath);
+  let report: IHealthReport;
+  try {
+    report = await collectHealth({
+      rootPath,
+      ignoreGlobs: (compiled.catalog.ignore ?? []).map((entry) => entry.glob),
+      scopes: compiled.catalog.scopes,
+      settings,
+      sort,
+      coverageText: coverage.text,
+      coverageSha256: coverage.sha256,
+      coverageManifest: coverage.manifest,
+      testGlobs: compiled.catalog.scopes.test,
+    });
+  } catch (error) {
+    const message = error instanceof LcovError || error instanceof Error ? error.message : String(error);
+    throw new CliError(FAILURE_EXIT, `health input rejected: ${message}`);
+  }
 
   if (format === "json") {
     print(`${JSON.stringify({ ...report, findings: report.findings.slice(0, top) }, null, 2)}\n`);

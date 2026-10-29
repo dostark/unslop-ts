@@ -46,6 +46,29 @@ export interface IHealthFinding {
   readonly param_count: number;
   readonly contributions: readonly IHealthContribution[];
   readonly severity: HealthSeverity;
+  readonly crap: number;
+  readonly coverage_source: CoverageSource;
+  readonly coverage_reason: CoverageReason;
+  readonly coverage_precision: CoveragePrecision | null;
+}
+
+/** Where the coverage percentage of one finding came from. */
+export type CoverageSource = "lcov" | "estimated";
+
+/** Why the coverage percentage has its value. */
+export type CoverageReason = "measured" | "no_input" | "file_missing" | "no_executable_samples";
+
+/** The precision a measured coverage sample claims. */
+export type CoveragePrecision = "line" | "line_ambiguous";
+
+/** The coverage input facts of one report. */
+export interface IHealthCoverageSummary {
+  readonly source: "none" | "lcov";
+  readonly file_sha256: string | null;
+  readonly snapshot_sha256: string;
+  readonly revision: "unverified" | "verified";
+  readonly matched_files: number;
+  readonly unmatched_files: number;
 }
 
 /** One unit-size band: a unit count and its percentage of the measured units. */
@@ -72,6 +95,7 @@ export interface IHealthOptions {
   readonly max_cyclomatic: number;
   readonly max_cognitive: number;
   readonly max_lines: number;
+  readonly max_crap: number;
   readonly variant: MetricVariant;
   readonly count_nullish: boolean;
 }
@@ -117,6 +141,7 @@ export interface IHealthSummary {
   readonly dead_files: IHealthDeadFiles;
   readonly graph: IHealthGraphSummary;
   readonly options: IHealthOptions;
+  readonly coverage: IHealthCoverageSummary;
 }
 
 /** One attributed failure. */
@@ -128,6 +153,7 @@ export interface IHealthError {
 /** The named input bounds this checkpoint enforces. */
 export interface IHealthLimits {
   readonly source_bytes: number;
+  readonly coverage_bytes: number;
 }
 
 /** The complete health report this checkpoint writes. */
@@ -174,6 +200,10 @@ export const HealthFindingSchema: z.ZodType<IHealthFinding, IHealthFinding> = z.
   param_count: nonNegativeInteger,
   contributions: z.array(HealthContributionSchema),
   severity,
+  crap: finite,
+  coverage_source: z.enum(["lcov", "estimated"]),
+  coverage_reason: z.enum(["measured", "no_input", "file_missing", "no_executable_samples"]),
+  coverage_precision: z.enum(["line", "line_ambiguous"]).nullable(),
 }).strict();
 
 /** One unit-size band: a unit count and its percentage of the measured units. */
@@ -200,6 +230,7 @@ export const HealthOptionsSchema: z.ZodType<IHealthOptions, IHealthOptions> = z.
   max_cyclomatic: oneBased,
   max_cognitive: oneBased,
   max_lines: oneBased,
+  max_crap: finite,
   variant: z.enum(["classic", "extended"]),
   count_nullish: z.boolean(),
 }).strict();
@@ -233,6 +264,16 @@ export const HealthGraphSummarySchema: z.ZodType<IHealthGraphSummary, IHealthGra
   complete: z.boolean(),
 }).strict();
 
+/** The coverage input facts of one report. */
+const HealthCoverageSummarySchema: z.ZodType<IHealthCoverageSummary, IHealthCoverageSummary> = z.object({
+  source: z.enum(["none", "lcov"]),
+  file_sha256: z.string().min(1).nullable(),
+  snapshot_sha256: z.string().min(1),
+  revision: z.enum(["unverified", "verified"]),
+  matched_files: nonNegativeInteger,
+  unmatched_files: nonNegativeInteger,
+}).strict();
+
 /** The aggregate populations of one run. */
 export const HealthSummarySchema: z.ZodType<IHealthSummary, IHealthSummary> = z.object({
   analyzed_files: nonNegativeInteger,
@@ -245,6 +286,7 @@ export const HealthSummarySchema: z.ZodType<IHealthSummary, IHealthSummary> = z.
   dead_files: HealthDeadFilesSchema,
   graph: HealthGraphSummarySchema,
   options: HealthOptionsSchema,
+  coverage: HealthCoverageSummarySchema,
 }).strict();
 
 /** One attributed failure. */
@@ -256,6 +298,7 @@ export const HealthErrorSchema: z.ZodType<IHealthError, IHealthError> = z.object
 /** The named input bounds this checkpoint enforces. */
 export const HealthLimitsSchema: z.ZodType<IHealthLimits, IHealthLimits> = z.object({
   source_bytes: oneBased,
+  coverage_bytes: oneBased,
 }).strict();
 
 /** The complete health report this checkpoint writes. */
