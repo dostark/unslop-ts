@@ -199,3 +199,37 @@ Deno.test("health-config-resolution: the real descriptor supplies options and a 
     assertEquals(extended?.severity, "critical");
   });
 });
+
+const GRAPH_FILES: Readonly<Record<string, string>> = {
+  "packages/x/src/a.ts":
+    'import "./side.ts";\nimport type { Shape } from "./types.ts";\nexport const local = 1;\nexport function use(value: number): number { return value; }\n',
+  "packages/x/src/side.ts": "export const side = 1;\n",
+  "packages/x/src/types.ts":
+    "export type Shape = { a: number };\nexport function build(): Shape { return { a: 1 }; }\n",
+  "packages/x/src/unresolved.ts": 'import { x } from "./missing.ts";\nexport const y = x;\n',
+};
+
+Deno.test("health-graph-cli: the real command emits file scores and graph limitations", async () => {
+  await withHealthProject(GRAPH_FILES, async (dir) => {
+    const result = await health(dir, ["--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const report = parseReport(result.stdout);
+    assertEquals(report.summary.graph.unresolved_specifiers, 1);
+    assertEquals(report.summary.graph.complete, false);
+    assertEquals(report.summary.graph.internal_edges >= 2, true);
+    assertEquals(report.summary.graph.runtime_edges <= report.summary.graph.internal_edges, true);
+    assertEquals(report.file_scores.length, report.summary.file_scores_population);
+    assertEquals(report.summary.dead_files.population, report.summary.analyzed_files);
+    assertEquals(typeof report.summary.dead_files.available, "boolean");
+    assertEquals(report.summary.dead_exports.total >= 3, true);
+    const a = report.file_scores.find((score) => score.path === "packages/x/src/a.ts");
+    assertEquals(a?.fan_out, 2);
+    assertEquals(a?.fan_in, 0);
+    assertEquals(a !== undefined && a.mi >= 0 && a.mi <= 100, true);
+    assertEquals(a !== undefined && a.lines > 0, true);
+    const side = report.file_scores.find((score) => score.path === "packages/x/src/side.ts");
+    assertEquals(side?.fan_in, 1);
+    const sorted = report.file_scores.map((score) => score.path);
+    assertEquals(sorted, [...sorted].sort((left, right) => left.localeCompare(right)));
+  });
+});

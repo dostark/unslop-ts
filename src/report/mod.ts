@@ -9,14 +9,39 @@
 
 export { collectRunReport, failingFindings } from "./collect.ts";
 export { DEFAULT_HEALTH_FORMAT, DEFAULT_HEALTH_SORT, DEFAULT_HEALTH_TOP } from "./constants.ts";
+export {
+  deadRatioOf,
+  exportPopulationOf,
+  type IExportPopulation,
+  type IValueExportSite,
+  valueExportSitesOf,
+} from "./exports.ts";
+export {
+  buildHealthGraph,
+  type IGraphEdge,
+  type IGraphLimitations,
+  type IHealthGraph,
+  resolveSpecifier,
+} from "./graph.ts";
 export { collectHealth, type HealthSortKey, type ICollectHealthInput, type IHealthSettings } from "./health.ts";
+export {
+  type IMaintainabilityInput,
+  type MaintainabilityBand,
+  maintainabilityBandOf,
+  maintainabilityIndexOf,
+  MI_GOOD,
+  MI_MODERATE,
+} from "./maintainability.ts";
 export {
   HEALTH_FORMULA_VERSION,
   HEALTH_SCHEMA_VERSION,
   HealthBandSchema,
   HealthContributionSchema,
+  HealthDeadFilesSchema,
   HealthErrorSchema,
+  HealthFileScoreSchema,
   HealthFindingSchema,
+  HealthGraphSummarySchema,
   HealthLimitsSchema,
   HealthOptionsSchema,
   HealthReportSchema,
@@ -25,8 +50,11 @@ export {
   HealthVitalSignsSchema,
   type IHealthBand,
   type IHealthContribution,
+  type IHealthDeadFiles,
   type IHealthError,
+  type IHealthFileScore,
   type IHealthFinding,
+  type IHealthGraphSummary,
   type IHealthLimits,
   type IHealthOptions,
   type IHealthReport,

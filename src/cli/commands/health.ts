@@ -142,6 +142,14 @@ function renderText(report: IHealthReport, top: number): string {
     `maxima: cyclomatic ${options.max_cyclomatic}, cognitive ${options.max_cognitive}, lines ${options.max_lines} ` +
     `(variant ${options.variant}, count-nullish ${options.count_nullish})`,
     `unit size: low ${band("low")}, medium ${band("medium")}, high ${band("high")}, very high ${band("very_high")}`,
+    `graph: ${report.summary.graph.internal_edges} internal edge(s), ` +
+    `${report.summary.graph.runtime_edges} runtime, ${report.summary.graph.external_specifiers} external, ` +
+    `${report.summary.graph.unresolved_specifiers} unresolved, ` +
+    `${report.summary.graph.nonliteral_dynamic_imports} nonliteral dynamic ` +
+    `(${report.summary.graph.complete ? "complete" : "incomplete"})`,
+    `file scores: ${report.summary.file_scores_population} file(s), dead exports ` +
+    `${report.summary.dead_exports.unused}/${report.summary.dead_exports.total}, dead files ` +
+    `${report.summary.dead_files.available ? String(report.summary.dead_files.count) : "unavailable"}`,
   ];
   for (const finding of report.findings.slice(0, top)) {
     lines.push(

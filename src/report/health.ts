@@ -13,14 +13,20 @@ import { matchesAnyGlob } from "../engine/glob.ts";
 import { join as posixJoin } from "../engine/posix_path.ts";
 import { measureFunction } from "../metrics/function_metrics.ts";
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
+import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
+import { deadRatioOf, exportPopulationOf } from "./exports.ts";
+import { buildHealthGraph } from "./graph.ts";
 import {
   HEALTH_FORMULA_VERSION,
   HEALTH_SCHEMA_VERSION,
+  type IHealthDeadFiles,
   type IHealthError,
+  type IHealthFileScore,
   type IHealthFinding,
   type IHealthReport,
   type IHealthVitalSigns,
 } from "./health_model.ts";
+import { maintainabilityIndexOf } from "./maintainability.ts";
 import { type IParsedHealthFile, MAX_SOURCE_BYTES, parseHealthFile } from "./parse.ts";
 import { TOOL_VERSION } from "./version.ts";
 
@@ -168,16 +174,36 @@ async function sourceFiles(input: ICollectHealthInput): Promise<{ files: string[
   return { files, excluded };
 }
 
+/** The unique code-token lines of one file. */
+function uniqueLinesOf(file: IParsedHealthFile): number {
+  const lines = new Set<number>();
+  for (const token of file.context.tokens) {
+    const first = file.context.positionAt(token.start).line;
+    const last = token.end > token.start ? file.context.positionAt(token.end - 1).line : first;
+    for (let line = first; line <= last; line++) lines.add(line);
+  }
+  return lines.size;
+}
+
+/** The measured facts of one file that the file score reads. */
+interface IFileFacts {
+  readonly functions: number;
+  readonly cyclomatic: number;
+  readonly lines: number;
+}
+
 /** Measures one parsed file into findings and unit-size bands. */
 function measureFile(
   file: IParsedHealthFile,
   input: ICollectHealthInput,
   findings: IMeasuredFinding[],
   bands: Record<UnitSizeBand, number>,
-): number {
+): IFileFacts {
   const options: IMetricOptions = { variant: input.settings.variant, countNullish: input.settings.countNullish };
+  let cyclomatic = 0;
   for (const unit of file.units) {
     const metrics = measureFunction(unit, options, file.context);
+    cyclomatic += metrics.cyclomatic;
     bands[bandOf(metrics.lines)]++;
     const values: IFindingValues = {
       cyclomatic: metrics.cyclomatic,
@@ -207,7 +233,7 @@ function measureFile(
       values,
     });
   }
-  return file.units.length;
+  return { functions: file.units.length, cyclomatic, lines: uniqueLinesOf(file) };
 }
 
 /** The severity order used by the severity sort. */
@@ -229,37 +255,116 @@ function comparatorOf(sort: HealthSortKey): (left: IMeasuredFinding, right: IMea
   };
 }
 
+/** The alias map of the project's root Deno configuration, used to resolve import specifiers. */
+async function readAliases(rootPath: string): Promise<Record<string, string>> {
+  let text: string;
+  try {
+    text = await Deno.readTextFile(platformJoin(rootPath, "deno.json"));
+  } catch {
+    return {};
+  }
+  let imports: Record<string, unknown>;
+  try {
+    imports = (JSON.parse(text) as { imports?: Record<string, unknown> }).imports ?? {};
+  } catch {
+    return {};
+  }
+  const aliases: Record<string, string> = {};
+  for (const [key, value] of Object.entries(imports)) {
+    if (typeof value !== "string" || !value.startsWith("./")) continue;
+    aliases[key.endsWith("/") ? key : `${key}/`] = value;
+  }
+  return aliases;
+}
+
+/** The dead-file population of the measured snapshot, or an unavailable result when the scan fails. */
+async function deadFilesOf(rootPath: string, measured: ReadonlySet<string>): Promise<IHealthDeadFiles> {
+  try {
+    const report = await checkManifestRepository(rootPath, {
+      walkSkipPatterns: ["/node_modules(/|$)", "/\\.git(/|$)", "/dist(/|$)", "/tests_node(/|$)"],
+      extraEntries: [],
+      referenceGlobs: [],
+    });
+    return {
+      count: report.findings.filter((finding) => measured.has(finding.repoPath)).length,
+      population: measured.size,
+      available: true,
+    };
+  } catch {
+    return { count: 0, population: measured.size, available: false };
+  }
+}
+
 /** Collects the report for one descriptor root. */
 export async function collectHealth(input: ICollectHealthInput): Promise<IHealthReport> {
   const { files, excluded } = await sourceFiles(input);
   const findings: IMeasuredFinding[] = [];
   const errors: IHealthError[] = [];
   const bands: Record<UnitSizeBand, number> = { low: 0, medium: 0, high: 0, very_high: 0 };
-  let functions = 0;
-  let analyzed = 0;
+  const parsed = new Map<string, IParsedHealthFile>();
+  const facts = new Map<string, IFileFacts>();
   for (const relativePath of files) {
     try {
       const file = await parseHealthFile(platformJoin(input.rootPath, relativePath), relativePath);
-      functions += measureFile(file, input, findings, bands);
-      analyzed++;
+      parsed.set(relativePath, file);
+      facts.set(relativePath, measureFile(file, input, findings, bands));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push({ path: relativePath, message });
     }
   }
+  const graph = buildHealthGraph(parsed, await readAliases(input.rootPath));
+  const exports = exportPopulationOf(parsed);
+  let functions = 0;
+  const fileScores: IHealthFileScore[] = [];
+  for (const [path, measured] of facts) {
+    functions += measured.functions;
+    const exportsForPath = exports.byPath.get(path) ?? { total: 0, unused: 0 };
+    const deadExportRatio = deadRatioOf(exportsForPath.total, exportsForPath.unused);
+    const fanOut = graph.fanOut.get(path) ?? 0;
+    fileScores.push({
+      path,
+      lines: measured.lines,
+      cyclomatic: measured.cyclomatic,
+      density: measured.lines === 0 ? 0 : measured.cyclomatic / measured.lines,
+      dead_export_ratio: deadExportRatio,
+      fan_in: graph.fanIn.get(path) ?? 0,
+      fan_out: fanOut,
+      mi: maintainabilityIndexOf({
+        fileLines: measured.lines,
+        cyclomatic: measured.cyclomatic,
+        deadExportRatio,
+        fanOut,
+      }),
+    });
+  }
+  fileScores.sort((left, right) => left.path.localeCompare(right.path));
   findings.sort(comparatorOf(input.sort));
   const reportFindings: IHealthFinding[] = findings.map(({ values: _values, ...finding }) => finding);
+  const deadFiles = await deadFilesOf(input.rootPath, new Set(parsed.keys()));
   return {
     schema_version: HEALTH_SCHEMA_VERSION,
     formula_version: HEALTH_FORMULA_VERSION,
     tool_version: TOOL_VERSION,
     findings: reportFindings,
+    file_scores: fileScores,
     summary: {
-      analyzed_files: analyzed,
+      analyzed_files: parsed.size,
       excluded_files: excluded,
       failed_files: errors.length,
       functions,
       findings_population: reportFindings.length,
+      file_scores_population: fileScores.length,
+      dead_exports: { total: exports.total, unused: exports.unused },
+      dead_files: deadFiles,
+      graph: {
+        internal_edges: graph.edges.length,
+        runtime_edges: graph.edges.filter((edge) => edge.kind === "runtime").length,
+        external_specifiers: graph.limitations.external,
+        unresolved_specifiers: graph.limitations.unresolved,
+        nonliteral_dynamic_imports: graph.limitations.nonliteral_dynamic,
+        complete: graph.complete,
+      },
       options: {
         max_cyclomatic: input.settings.maxCyclomatic,
         max_cognitive: input.settings.maxCognitive,

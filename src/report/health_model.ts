@@ -76,6 +76,35 @@ export interface IHealthOptions {
   readonly count_nullish: boolean;
 }
 
+/** One file score: the measured facts and the maintainability index they produce. */
+export interface IHealthFileScore {
+  readonly path: string;
+  readonly lines: number;
+  readonly cyclomatic: number;
+  readonly density: number;
+  readonly dead_export_ratio: number;
+  readonly fan_in: number;
+  readonly fan_out: number;
+  readonly mi: number;
+}
+
+/** The dead-file population of the snapshot. `available` is false when the scan could not run. */
+export interface IHealthDeadFiles {
+  readonly count: number;
+  readonly population: number;
+  readonly available: boolean;
+}
+
+/** The dependency-graph populations and the limits of the evidence. */
+export interface IHealthGraphSummary {
+  readonly internal_edges: number;
+  readonly runtime_edges: number;
+  readonly external_specifiers: number;
+  readonly unresolved_specifiers: number;
+  readonly nonliteral_dynamic_imports: number;
+  readonly complete: boolean;
+}
+
 /** The aggregate populations of one run. */
 export interface IHealthSummary {
   readonly analyzed_files: number;
@@ -83,6 +112,10 @@ export interface IHealthSummary {
   readonly failed_files: number;
   readonly functions: number;
   readonly findings_population: number;
+  readonly file_scores_population: number;
+  readonly dead_exports: { readonly total: number; readonly unused: number };
+  readonly dead_files: IHealthDeadFiles;
+  readonly graph: IHealthGraphSummary;
   readonly options: IHealthOptions;
 }
 
@@ -103,6 +136,7 @@ export interface IHealthReport {
   readonly formula_version: typeof HEALTH_FORMULA_VERSION;
   readonly tool_version: string;
   readonly findings: readonly IHealthFinding[];
+  readonly file_scores: readonly IHealthFileScore[];
   readonly summary: IHealthSummary;
   readonly vital_signs: IHealthVitalSigns;
   readonly errors: readonly IHealthError[];
@@ -170,6 +204,35 @@ export const HealthOptionsSchema: z.ZodType<IHealthOptions, IHealthOptions> = z.
   count_nullish: z.boolean(),
 }).strict();
 
+/** One file score: the measured facts and the maintainability index they produce. */
+export const HealthFileScoreSchema: z.ZodType<IHealthFileScore, IHealthFileScore> = z.object({
+  path: z.string().min(1),
+  lines: nonNegativeInteger,
+  cyclomatic: nonNegativeInteger,
+  density: finite,
+  dead_export_ratio: finite,
+  fan_in: nonNegativeInteger,
+  fan_out: nonNegativeInteger,
+  mi: finite,
+}).strict();
+
+/** The dead-file population of the snapshot. */
+export const HealthDeadFilesSchema: z.ZodType<IHealthDeadFiles, IHealthDeadFiles> = z.object({
+  count: nonNegativeInteger,
+  population: nonNegativeInteger,
+  available: z.boolean(),
+}).strict();
+
+/** The dependency-graph populations and the limits of the evidence. */
+export const HealthGraphSummarySchema: z.ZodType<IHealthGraphSummary, IHealthGraphSummary> = z.object({
+  internal_edges: nonNegativeInteger,
+  runtime_edges: nonNegativeInteger,
+  external_specifiers: nonNegativeInteger,
+  unresolved_specifiers: nonNegativeInteger,
+  nonliteral_dynamic_imports: nonNegativeInteger,
+  complete: z.boolean(),
+}).strict();
+
 /** The aggregate populations of one run. */
 export const HealthSummarySchema: z.ZodType<IHealthSummary, IHealthSummary> = z.object({
   analyzed_files: nonNegativeInteger,
@@ -177,6 +240,10 @@ export const HealthSummarySchema: z.ZodType<IHealthSummary, IHealthSummary> = z.
   failed_files: nonNegativeInteger,
   functions: nonNegativeInteger,
   findings_population: nonNegativeInteger,
+  file_scores_population: nonNegativeInteger,
+  dead_exports: z.object({ total: nonNegativeInteger, unused: nonNegativeInteger }).strict(),
+  dead_files: HealthDeadFilesSchema,
+  graph: HealthGraphSummarySchema,
   options: HealthOptionsSchema,
 }).strict();
 
@@ -197,6 +264,7 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   formula_version: z.literal(HEALTH_FORMULA_VERSION),
   tool_version: z.string().min(1),
   findings: z.array(HealthFindingSchema),
+  file_scores: z.array(HealthFileScoreSchema),
   summary: HealthSummarySchema,
   vital_signs: HealthVitalSignsSchema,
   errors: z.array(HealthErrorSchema),
