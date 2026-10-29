@@ -7,7 +7,7 @@
  * @related-files [src/report/health_score.ts, src/report/duplication.ts]
  */
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { checkRepository, type TJscpdRunner } from "../src/rules/whole_tree/duplicate_code.ts";
 import type { IDuplicateCodeSettings } from "../src/rules/whole_tree/options.ts";
@@ -221,10 +221,7 @@ Deno.test("health-runner-security: the local bin is version and containment chec
       groups: [{ name: "a", paths: ["."], ignore: [], threshold: 100, minLines: 5, maxGapLines: 0, pattern: null }],
     };
     await assertThrowsAsync(
-      () =>
-        checkRepository(root, settings, async () => {
-          throw new Error("denied");
-        }, { tempRoot }),
+      () => checkRepository(root, settings, () => Promise.reject(new Error("denied")), { tempRoot }),
       "denied",
     );
     assertEquals([...Deno.readDirSync(tempRoot)], []);

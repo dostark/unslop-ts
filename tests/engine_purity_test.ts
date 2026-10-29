@@ -9,6 +9,7 @@
 
 import { assert, assertEquals, assertFalse } from "@std/assert";
 import * as api from "../mod.ts";
+import * as report from "../src/report/mod.ts";
 import { main } from "../src/cli/unslop.ts";
 import { walk } from "@std/fs";
 import { dirname, fromFileUrl, join, normalize, relative } from "@std/path";
@@ -250,7 +251,6 @@ Deno.test("engine_suite_and_public_exports", async () => {
 });
 
 Deno.test("health-parser-package: the report entry owns the parser and the pin stays exact", async () => {
-  const report = await import("../src/report/mod.ts");
   assertEquals(typeof report.parseHealthFile, "function");
   assertEquals(typeof report.collectHealth, "function");
   assertEquals(typeof report.HealthReportSchema.safeParse, "function");
