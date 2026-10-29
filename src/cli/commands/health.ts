@@ -259,6 +259,10 @@ function renderText(report: IHealthReport, top: number): string {
     `${report.summary.graph.unresolved_specifiers} unresolved, ` +
     `${report.summary.graph.nonliteral_dynamic_imports} nonliteral dynamic ` +
     `(${report.summary.graph.complete ? "complete" : "incomplete"})`,
+    `cycles: ${report.vital_signs.cycles.sccs} runtime SCC(s), ${report.vital_signs.cycles.files} ` +
+    `file(s) in cycles (${report.vital_signs.cycles.per_thousand.toFixed(2)} per 1000)`,
+    `coupling: ${report.vital_signs.coupling.high_files} high file(s) of ` +
+    `${report.vital_signs.coupling.code_files} (${report.vital_signs.coupling.percent.toFixed(1)}%)`,
     `file scores: ${report.summary.file_scores_population} file(s), dead exports ` +
     `${report.summary.dead_exports.unused}/${report.summary.dead_exports.total}, dead files ` +
     `${report.summary.dead_files.available ? String(report.summary.dead_files.count) : "unavailable"}`,

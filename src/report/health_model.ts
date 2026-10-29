@@ -108,6 +108,19 @@ export interface IHealthVitalSigns {
       readonly very_high: IHealthBand;
     };
   };
+  readonly cycles: {
+    readonly sccs: number;
+    readonly files: number;
+    readonly code_files: number;
+    readonly per_thousand: number;
+  };
+  readonly coupling: {
+    readonly high_files: number;
+    readonly code_files: number;
+    readonly percent: number;
+    readonly fan_in_limit: number;
+    readonly fan_out_limit: number;
+  };
 }
 
 /** The active measurement contract of one run. */
@@ -245,6 +258,19 @@ export const HealthVitalSignsSchema: z.ZodType<IHealthVitalSigns, IHealthVitalSi
       high: HealthBandSchema,
       very_high: HealthBandSchema,
     }).strict(),
+  }).strict(),
+  cycles: z.object({
+    sccs: nonNegativeInteger,
+    files: nonNegativeInteger,
+    code_files: nonNegativeInteger,
+    per_thousand: finite,
+  }).strict(),
+  coupling: z.object({
+    high_files: nonNegativeInteger,
+    code_files: nonNegativeInteger,
+    percent: finite,
+    fan_in_limit: oneBased,
+    fan_out_limit: oneBased,
   }).strict(),
 }).strict();
 

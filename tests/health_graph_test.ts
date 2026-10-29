@@ -3,7 +3,7 @@
  * @path tests/health_graph_test.ts
  * @description Unit values for the maintainability index, the graph projections and the raw export population.
  * @architectural-layer Test
- * @related-files [src/report/graph.ts, src/report/exports.ts, src/report/maintainability.ts]
+ * @related-files [src/report/graph.ts, src/report/exports.ts, src/report/maintainability.ts, src/rules/whole_tree/import_cycles.ts]
  */
 
 import { assert, assertEquals } from "@std/assert";
@@ -18,6 +18,7 @@ import {
   valueExportSitesOf,
 } from "../src/report/mod.ts";
 import type { IParsedHealthFile } from "../src/report/parse.ts";
+import { couplingSignalOf, runtimeCyclesOf } from "../src/rules/whole_tree/import_cycles.ts";
 
 /** Writes the files to a temp dir and parses the snapshot the way the CLI does. */
 async function snapshotOf(files: Readonly<Record<string, string>>): Promise<Map<string, IParsedHealthFile>> {
@@ -114,4 +115,63 @@ Deno.test("health-export-population: suppressed sites stay, type exports leave, 
   assertEquals(population.byPath.get("src/types_only.ts")?.total ?? 0, 0);
   assertEquals(deadRatioOf(0, 0), 0);
   assertEquals(deadRatioOf(6, 2), 1 / 3);
+});
+
+Deno.test("import-cycles: a three-file loop is one SCC and disconnected cycles count separately", () => {
+  const loop = runtimeCyclesOf([
+    { from: "a.ts", to: "b.ts", kind: "runtime" },
+    { from: "b.ts", to: "c.ts", kind: "runtime" },
+    { from: "c.ts", to: "a.ts", kind: "runtime" },
+  ]);
+  assertEquals(loop, { sccs: 1, files: 3 });
+  const several = runtimeCyclesOf([
+    { from: "a.ts", to: "b.ts", kind: "runtime" },
+    { from: "b.ts", to: "a.ts", kind: "runtime" },
+    { from: "d.ts", to: "e.ts", kind: "runtime" },
+    { from: "e.ts", to: "d.ts", kind: "runtime" },
+    { from: "f.ts", to: "f.ts", kind: "runtime" },
+  ]);
+  assertEquals(several, { sccs: 2, files: 4 });
+  const dag = runtimeCyclesOf([
+    { from: "a.ts", to: "b.ts", kind: "runtime" },
+    { from: "a.ts", to: "c.ts", kind: "runtime" },
+  ]);
+  assertEquals(dag, { sccs: 0, files: 0 });
+  assertEquals(runtimeCyclesOf([]), { sccs: 0, files: 0 });
+});
+
+Deno.test("health-coupling: duplicate edges, type-only coupling and the limits count once per file", () => {
+  const edges = [
+    { from: "a.ts", to: "b.ts", kind: "type" as const },
+    { from: "a.ts", to: "b.ts", kind: "runtime" as const },
+  ];
+  const single = couplingSignalOf(edges, 2);
+  assertEquals(single.high_files, 0);
+  assertEquals(single.fan_in_limit, 20);
+  assertEquals(single.fan_out_limit, 15);
+
+  const fanOut = Array.from({ length: 16 }, (_, index) => ({
+    from: "hub.ts",
+    to: `leaf_${index}.ts`,
+    kind: "runtime" as const,
+  }));
+  const hub = couplingSignalOf(fanOut, 17);
+  assertEquals(hub.high_files, 1);
+  assertEquals(hub.percent, (1 / 17) * 100);
+
+  const fanIn = Array.from({ length: 21 }, (_, index) => ({
+    from: `source_${index}.ts`,
+    to: "sink.ts",
+    kind: "runtime" as const,
+  }));
+  const sink = couplingSignalOf(fanIn, 22);
+  assertEquals(sink.high_files, 1);
+
+  const atLimit = Array.from({ length: 15 }, (_, index) => ({
+    from: "edge.ts",
+    to: `leaf_${index}.ts`,
+    kind: "runtime" as const,
+  }));
+  assertEquals(couplingSignalOf(atLimit, 16).high_files, 0);
+  assertEquals(couplingSignalOf([], 0).percent, 0);
 });

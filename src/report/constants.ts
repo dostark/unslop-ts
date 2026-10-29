@@ -39,3 +39,9 @@ export const MAX_GIT_STDERR_BYTES = 8 * 1024;
 
 /** The Git child deadline in milliseconds. */
 export const GIT_DEADLINE_MS = 120 * 1000;
+
+/** The structural fan-in above which a file reads as highly coupled. */
+export const COUPLING_FAN_IN_LIMIT = 20;
+
+/** The structural fan-out above which a file reads as highly coupled. */
+export const COUPLING_FAN_OUT_LIMIT = 15;

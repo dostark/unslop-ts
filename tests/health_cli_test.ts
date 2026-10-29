@@ -332,3 +332,27 @@ Deno.test("health-hotspot-cli: the real --since and --min-commits flags change C
     assertEquals(narrow.hotspot_summary.since > wide.hotspot_summary.since, true);
   });
 });
+
+Deno.test("health-cycle-cli: the command exposes the exact cycle and coupling populations", async () => {
+  const files: Readonly<Record<string, string>> = {
+    "packages/x/src/a.ts": 'import type { IThing } from "./types.ts";\n' +
+      'import { b } from "./b.ts";\n\n' +
+      "export function a(thing: IThing): number {\n  return b() + thing.value;\n}\n",
+    "packages/x/src/b.ts": 'import { a } from "./a.ts";\n\n' +
+      "export function b(): number {\n  return 1;\n}\n",
+    "packages/x/src/types.ts": "export interface IThing {\n  value: number;\n}\n",
+  };
+  await withHealthProject(files, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(report.vital_signs.cycles.sccs, 1);
+    assertEquals(report.vital_signs.cycles.files, 2);
+    assertEquals(report.vital_signs.cycles.code_files, 5);
+    assertEquals(report.vital_signs.cycles.per_thousand, (1 / 5) * 1000);
+    assertEquals(report.vital_signs.coupling.high_files, 0);
+    assertEquals(report.vital_signs.coupling.code_files, 5);
+    assertEquals(report.vital_signs.coupling.percent, 0);
+    assertEquals(report.vital_signs.coupling.fan_in_limit, 20);
+    assertEquals(report.vital_signs.coupling.fan_out_limit, 15);
+    assertEquals(report.summary.graph.runtime_edges, 2);
+  });
+});

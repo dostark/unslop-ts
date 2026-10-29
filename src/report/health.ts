@@ -13,6 +13,7 @@ import { matchesAnyGlob } from "../engine/glob.ts";
 import { join as posixJoin } from "../engine/posix_path.ts";
 import { measureFunction, ownedLineNumbers } from "../metrics/function_metrics.ts";
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
+import { couplingSignalOf, runtimeCyclesOf } from "../rules/whole_tree/import_cycles.ts";
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
@@ -144,8 +145,14 @@ function percentOf(count: number, total: number): number {
 }
 
 /** The vital signs of the measured units. */
-function vitalSignsOf(bands: Readonly<Record<UnitSizeBand, number>>, total: number): IHealthVitalSigns {
+function vitalSignsOf(
+  bands: Readonly<Record<UnitSizeBand, number>>,
+  total: number,
+  graph: IHealthGraph,
+  codeFiles: number,
+): IHealthVitalSigns {
   const band = (count: number) => ({ count, percent: percentOf(count, total) });
+  const cycles = runtimeCyclesOf(graph.edges);
   return {
     unit_size: {
       total,
@@ -156,6 +163,13 @@ function vitalSignsOf(bands: Readonly<Record<UnitSizeBand, number>>, total: numb
         very_high: band(bands.very_high),
       },
     },
+    cycles: {
+      sccs: cycles.sccs,
+      files: cycles.files,
+      code_files: codeFiles,
+      per_thousand: codeFiles === 0 ? 0 : (cycles.sccs / codeFiles) * 1000,
+    },
+    coupling: couplingSignalOf(graph.edges, codeFiles),
   };
 }
 
@@ -638,7 +652,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
         count_nullish: input.settings.countNullish,
       },
     },
-    vital_signs: vitalSignsOf(bands, functions),
+    vital_signs: vitalSignsOf(bands, functions, graph, parsed.size),
     errors,
     limits: {
       source_bytes: MAX_SOURCE_BYTES,
