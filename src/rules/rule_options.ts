@@ -9,7 +9,13 @@
 
 import { z } from "zod";
 import { compilesAsRegex, RegexFlagsSchema, RegexSourceSchema } from "../engine/regex_option.ts";
-import { DEFAULT_MAX_CYCLOMATIC, DEFAULT_METRIC_VARIANT, METRIC_VARIANTS } from "../metrics/constants.ts";
+import {
+  DEFAULT_COUNT_NULLISH,
+  DEFAULT_MAX_COGNITIVE,
+  DEFAULT_MAX_CYCLOMATIC,
+  DEFAULT_METRIC_VARIANT,
+  METRIC_VARIANTS,
+} from "../metrics/constants.ts";
 import { DEFAULT_REASON_SEPARATOR } from "./deno/ignore_directive.ts";
 import { DEFAULT_FORBIDDEN_IGNORES } from "./deno/no_forbidden_lint_ignore.ts";
 import { DEFAULT_DENO_SHEBANG } from "./deno/require_deno_shebang.ts";
@@ -65,6 +71,11 @@ const MetricVariantSchema = z.enum(METRIC_VARIANTS);
 const MaxCyclomaticComplexityOptions = z.object({
   max: z.number().int().positive().default(DEFAULT_MAX_CYCLOMATIC),
   variant: MetricVariantSchema.default(DEFAULT_METRIC_VARIANT),
+}).strict();
+
+const MaxCognitiveComplexityOptions = z.object({
+  max: z.number().int().positive().default(DEFAULT_MAX_COGNITIVE),
+  countNullish: z.boolean().default(DEFAULT_COUNT_NULLISH),
 }).strict();
 
 const MaxClassSizeOptions = z.object({
@@ -222,6 +233,7 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-repeated-assert-call": NoRepeatedAssertCallOptions,
   "no-constant-substring-assert": NoConstantSubstringAssertOptions,
   "max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
+  "max-cognitive-complexity": MaxCognitiveComplexityOptions,
   "max-class-size": MaxClassSizeOptions,
   "require-optional-wrapper": RequireOptionalWrapperOptions,
   "import-inside-statement": ImportCallOptions,

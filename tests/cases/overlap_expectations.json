@@ -140,6 +140,15 @@
     }
   },
   {
+    "rule": "max-cognitive-complexity",
+    "source": "export function run(a, b, c, d, e, f) {\n  if (a) { if (b) { if (c) { if (d) { if (e) { if (f) { return 1; } } } } } }\n  return 0;\n}\n",
+    "expected": {
+      "deno": {},
+      "eslint": {},
+      "oxlint": {}
+    }
+  },
+  {
     "rule": "max-class-size",
     "source": "export class A { m() { return 1; } n() { return 2; } }\n",
     "expected": {

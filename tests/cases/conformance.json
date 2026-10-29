@@ -236,6 +236,36 @@
     ]
   },
   {
+    "rule": "max-cognitive-complexity",
+    "valid": [
+      "export function run(a) { return a; }\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run(a) { if (a) { if (a) { return 1; } } return 0; }\n",
+        "options": [
+          {
+            "max": 2
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has cognitive complexity 3 (limit 2)."
+      },
+      {
+        "code": "export function run(a) { if (a) { return a ?? 0; } return 0; }\n",
+        "options": [
+          {
+            "max": 1
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has cognitive complexity 2 (limit 1)."
+      }
+    ]
+  },
+  {
     "rule": "max-class-size",
     "valid": [
       "export const value = 1;\n"

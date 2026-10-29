@@ -9,6 +9,12 @@
     "ignore": []
   },
   "rules": {
+    "self/max-cognitive-complexity": {
+      "level": "error",
+      "options": {
+        "max": 29
+      }
+    },
     "self/max-cyclomatic-complexity": {
       "level": "error",
       "options": {

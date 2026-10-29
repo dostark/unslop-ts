@@ -125,7 +125,8 @@ Deno.test("cyclomatic-nested-units: descendant decisions are excluded and indepe
 Deno.test("cyclomatic-contributions: exact kind, weight and UTF-16 position keep the sum invariant", () => {
   const metrics = measureAll(CONTRIBUTIONS)[0];
   assertEquals(metrics.cyclomatic, 7);
-  assertEquals(metrics.contributions.length, 6);
+  const counted = metrics.contributions.filter((entry) => entry.metric === "cyclomatic");
+  assertEquals(counted.length, 6);
   const conditional = CONTRIBUTIONS.indexOf("a && b");
   const expected: readonly (readonly [string, number])[] = [
     ["if", CONTRIBUTIONS.indexOf("if (a)")],
@@ -136,17 +137,23 @@ Deno.test("cyclomatic-contributions: exact kind, weight and UTF-16 position keep
     ["logical-and", conditional],
   ];
   for (const [kind, offset] of expected) {
-    const contribution = metrics.contributions.find((entry) => entry.kind === kind);
+    const contribution = counted.find((entry) => entry.kind === kind);
     assert(contribution !== undefined, `${kind} is missing`);
     assertEquals(contribution.metric, "cyclomatic");
     assertEquals(contribution.weight, 1);
     assertEquals(contribution.nesting, 0);
     assertEquals({ line: contribution.line, column: contribution.column }, positionOf(CONTRIBUTIONS, offset));
   }
-  const weights = metrics.contributions.reduce((sum, entry) => sum + entry.weight, 0);
+  const weights = metrics.contributions.filter((entry) => entry.metric === "cyclomatic").reduce(
+    (sum, entry) => sum + entry.weight,
+    0,
+  );
   assertEquals(metrics.cyclomatic, 1 + weights);
   const classic = measureAll(CONTRIBUTIONS, CLASSIC_OPTIONS)[0];
-  assertEquals(classic.contributions.map((entry) => entry.kind), ["if", "else-if", "ternary", "logical-and"]);
+  assertEquals(
+    classic.contributions.filter((entry) => entry.metric === "cyclomatic").map((entry) => entry.kind),
+    ["if", "else-if", "ternary", "logical-and"],
+  );
 });
 
 Deno.test("rule-reads-core: both rule variants report the core value through the real Deno plugin", () => {

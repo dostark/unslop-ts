@@ -9,6 +9,8 @@
 
 import { asNode, type ILintNode, isNodeLike, NODE_IDENTIFIER } from "../engine/type_environment.ts";
 import type { IRuleNode } from "../rules/types.ts";
+import { cognitiveContributions } from "./cognitive.ts";
+import { forEachChildNode, FUNCTION_KINDS, isFunctionUnitNode, rangeOf } from "./estree.ts";
 import type {
   IFunctionMetrics,
   IFunctionUnit,
@@ -21,19 +23,6 @@ import type {
 
 /** The cyclomatic count of a function with no decision. */
 const CYCLOMATIC_BASE = 1;
-
-/** The node types that declare an executable function body, for ESTree and Babel trees. */
-const FUNCTION_KINDS: ReadonlySet<string> = new Set([
-  "FunctionDeclaration",
-  "FunctionExpression",
-  "ArrowFunctionExpression",
-  "ClassMethod",
-  "ObjectMethod",
-  "ClassPrivateMethod",
-]);
-
-/** Keys a traversal never follows: host metadata, positions, comments, and parent links. */
-const SKIPPED_KEYS: ReadonlySet<string> = new Set(["parent", "range", "loc", "comments", "tokens"]);
 
 /** The counted loop node types and their contribution kinds. */
 const LOOP_KINDS: Readonly<Record<string, MetricContributionKind>> = {
@@ -62,43 +51,6 @@ const KEYED_PARENT_KINDS: ReadonlySet<string> = new Set([
 
 /** The Babel method nodes that carry their own key and behave as a function unit. */
 const SELF_KEYED_KINDS: ReadonlySet<string> = new Set(["ClassMethod", "ObjectMethod", "ClassPrivateMethod"]);
-
-/** A metric-core failure that a caller must surface instead of hiding as a zero value. */
-export class MetricCoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MetricCoreError";
-  }
-}
-
-/** Visits every ESTree child of a node, skipping host metadata. */
-function forEachChildNode(node: ILintNode, visit: (child: ILintNode) => void): void {
-  for (const key in node) {
-    if (SKIPPED_KEYS.has(key)) continue;
-    const value = node[key];
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (isNodeLike(item)) visit(asNode(item));
-      }
-    } else if (isNodeLike(value)) {
-      visit(asNode(value));
-    }
-  }
-}
-
-/** The host range of a node, or an explicit failure when the host supplies none. */
-function rangeOf(node: ILintNode): readonly [number, number] {
-  const range = node.range;
-  if (range === undefined) {
-    throw new MetricCoreError(`The host node '${node.type}' has no range, so it cannot be measured.`);
-  }
-  return range;
-}
-
-/** True when the node declares an executable function body. */
-function isFunctionUnitNode(node: ILintNode): boolean {
-  return FUNCTION_KINDS.has(node.type) && isNodeLike(node.body);
-}
 
 /** The identifier name of a value, or null. */
 function identifierName(value: unknown): string | null {
@@ -160,6 +112,14 @@ function anonymousName(node: ILintNode, context: IMeasurementContext): string {
   return `<anonymous>@${position.line}:${position.column}`;
 }
 
+/** The name a direct self-call resolves to: its own id, or the variable it is assigned to. */
+function bindingNameOf(node: ILintNode, parent: ILintNode | null): string | null {
+  const declared = identifierName(node.id);
+  if (declared !== null) return declared;
+  if (parent !== null && parent.type === "VariableDeclarator") return identifierName(parent.id);
+  return null;
+}
+
 /** The display name of a function unit. */
 function nameOf(node: ILintNode, parent: ILintNode | null, context: IMeasurementContext): string {
   const declared = identifierName(node.id) ?? nameFromSelf(node);
@@ -181,7 +141,13 @@ export function functionUnits(program: IRuleNode, context: IMeasurementContext):
     const descendantRanges: (readonly [number, number])[] = [];
     for (const ancestor of open) ancestor.push(range);
     open.push(descendantRanges);
-    units.push({ node, name: nameOf(node, parent, context), range, descendantRanges });
+    units.push({
+      node,
+      name: nameOf(node, parent, context),
+      range,
+      descendantRanges,
+      bindingName: bindingNameOf(node, parent),
+    });
     forEachChildNode(node, (child) => visit(child, node));
     open.pop();
   };
@@ -342,22 +308,26 @@ export function measureFunction(
   options: IMetricOptions,
   context: IMeasurementContext,
 ): IFunctionMetrics {
-  const contributions = cyclomaticContributions(unit, options, context);
+  const cyclomaticEntries = cyclomaticContributions(unit, options, context);
   if (options.variant === "extended") {
     for (const offset of optionalContributionOffsets(unit, context)) {
-      contributions.push(contributionAt(offset, "optional-chain", context));
+      cyclomaticEntries.push(contributionAt(offset, "optional-chain", context));
     }
   }
-  contributions.sort((left, right) => left.line - right.line || left.column - right.column);
+  const cognitiveEntries = cognitiveContributions(unit, options, context);
+  const contributions = [...cyclomaticEntries, ...cognitiveEntries].sort(
+    (left, right) => left.line - right.line || left.column - right.column,
+  );
   const position = context.positionAt(unit.range[0]);
-  const cyclomatic = contributions.reduce((sum, entry) => sum + entry.weight, CYCLOMATIC_BASE);
+  const cyclomatic = cyclomaticEntries.reduce((sum, entry) => sum + entry.weight, CYCLOMATIC_BASE);
+  const cognitive = cognitiveEntries.reduce((sum, entry) => sum + entry.weight, 0);
   return {
     name: unit.name,
     line: position.line,
     column: position.column,
     range: unit.range,
     cyclomatic,
-    cognitive: 0,
+    cognitive,
     lines: ownedLines(unit, context).size,
     params: parameterCount(asNode(unit.node)),
     contributions,

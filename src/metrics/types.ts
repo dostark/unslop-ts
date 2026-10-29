@@ -80,6 +80,8 @@ export interface IFunctionUnit {
   readonly name: string;
   readonly range: readonly [number, number];
   readonly descendantRanges: readonly (readonly [number, number])[];
+  /** The name a direct self-call resolves to, or null for a method or an anonymous unit. */
+  readonly bindingName: string | null;
 }
 
 /** One counted decision, with the exact position and applied weight. */

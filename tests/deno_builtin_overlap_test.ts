@@ -140,6 +140,13 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "max-cognitive-complexity",
+    name: "a function with deep nesting",
+    source:
+      "export function pick(a: boolean, b: boolean, c: boolean, d: boolean, e: boolean, f: boolean): number {\n  if (a) {\n    if (b) {\n      if (c) {\n        if (d) {\n          if (e) {\n            if (f) {\n              return 1;\n            }\n          }\n        }\n      }\n    }\n  }\n  return 0;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
     rule: "max-class-size",
     name: "a class with methods",
     source: "export class Big {\n  one(): number {\n    return 1;\n  }\n  two(): number {\n    return 2;\n  }\n}\n",

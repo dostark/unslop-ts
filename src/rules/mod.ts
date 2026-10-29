@@ -26,6 +26,7 @@ import {
   createNoRepeatedAssertCall,
 } from "./test_assertion_rules.ts";
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
+import { createMaxCognitiveComplexity } from "./max_cognitive_complexity.ts";
 import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
 import {
@@ -232,6 +233,19 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       },
       requiresTestGlobs: false,
       create: createMaxCyclomaticComplexity,
+    },
+    "max-cognitive-complexity": {
+      overlaps: [{ ecosystem: "eslint", rule: "sonarjs/cognitive-complexity", kind: "related" }],
+      meta: {
+        description: "A function whose cognitive complexity exceeds the limit.",
+        category: "complexity",
+        docs: "#complexity-rules",
+        preset: "recommended",
+        limits:
+          "Each function starts at nesting zero. Nullish sequences count unless countNullish is false, and recursion counts only for a direct binding call.",
+      },
+      requiresTestGlobs: false,
+      create: createMaxCognitiveComplexity,
     },
     "max-class-size": {
       overlaps: [{ ecosystem: "eslint", rule: "max-classes-per-file", kind: "related" }],

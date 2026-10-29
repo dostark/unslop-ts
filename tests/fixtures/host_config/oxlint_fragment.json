@@ -28,6 +28,13 @@
         "variant": "extended"
       }
     ],
+    "demo/max-cognitive-complexity": [
+      "error",
+      {
+        "max": 15,
+        "countNullish": true
+      }
+    ],
     "demo/max-class-size": "off",
     "demo/require-optional-wrapper": "off",
     "demo/import-inside-statement": [
@@ -123,6 +130,7 @@
         "demo/no-repeated-assert-call": "docs/style_guide.md#test-assertions",
         "demo/no-constant-substring-assert": "docs/style_guide.md#test-assertions",
         "demo/max-cyclomatic-complexity": "docs/style_guide.md#complexity-rules",
+        "demo/max-cognitive-complexity": "docs/style_guide.md#complexity-rules",
         "demo/max-class-size": "docs/style_guide.md#complexity-rules",
         "demo/require-optional-wrapper": "docs/style_guide.md#optional-parameters",
         "demo/import-inside-statement": "docs/style_guide.md#imports-at-the-top",

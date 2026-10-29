@@ -370,6 +370,10 @@ Keep functions and classes small enough to read in one pass.
 - **Cyclomatic complexity:** a function scores 1 plus one for each `if`, loop, `catch`, conditional
   expression, `case` with a test, and `&&` or `||` operator. The default limit is 15. Nested functions are
   scored on their own.
+- **Cognitive complexity:** a function scores one for each `if`, loop, `switch`, `catch`, conditional
+  expression, and logical operator run, plus one per level of nesting. `else if` and `else` add one without a
+  nesting surcharge. A labeled jump and a direct recursive call add one each. The default limit is 15, and
+  each function starts at nesting zero.
 - **Class size:** a class of at least 200 lines gets a score from its method count, constructor parameters,
   length, longest method, imports, and fields. A score of 60 or more is a god object. Split it into focused
   classes.
@@ -378,6 +382,7 @@ Keep functions and classes small enough to read in one pass.
 | --------------------------- | ------------------------------------------------------- |
 | `max-params`                | A function with more parameters than the limit (opt-in) |
 | `max-cyclomatic-complexity` | A function whose complexity exceeds the limit           |
+| `max-cognitive-complexity`  | A function whose cognitive complexity exceeds the limit |
 | `max-class-size`            | A class whose size score reaches the threshold (opt-in) |
 
 ## Optional Parameters {#optional-parameters}

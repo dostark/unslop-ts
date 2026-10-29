@@ -121,6 +121,12 @@
       "docs": "#complexity-rules"
     },
     {
+      "id": "max-cognitive-complexity",
+      "category": "complexity",
+      "preset": "recommended",
+      "docs": "#complexity-rules"
+    },
+    {
       "id": "max-cyclomatic-complexity",
       "category": "complexity",
       "preset": "recommended",

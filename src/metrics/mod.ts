@@ -16,7 +16,8 @@ export {
   METRIC_VARIANTS,
 } from "./constants.ts";
 export { createMeasurementContext } from "./context.ts";
-export { functionUnits, measureFunction, MetricCoreError } from "./function_metrics.ts";
+export { MetricCoreError } from "./estree.ts";
+export { functionUnits, measureFunction } from "./function_metrics.ts";
 export { METRIC_CONTRIBUTION_KINDS } from "./types.ts";
 export type {
   IFunctionMetrics,

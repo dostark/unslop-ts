@@ -114,7 +114,7 @@ Deno.test("function-lines-and-params: class, object-literal, default-export and 
   assertEquals(measureAll(DEFAULT_EXPORT).map((entry) => entry.name), ["default"]);
 });
 
-Deno.test("metric-core-cross-parser: golden corpus values match the Deno host and typescript-estree", () => {
+Deno.test("metric-core-cross-parser: golden corpus values match the Deno host and the Babel AST", () => {
   const corpus = [
     {
       name: "alpha",
