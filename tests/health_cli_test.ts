@@ -380,6 +380,18 @@ Deno.test("health-alias-coverage-cycle: alias imports give runtime reach, an exa
   });
 });
 
+Deno.test("health-malformed-lcov-cli: malformed coverage cannot produce a successful measured report", async () => {
+  const path = "packages/x/src/mixed.ts";
+  const bodies = ["DA:1,", "FN:garbage", "FNDA:garbage", "DA:1,1\nend_of_record\nend_of_record"];
+  for (const body of bodies) {
+    await withHealthProject({ ...MAIN_FILES, "coverage.lcov": `SF:${path}\n${body}\nend_of_record\n` }, async (dir) => {
+      const result = await health(dir, ["--format=json", "--coverage=coverage.lcov"]);
+      assertEquals(result.code, 1, body);
+      assertStringIncludes(result.stderr, "health input rejected");
+    });
+  }
+});
+
 Deno.test("health-cycle-cli: the command exposes the exact cycle and coupling populations", async () => {
   const files: Readonly<Record<string, string>> = {
     "packages/x/src/a.ts": 'import type { IThing } from "./types.ts";\n' +

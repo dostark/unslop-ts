@@ -102,6 +102,60 @@ Deno.test("lcov-ownership-and-errors: shared lines, bad records, traversal and b
   );
 });
 
+/** One record body inside a valid SF block for the snapshot file. */
+function recordIn(body: string): string {
+  return `SF:packages/x/src/a.ts\n${body}\nend_of_record`;
+}
+
+Deno.test("lcov-missing-fields: missing hits, malformed function records and nonfinite counts are rejected", () => {
+  const malformed = [
+    "DA:1,",
+    "DA:1",
+    "DA:1,1.5",
+    "DA:1, 2",
+    "DA:1,1e3",
+    "DA:1,0x10",
+    "DA:1,1,",
+    "DA:1.5,1",
+    "FN:garbage",
+    "FN:3",
+    "FN:0,name",
+    "FN:3,",
+    "FNDA:garbage",
+    "FNDA:2",
+    "FNDA:x,name",
+    "FNDA:2,",
+    "FNF:",
+    "FNH:1.5",
+    "LF: ",
+    "LH:1e3",
+    "BRF:-1",
+    "BRDA:garbage",
+    "BRDA:1,0,0",
+    "BRDA:1,0,0,x",
+    "constructor:1",
+  ];
+  for (const body of malformed) {
+    assertThrows(() => parseLcov(recordIn(body), ROOT, SNAPSHOT), LcovError, "", body);
+  }
+  const huge = `1${"0".repeat(308)}`;
+  assertThrows(() => parseLcov(recordIn(`DA:1,${huge}\nDA:1,${huge}`), ROOT, SNAPSHOT), LcovError, "finite");
+  const valid = [
+    "DA:1,0",
+    "DA:1,7,abc123",
+    "FN:3,name",
+    "FN:3,5,name",
+    "FN:3,a,b",
+    "FNDA:0,name",
+    "FNF:0",
+    "BRDA:1,0,0,-",
+    "BRDA:1,0,0,4",
+  ];
+  for (const body of valid) {
+    parseLcov(recordIn(body), ROOT, SNAPSHOT);
+  }
+});
+
 Deno.test("lcov-ownership-and-errors: a manifest is accepted when it matches the measured bytes", async () => {
   const relative = "packages/x/src/a.ts";
   const dir = await Deno.makeTempDir();

@@ -44,23 +44,24 @@ const LcovRecordSchema = z.object({
   value: z.string(),
 }).strict();
 
-/** The metadata tags the parser accepts and ignores after validating their shape. */
-const METADATA_TAGS: ReadonlySet<string> = new Set([
-  "TN",
-  "VER",
-  "FN",
-  "FNDA",
-  "FNF",
-  "FNH",
-  "LF",
-  "LH",
-  "BRDA",
-  "BRF",
-  "BRH",
-]);
+/** The count tags, whose whole value is one nonnegative integer. */
+const COUNT_TAGS: ReadonlySet<string> = new Set(["FNF", "FNH", "LF", "LH", "BRF", "BRH"]);
 
-/** The counts a metadata record carries, when it carries counts. */
-const NUMERIC_METADATA: ReadonlySet<string> = new Set(["FNF", "FNH", "LF", "LH", "BRF", "BRH"]);
+/** The free-form tags the parser accepts without a value grammar. */
+const FREE_TAGS: ReadonlySet<string> = new Set(["TN", "VER"]);
+
+const COUNT = /^\d+$/;
+const LINE_NUMBER = /^[1-9]\d*$/;
+const FN_RECORD = /^[1-9]\d*(,[1-9]\d*)?,.+$/;
+const FNDA_RECORD = /^\d+,.+$/;
+const BRDA_RECORD = /^[1-9]\d*,\d+,\d+,(\d+|-)$/;
+const RECORD_GRAMMARS: ReadonlyMap<string, RegExp> = new Map([
+  ["FN", FN_RECORD],
+  ["FNDA", FNDA_RECORD],
+  ["BRDA", BRDA_RECORD],
+]);
+const DA_FIELDS_MAX = 3;
+const UTF8_BYTES_PER_UNIT_MAX = 3;
 
 /** Reads one `TAG:value` line with the strict record schema. */
 function parseRecord(line: string): { tag: string; value: string } {
@@ -69,10 +70,12 @@ function parseRecord(line: string): { tag: string; value: string } {
   return LcovRecordSchema.parse({ tag: line.slice(0, separator), value: line.slice(separator + 1) });
 }
 
-/** Rejects a count that is not a finite nonnegative number. */
+/** Rejects a count that is not a nonnegative decimal integer within the finite range. */
 function countOf(value: string, record: string): number {
   const count = Number(value);
-  if (!Number.isFinite(count) || count < 0) throw new LcovError(`${record}: '${value}' is not a nonnegative count`);
+  if (!COUNT.test(value) || !Number.isFinite(count)) {
+    throw new LcovError(`${record}: '${value}' is not a nonnegative count`);
+  }
   return count;
 }
 
@@ -108,29 +111,37 @@ function escapesRoot(value: string): boolean {
   return normalized.startsWith("../") || normalized === "..";
 }
 
-/** Rejects a DA record whose line or hits are not valid LCOV counts. */
+/** Rejects a DA record whose line, hits or merged total are not valid finite LCOV counts. */
 function applyDaRecord(
   value: string,
   current: { readonly path: string | null },
   files: Map<string, Map<number, number>>,
 ): void {
   const fields = value.split(",");
-  if (fields.length > 3) throw new LcovError("a DA record has more than three fields");
+  if (fields.length > DA_FIELDS_MAX) throw new LcovError("a DA record has more than three fields");
   const [lineValue, hitsValue] = fields;
-  const lineNumber = Number(lineValue);
-  if (!Number.isInteger(lineNumber) || lineNumber <= 0) {
-    throw new LcovError(`DA line '${lineValue}' is not a positive integer`);
+  if (!LINE_NUMBER.test(lineValue)) throw new LcovError(`DA line '${lineValue}' is not a positive integer`);
+  if (hitsValue === undefined || hitsValue === "") throw new LcovError(`DA ${lineValue}: the hit count is missing`);
+  const hits = countOf(hitsValue, `DA ${lineValue}`);
+  if (fields.length === DA_FIELDS_MAX && fields[2] === "") {
+    throw new LcovError(`DA ${lineValue}: the checksum is empty`);
   }
-  const hits = countOf(hitsValue ?? "", `DA ${lineValue}`);
   const target = current.path === null ? null : files.get(current.path);
   if (target === null || target === undefined) return;
-  target.set(lineNumber, (target.get(lineNumber) ?? 0) + hits);
+  const merged = (target.get(Number(lineValue)) ?? 0) + hits;
+  if (!Number.isFinite(merged)) throw new LcovError(`DA ${lineValue}: the merged hit count is not finite`);
+  target.set(Number(lineValue), merged);
 }
 
-/** Validates and ignores one supported metadata record. */
+/** Validates and ignores one supported metadata record against its grammar. */
 function applyMetadataRecord(tag: string, value: string): void {
-  if (!METADATA_TAGS.has(tag)) throw new LcovError(`unknown LCOV record '${tag}'`);
-  if (NUMERIC_METADATA.has(tag)) countOf(value, tag);
+  if (COUNT_TAGS.has(tag)) {
+    countOf(value, tag);
+    return;
+  }
+  const grammar = RECORD_GRAMMARS.get(tag);
+  if (grammar === undefined) throw new LcovError(`unknown LCOV record '${tag}'`);
+  if (!grammar.test(value)) throw new LcovError(`${tag}: '${value.slice(0, 80)}' does not match the record grammar`);
 }
 
 /** Opens one SF record, attributing an outside or escaping path as unmatched. */
@@ -153,6 +164,12 @@ function startRecord(
   return { path };
 }
 
+/** The UTF-8 byte length of a record, encoded only when its length could exceed the bound. */
+function byteLengthOf(record: string): number {
+  if (record.length * UTF8_BYTES_PER_UNIT_MAX <= MAX_LCOV_RECORD_BYTES) return record.length;
+  return new TextEncoder().encode(record).byteLength;
+}
+
 /** Parses one LCOV text against the snapshot identities. */
 export function parseLcov(
   text: string,
@@ -163,7 +180,7 @@ export function parseLcov(
   const unmatched: string[] = [];
   let current: { readonly path: string | null } | null = null;
   for (const record of text.split("\n")) {
-    if (record.length > MAX_LCOV_RECORD_BYTES) {
+    if (byteLengthOf(record) > MAX_LCOV_RECORD_BYTES) {
       throw new LcovError(`an LCOV record exceeds the ${MAX_LCOV_RECORD_BYTES} byte bound`);
     }
     const line = record.trim();
@@ -178,7 +195,7 @@ export function parseLcov(
       current = startRecord(value, current, rootPath, snapshotPaths, files, unmatched);
       continue;
     }
-    if (tag === "TN" || tag === "VER") continue;
+    if (FREE_TAGS.has(tag)) continue;
     if (current === null) throw new LcovError(`${tag} record outside an SF record`);
     if (tag === "DA") {
       applyDaRecord(value, current, files);
