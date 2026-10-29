@@ -31,6 +31,7 @@ import {
   LOW_MAINTAINABILITY,
   scoreSignalsOf,
 } from "./health_score.ts";
+import { readImportAliases } from "./aliases.ts";
 import { buildHealthGraph, type IHealthGraph } from "./graph.ts";
 import {
   HEALTH_FORMULA_VERSION,
@@ -460,28 +461,6 @@ async function digestOfRoot(rootPath: string, paths: Iterable<string>): Promise<
   return hexOf(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.join("\n"))));
 }
 
-/** The alias map of the project's root Deno configuration, used to resolve import specifiers. */
-async function readAliases(rootPath: string): Promise<Record<string, string>> {
-  let text: string;
-  try {
-    text = await Deno.readTextFile(platformJoin(rootPath, "deno.json"));
-  } catch {
-    return {};
-  }
-  let imports: Record<string, unknown>;
-  try {
-    imports = (JSON.parse(text) as { imports?: Record<string, unknown> }).imports ?? {};
-  } catch {
-    return {};
-  }
-  const aliases: Record<string, string> = {};
-  for (const [key, value] of Object.entries(imports)) {
-    if (typeof value !== "string" || !value.startsWith("./")) continue;
-    aliases[key.endsWith("/") ? key : `${key}/`] = value;
-  }
-  return aliases;
-}
-
 /** The dead-file population of the measured snapshot, or an unavailable result when the scan fails. */
 async function deadFilesOf(rootPath: string, measured: ReadonlySet<string>): Promise<IHealthDeadFiles> {
   try {
@@ -703,7 +682,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
   const coverage: ILcovCoverage | null = input.coverageText === null
     ? null
     : parseLcov(input.coverageText, input.rootPath, new Set(parsed.keys()));
-  const graph = buildHealthGraph(parsed, await readAliases(input.rootPath));
+  const graph = buildHealthGraph(parsed, await readImportAliases(input.rootPath));
   const exports = exportPopulationOf(parsed);
   const reach = reachabilityOf(graph, input.testGlobs);
   const findings: IMeasuredFinding[] = [];

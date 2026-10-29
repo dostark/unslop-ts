@@ -10,6 +10,7 @@
 import { asNode, type ILintNode, isNodeLike } from "../engine/type_environment.ts";
 import { dirname, normalize } from "../engine/posix_path.ts";
 import { forEachChildNode } from "../metrics/estree.ts";
+import { AMBIGUOUS_ALIAS } from "./aliases.ts";
 import type { IParsedHealthFile } from "./parse.ts";
 
 /** One dependency edge between two measured files. */
@@ -76,6 +77,20 @@ function isTypeOnly(node: ILintNode, specifierCount: number): boolean {
     });
 }
 
+/** The alias entry an import map picks for a specifier: the exact key, else the longest directory prefix. */
+function aliasEntryOf(
+  specifier: string,
+  aliases: Readonly<Record<string, string>>,
+): { readonly target: string; readonly suffix: string } | null {
+  if (Object.hasOwn(aliases, specifier)) return { target: aliases[specifier], suffix: "" };
+  let best: string | null = null;
+  for (const key of Object.keys(aliases)) {
+    if (!key.endsWith("/") || !specifier.startsWith(key) || specifier === key) continue;
+    if (best === null || key.length > best.length) best = key;
+  }
+  return best === null ? null : { target: aliases[best], suffix: specifier.slice(best.length) };
+}
+
 /** The internal file a specifier names, or null when it does not resolve inside the snapshot. */
 export function resolveSpecifier(
   specifier: string,
@@ -86,12 +101,10 @@ export function resolveSpecifier(
   if (specifier.startsWith(".")) {
     return probe(normalize(`${dirname(fromPath)}/${specifier}`), known);
   }
-  for (const [key, target] of Object.entries(aliases)) {
-    if (!specifier.startsWith(key)) continue;
-    const suffix = specifier.slice(key.length).replace(/^\//, "");
-    return probe(normalize(`${target.replace(/^\.\//, "").replace(/\/$/, "")}/${suffix}`), known);
-  }
-  return null;
+  const entry = aliasEntryOf(specifier, aliases);
+  if (entry === null || entry.target === AMBIGUOUS_ALIAS) return null;
+  const base = entry.target.replace(/^\.\//, "").replace(/\/$/, "");
+  return probe(normalize(entry.suffix === "" ? base : `${base}/${entry.suffix}`), known);
 }
 
 /** Probes a base path for an exact file or a supported extension. */
@@ -127,7 +140,7 @@ function classifySpecifier(
   }
   const target = resolveSpecifier(specifier, fromPath, known, aliases);
   if (target === null) {
-    if (specifier.startsWith(".") || Object.keys(aliases).some((key) => specifier.startsWith(key))) {
+    if (specifier.startsWith(".") || aliasEntryOf(specifier, aliases) !== null) {
       limitations.unresolved++;
     } else {
       limitations.external++;

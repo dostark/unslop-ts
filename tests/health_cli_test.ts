@@ -8,6 +8,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
+import { crapOf, DIRECT_COVERAGE_PERCENT } from "../src/report/crap.ts";
 import { HealthReportSchema, type IHealthReport } from "../src/report/mod.ts";
 import { enginePins, runDeno } from "./helpers/demo_project.ts";
 
@@ -80,14 +81,19 @@ async function withHealthProject<T>(
 ): Promise<T> {
   const dir = await Deno.makeTempDir({ prefix: "unslop_health_" });
   try {
+    const extra = JSON.parse(files["deno.json"] ?? "{}") as { imports?: Record<string, string> };
     await Deno.writeTextFile(
       join(dir, "deno.json"),
-      JSON.stringify({ imports: { "@dostark/unslop-ts": ENGINE, ...(await enginePins()) } }),
+      JSON.stringify({
+        ...extra,
+        imports: { "@dostark/unslop-ts": ENGINE, ...(await enginePins()), ...extra.imports },
+      }),
     );
     await Deno.writeTextFile(join(dir, "unslop.project.ts"), DESCRIPTOR);
     await Deno.writeTextFile(join(dir, "unslop.config.json"), JSON.stringify(catalog(extraRules), null, 2));
     await Deno.writeTextFile(join(dir, "plugin.ts"), "export {};\n");
     for (const [path, source] of Object.entries(files)) {
+      if (path === "deno.json") continue;
       await Deno.mkdir(join(dir, path, ".."), { recursive: true });
       await Deno.writeTextFile(join(dir, path), source);
     }
@@ -349,6 +355,28 @@ Deno.test("health-hotspot-cli: the real --since and --min-commits flags change C
 
     const narrow = parseReport((await health(dir, ["--format=json", "--since=30d", "--min-commits=1"])).stdout);
     assertEquals(narrow.hotspot_summary.since > wide.hotspot_summary.since, true);
+  });
+});
+
+Deno.test("health-alias-coverage-cycle: alias imports give runtime reach, an exact cycle and a complete graph", async () => {
+  const files: Readonly<Record<string, string>> = {
+    "deno.json": JSON.stringify({ imports: { "@a": "./packages/x/src/a.ts", "@b": "./packages/x/src/b.ts" } }),
+    "packages/x/src/a.ts": 'import { b } from "@b";\n\nexport function a(flag: boolean): number {\n' +
+      "  if (flag) return b();\n  return 0;\n}\n",
+    "packages/x/src/b.ts": 'import { a } from "@a";\n\nexport function b(): number {\n  return a(false);\n}\n',
+    "packages/x/src/a_test.ts": 'import { a } from "@a";\n\nexport const result = a(true);\n',
+  };
+  await withHealthProject(files, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(report.summary.graph.complete, true);
+    assertEquals(report.summary.graph.unresolved_specifiers, 0);
+    assertEquals(report.summary.graph.internal_edges, 3);
+    assertEquals(report.vital_signs.cycles.sccs, 1);
+    assertEquals(report.vital_signs.cycles.files, 2);
+    const direct = report.findings.find((finding) => finding.name === "a");
+    assert(direct !== undefined);
+    assertEquals(direct.cyclomatic, 2);
+    assertEquals(direct.crap, crapOf(direct.cyclomatic, DIRECT_COVERAGE_PERCENT));
   });
 });
 

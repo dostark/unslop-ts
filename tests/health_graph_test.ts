@@ -18,6 +18,7 @@ import {
   valueExportSitesOf,
 } from "../src/report/mod.ts";
 import type { IParsedHealthFile } from "../src/report/parse.ts";
+import { readImportAliases } from "../src/report/aliases.ts";
 import { couplingSignalOf, runtimeCyclesOf } from "../src/rules/whole_tree/import_cycles.ts";
 
 /** Writes the files to a temp dir and parses the snapshot the way the CLI does. */
@@ -174,4 +175,84 @@ Deno.test("health-coupling: duplicate edges, type-only coupling and the limits c
   }));
   assertEquals(couplingSignalOf(atLimit, 16).high_files, 0);
   assertEquals(couplingSignalOf([], 0).percent, 0);
+});
+
+/** Writes a project, parses its source snapshot and runs `body` with the root, the snapshot and the real aliases. */
+async function withAliasProject<T>(
+  files: Readonly<Record<string, string>>,
+  body: (root: string, snapshot: Map<string, IParsedHealthFile>) => Promise<T>,
+): Promise<T> {
+  const dir = await Deno.makeTempDir({ prefix: "unslop_alias_" });
+  try {
+    for (const [path, source] of Object.entries(files)) {
+      await Deno.mkdir(join(dir, path, ".."), { recursive: true });
+      await Deno.writeTextFile(join(dir, path), source);
+    }
+    const snapshot = new Map<string, IParsedHealthFile>();
+    for (const path of Object.keys(files).filter((name) => name.endsWith(".ts")).sort()) {
+      snapshot.set(path, await parseHealthFile(join(dir, path), path));
+    }
+    return await body(dir, snapshot);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+const ALIAS_IMPORTS = [
+  'import "@local";',
+  'import "@lib/x.ts";',
+  'import "@lib/deep/y.ts";',
+  'import "@scope/m";',
+  'import "@scope/m/sub";',
+  'import "@local/more";',
+].join("\n");
+
+const ALIAS_FILES: Readonly<Record<string, string>> = {
+  "deno.json": JSON.stringify({
+    workspace: ["./packages/m"],
+    imports: { "@local": "./src/dep.ts", "@lib/": "./lib/", "@lib/deep/": "./other/deep/" },
+  }),
+  "packages/m/deno.jsonc": '{\n  // the workspace package\n  "name": "@scope/m",\n' +
+    '  "exports": { ".": "./mod.ts", "./sub": "./src/sub.ts", },\n}\n',
+  "src/a.ts": `${ALIAS_IMPORTS}\nexport const a = 1;\n`,
+  "src/dep.ts": "export const dep = 1;\n",
+  "lib/x.ts": "export const x = 1;\n",
+  "other/deep/y.ts": "export const y = 1;\n",
+  "packages/m/mod.ts": "export const m = 1;\n",
+  "packages/m/src/sub.ts": "export const sub = 1;\n",
+};
+
+Deno.test("health-real-config-aliases: exact, longest-prefix, JSONC and workspace aliases give the correct edges", async () => {
+  await withAliasProject(ALIAS_FILES, async (root, snapshot) => {
+    const graph = buildHealthGraph(snapshot, await readImportAliases(root));
+    assertEquals(
+      graph.edges.map((edge) => edge.to).sort(),
+      ["lib/x.ts", "other/deep/y.ts", "packages/m/mod.ts", "packages/m/src/sub.ts", "src/dep.ts"],
+    );
+    assertEquals(graph.limitations.external, 1);
+    assertEquals(graph.limitations.unresolved, 0);
+    assertEquals(graph.complete, true);
+  });
+  await withAliasProject({
+    "deno.json": JSON.stringify({ imports: { "@gone": "./src/missing.ts" } }),
+    "src/a.ts": 'import "@gone";\nexport const a = 1;\n',
+  }, async (root, snapshot) => {
+    const graph = buildHealthGraph(snapshot, await readImportAliases(root));
+    assertEquals(graph.edges, []);
+    assertEquals(graph.limitations.unresolved, 1);
+    assertEquals(graph.limitations.external, 0);
+    assertEquals(graph.complete, false);
+  });
+  await withAliasProject({
+    "deno.json": JSON.stringify({ workspace: ["./one", "./two"] }),
+    "one/deno.json": JSON.stringify({ imports: { "@shared": "./a.ts" } }),
+    "two/deno.json": JSON.stringify({ imports: { "@shared": "./b.ts" } }),
+    "one/a.ts": "export const a = 1;\n",
+    "two/b.ts": 'import "@shared";\nexport const b = 1;\n',
+  }, async (root, snapshot) => {
+    const graph = buildHealthGraph(snapshot, await readImportAliases(root));
+    assertEquals(graph.edges, []);
+    assertEquals(graph.limitations.unresolved, 1);
+    assertEquals(graph.complete, false);
+  });
 });
