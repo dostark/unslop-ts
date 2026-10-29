@@ -8,6 +8,8 @@
  */
 
 import { join, resolve } from "@std/path";
+import { type IChildLimits, runBounded } from "./bounded_io.ts";
+import { RUNNER_LIMITS } from "./constants.ts";
 import {
   checkRepository as checkDuplicationRepository,
   type IClone,
@@ -20,9 +22,6 @@ const JSCPD_REQUIRED_VERSION = "5.4.2";
 
 /** The largest retained runner stderr. */
 const MAX_RUNNER_STDERR_BYTES = 8 * 1024;
-
-/** The runner deadline in milliseconds. */
-const RUNNER_DEADLINE_MS = 120 * 1000;
 
 /** The measured duplication of one snapshot. */
 export interface IDuplicationMeasurement {
@@ -41,18 +40,50 @@ export interface IDuplicationInput {
   readonly snapshotDigest: () => Promise<string>;
 }
 
-/** The unique code-token lines that any clone range covers in at least one copy. */
+/** The sorted code-token lines of one file, cached for the duration of one union. */
+function sortedLinesOf(
+  file: string,
+  tokenLines: ReadonlyMap<string, ReadonlySet<number>>,
+  cache: Map<string, readonly number[]>,
+): readonly number[] | undefined {
+  const cached = cache.get(file);
+  if (cached !== undefined) return cached;
+  const lines = tokenLines.get(file);
+  if (lines === undefined) return undefined;
+  const sorted = [...lines].sort((left, right) => left - right);
+  cache.set(file, sorted);
+  return sorted;
+}
+
+/** The index of the first sorted line at or after a start, found by binary search. */
+function firstIndexAtOrAfter(sorted: readonly number[], start: number): number {
+  let low = 0;
+  let high = sorted.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (sorted[middle] < start) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+/**
+ * The unique code-token lines that any clone range covers in at least one copy. The walk follows the known token
+ * lines, never the span of a range, so an enormous range costs no more than the file it names.
+ */
 export function duplicatedLinesOf(
   clones: readonly IClone[],
   tokenLines: ReadonlyMap<string, ReadonlySet<number>>,
 ): number {
   const seen = new Set<string>();
+  const cache = new Map<string, readonly number[]>();
   for (const clone of clones) {
     for (const range of [clone.first, clone.second]) {
-      const lines = tokenLines.get(range.file);
-      if (lines === undefined) continue;
-      for (let line = range.start; line <= range.end; line++) {
-        if (lines.has(line)) seen.add(`${range.file}:${line}`);
+      const sorted = sortedLinesOf(range.file, tokenLines, cache);
+      if (sorted === undefined) continue;
+      for (let index = firstIndexAtOrAfter(sorted, range.start); index < sorted.length; index++) {
+        if (sorted[index] > range.end) break;
+        seen.add(`${range.file}:${sorted[index]}`);
       }
     }
   }
@@ -136,26 +167,24 @@ async function installedJscpdBin(rootPath: string, requiredVersion: string): Pro
 export async function localJscpdRunner(
   rootPath: string,
   requiredVersion = JSCPD_REQUIRED_VERSION,
+  limits: IChildLimits = RUNNER_LIMITS,
 ): Promise<TJscpdRunner> {
   const bin = await installedJscpdBin(rootPath, requiredVersion);
   return async (args) => {
-    let output: Deno.CommandOutput;
+    let result;
     try {
-      output = await new Deno.Command("node", {
-        args: [bin, ...args],
-        cwd: rootPath,
-        env: { LD_LIBRARY_PATH: "" },
-        stdout: "piped",
-        stderr: "piped",
-        signal: AbortSignal.timeout(RUNNER_DEADLINE_MS),
-      }).output();
+      result = await runBounded("node", [bin, ...args], { cwd: rootPath, env: { LD_LIBRARY_PATH: "" } }, limits);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`jscpd-runner-failed: ${message}`);
     }
-    if (!output.success) {
-      const stderr = new TextDecoder().decode(output.stderr.slice(0, MAX_RUNNER_STDERR_BYTES)).trim();
-      throw new Error(`jscpd-failed: ${stderr || `exit ${output.code}`}`);
+    if (result.status === "timeout") {
+      throw new Error(`jscpd-runner-failed: the deadline of ${limits.deadlineMs} ms passed`);
+    }
+    if (result.status !== "exited") throw new Error("jscpd-runner-failed: the output exceeds its byte bound");
+    if (result.code !== 0) {
+      const stderr = new TextDecoder().decode(result.stderr.slice(0, MAX_RUNNER_STDERR_BYTES)).trim();
+      throw new Error(`jscpd-failed: ${stderr || `exit ${result.code}`}`);
     }
   };
 }

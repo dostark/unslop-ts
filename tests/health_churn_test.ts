@@ -7,7 +7,7 @@
  * @related-files [src/report/churn.ts, src/report/health.ts]
  */
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import {
   churnWeightOf,
@@ -194,4 +194,71 @@ Deno.test("git-history-grammar: a shallow clone and a non-repository are attribu
     await Deno.remove(clone, { recursive: true });
     await Deno.remove(plain, { recursive: true });
   }
+});
+
+const CHURN_URL = new URL("../src/report/churn.ts", import.meta.url).href;
+const STREAM_LIMIT_BYTES = 1024 * 1024;
+const FLOOD_BYTES = 70_000_000;
+const STALL_SECONDS = 60;
+const PROMPT_MS = 15_000;
+
+const FAKE_GIT = `#!/bin/sh
+case "$*" in
+  *--show-toplevel*)
+    case "$FAKE_MODE" in
+      stall) sleep ${STALL_SECONDS}; touch "$MARKER" ;;
+      stderr) yes y | head -c ${FLOOD_BYTES} >&2; touch "$MARKER" ;;
+    esac
+    echo /tmp/fake ;;
+  *--show-prefix*) echo ;;
+  *--is-shallow-repository*) echo false ;;
+  *--verify*) echo abc ;;
+  *log*) yes x | head -c ${FLOOD_BYTES}; touch "$MARKER" ;;
+esac
+`;
+
+/** Runs the real collectChurn in a child with a fake Git first on its PATH. */
+async function churnWithFakeGit(mode: string, deadlineMs: number): Promise<{ reason: string | null; marker: boolean }> {
+  const dir = await Deno.makeTempDir({ prefix: "unslop_fake_git_" });
+  try {
+    const bin = join(dir, "bin");
+    await Deno.mkdir(bin);
+    await Deno.writeTextFile(join(bin, "git"), FAKE_GIT);
+    await Deno.chmod(join(bin, "git"), 0o755);
+    const script = join(dir, "run.ts");
+    await Deno.writeTextFile(
+      script,
+      `import { collectChurn } from "${CHURN_URL}";\n` +
+        "const limits = JSON.parse(Deno.args[0]);\n" +
+        "const history = await collectChurn(Deno.args[1], 0, 0, new Set(), limits);\n" +
+        "console.log(JSON.stringify({ reason: history.reason }));\n",
+    );
+    const marker = join(dir, "marker");
+    const limits = { deadlineMs, maxStdoutBytes: STREAM_LIMIT_BYTES, maxStderrBytes: STREAM_LIMIT_BYTES };
+    const output = await new Deno.Command(Deno.execPath(), {
+      args: ["run", "-A", script, JSON.stringify(limits), dir],
+      env: { PATH: `${bin}:${Deno.env.get("PATH") ?? ""}`, FAKE_MODE: mode, MARKER: marker },
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assertEquals(output.code, 0, new TextDecoder().decode(output.stderr));
+    const reason = (JSON.parse(new TextDecoder().decode(output.stdout)) as { reason: string | null }).reason;
+    return { reason, marker: await Deno.stat(marker).then(() => true, () => false) };
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+Deno.test("health-child-stream-bounds: oversized output and stalled Git calls end before the producer completes", async () => {
+  const started = Date.now();
+  const stdout = await churnWithFakeGit("stdout", 30_000);
+  assertEquals(stdout.reason, "history-output-too-large");
+  assertEquals(stdout.marker, false);
+  const stderr = await churnWithFakeGit("stderr", 30_000);
+  assertStringIncludes(stderr.reason ?? "", "git-output-too-large");
+  assertEquals(stderr.marker, false);
+  const stalled = await churnWithFakeGit("stall", 1_000);
+  assertEquals(stalled.reason, "git-command-timeout");
+  assertEquals(stalled.marker, false);
+  assert(Date.now() - started < PROMPT_MS * 3, "the bounded calls must end promptly");
 });

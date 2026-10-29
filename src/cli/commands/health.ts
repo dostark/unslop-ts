@@ -29,6 +29,7 @@ import {
   DEFAULT_MIN_COMMITS,
   DEFAULT_SINCE_DAYS,
 } from "../../report/constants.ts";
+import { BoundedReadError, readFileBounded } from "../../report/bounded_io.ts";
 import { parseSince } from "../../report/churn.ts";
 import { localJscpdRunner } from "../../report/duplication.ts";
 import {
@@ -165,7 +166,13 @@ async function coverageInputOf(
     throw usage("--coverage must be inside the project root");
   }
   if (stat.size > MAX_LCOV_BYTES) throw usage(`--coverage exceeds the ${MAX_LCOV_BYTES} byte bound`);
-  const bytes = await Deno.readFile(real);
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = await readFileBounded(real, MAX_LCOV_BYTES);
+  } catch (error) {
+    if (error instanceof BoundedReadError) throw usage(`--coverage exceeds the ${MAX_LCOV_BYTES} byte bound`);
+    throw error;
+  }
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return { text: new TextDecoder().decode(bytes), sha256, manifest: await coverageManifestOf(real) };

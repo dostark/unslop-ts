@@ -7,11 +7,12 @@
  * @related-files [src/report/lcov.ts, src/report/crap.ts, src/report/health.ts]
  */
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { join } from "@std/path";
 import { coverageOfUnit, crapBandOf, crapOf, estimatedCoverageOf } from "../src/report/crap.ts";
 import { assertCoverageManifest, coverageRevisionOf } from "../src/report/health.ts";
 import { LcovError, MAX_LCOV_RECORD_BYTES, parseLcov } from "../src/report/lcov.ts";
+import { BoundedReadError, readFileBounded } from "../src/report/bounded_io.ts";
 import { parseHealthFile } from "../src/report/parse.ts";
 
 const ROOT = "/root";
@@ -229,6 +230,23 @@ Deno.test("coverage-manifest-population: empty, partial, unknown and changed-sou
       "SHA-256",
     );
     assertCoverageManifest(complete, parsed);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("health-input-stream-bounds: oversized and endless inputs reject during the bounded read", async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    const sized = join(dir, "sized.bin");
+    await Deno.writeFile(sized, new Uint8Array(2048));
+    assertEquals((await readFileBounded(sized, 2048)).byteLength, 2048);
+    await assertRejects(() => readFileBounded(sized, 2047), BoundedReadError, "2047");
+    await assertRejects(() => readFileBounded("/dev/zero", 1024 * 1024), BoundedReadError);
+    await assertRejects(() => parseHealthFile("/dev/zero", "endless.ts"), Error, "source bound");
+
+    const record = `SF:packages/x/src/a.ts\n${"DA:1,".repeat(MAX_LCOV_RECORD_BYTES / 4)}`;
+    assertThrows(() => parseLcov(record, ROOT, SNAPSHOT), LcovError, "byte bound");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

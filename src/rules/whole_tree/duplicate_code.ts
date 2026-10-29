@@ -8,6 +8,8 @@
  */
 
 import { join } from "@std/path";
+import { readFileBounded } from "../../report/bounded_io.ts";
+import { MAX_JSCPD_REPORT_BYTES } from "../../report/constants.ts";
 import {
   buildBaseline,
   fingerprintClone,
@@ -184,6 +186,32 @@ function toRepoPath(repoRoot: string, path: string): string {
   return path.startsWith(repoRoot + "/") ? path.slice(repoRoot.length + 1) : path;
 }
 
+/** True when the value is a safe integer at or above the minimum. */
+function isIntegerAtLeast(value: unknown, minimum: number): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= minimum;
+}
+
+/** Rejects a clone side whose name or line range is not a finite, ordered range of positive line numbers. */
+function assertRawRange(range: unknown, groupName: string): void {
+  const side = range as Partial<IRawRange> | null;
+  if (
+    side === null || typeof side !== "object" || typeof side.name !== "string" ||
+    !isIntegerAtLeast(side.start, 1) || !isIntegerAtLeast(side.end, side.start)
+  ) {
+    throw new Error(`The jscpd report of group '${groupName}' has an invalid clone range.`);
+  }
+}
+
+/** Rejects a clone whose line count or either range is invalid. */
+function assertRawClone(clone: unknown, groupName: string): void {
+  const raw = clone as Partial<IRawClone> | null;
+  if (raw === null || typeof raw !== "object" || !isIntegerAtLeast(raw.lines, 0)) {
+    throw new Error(`The jscpd report of group '${groupName}' has an invalid clone range.`);
+  }
+  assertRawRange(raw.firstFile, groupName);
+  assertRawRange(raw.secondFile, groupName);
+}
+
 function parseReport(text: string, groupName: string): IRawReport {
   const parsed: Partial<IRawReport> = JSON.parse(text);
   const total = parsed.statistics?.total;
@@ -193,13 +221,14 @@ function parseReport(text: string, groupName: string): IRawReport {
   if (total.sources === 0) {
     throw new Error(`Group '${groupName}' scanned no files; check its paths, ignore globs, and pattern.`);
   }
+  for (const clone of parsed.duplicates) assertRawClone(clone, groupName);
   return { statistics: { total }, duplicates: parsed.duplicates };
 }
 
 async function readReport(outputDir: string, groupName: string): Promise<IRawReport> {
   let text: string;
   try {
-    text = await Deno.readTextFile(join(outputDir, JSCPD_REPORT_FILE));
+    text = new TextDecoder().decode(await readFileBounded(join(outputDir, JSCPD_REPORT_FILE), MAX_JSCPD_REPORT_BYTES));
   } catch {
     throw new Error(`jscpd wrote no report for group '${groupName}'.`);
   }

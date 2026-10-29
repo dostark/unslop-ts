@@ -32,6 +32,7 @@ import {
   scoreSignalsOf,
 } from "./health_score.ts";
 import { readImportAliases } from "./aliases.ts";
+import { readFileBounded } from "./bounded_io.ts";
 import { buildHealthGraph, type IHealthGraph } from "./graph.ts";
 import {
   HEALTH_FORMULA_VERSION,
@@ -459,7 +460,7 @@ async function snapshotSha256(parsed: ReadonlyMap<string, IParsedHealthFile>): P
 async function digestOfRoot(rootPath: string, paths: Iterable<string>): Promise<string> {
   const parts: string[] = [];
   for (const path of [...paths].sort()) {
-    const bytes = await Deno.readFile(platformJoin(rootPath, path));
+    const bytes = await readFileBounded(platformJoin(rootPath, path), MAX_SOURCE_BYTES);
     parts.push(`${path}:${hexOf(await crypto.subtle.digest("SHA-256", bytes))}`);
   }
   return hexOf(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.join("\n"))));

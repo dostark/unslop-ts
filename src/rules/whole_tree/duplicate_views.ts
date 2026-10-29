@@ -43,29 +43,41 @@ export function atLeastLines(clones: readonly IClone[], minLines: number): IClon
   return clones.filter((clone) => clone.lines >= minLines);
 }
 
-/** The lines of each file that at least one clone covers. */
-function coveredLines(clones: readonly IClone[]): Map<string, Set<number>> {
-  const lines = new Map<string, Set<number>>();
+/** The count of lines of each file that at least one clone covers, from merged ranges, never from each line. */
+function coveredLineCounts(clones: readonly IClone[]): Map<string, number> {
+  const byFile = new Map<string, ICloneRange[]>();
   for (const clone of clones) {
     for (const range of [clone.first, clone.second]) {
-      const covered = lines.get(range.file) ?? new Set<number>();
-      for (let line = range.start; line <= range.end; line++) covered.add(line);
-      lines.set(range.file, covered);
+      const list = byFile.get(range.file) ?? [];
+      list.push(range);
+      byFile.set(range.file, list);
     }
   }
-  return lines;
+  const counts = new Map<string, number>();
+  for (const [file, ranges] of byFile) {
+    const sorted = [...ranges].sort((left, right) => left.start - right.start || left.end - right.end);
+    let total = 0;
+    let reached = 0;
+    for (const range of sorted) {
+      const from = Math.max(range.start, reached + 1);
+      if (range.end >= from) total += range.end - from + 1;
+      reached = Math.max(reached, range.end);
+    }
+    counts.set(file, total);
+  }
+  return counts;
 }
 
 /** Counts the lines that any clone touches, once each, across both copies of every clone. */
 export function involvedLineCount(clones: readonly IClone[]): number {
   let total = 0;
-  for (const covered of coveredLines(clones).values()) total += covered.size;
+  for (const covered of coveredLineCounts(clones).values()) total += covered;
   return total;
 }
 
 /** Ranks files by the union of the lines that clones cover, most first, ties by path. */
 export function rankFiles(clones: readonly IClone[]): IFileDuplication[] {
-  const lines = coveredLines(clones);
+  const lines = coveredLineCounts(clones);
   const cloneCount = new Map<string, number>();
   const partners = new Map<string, Set<string>>();
   const touch = (range: ICloneRange, other: ICloneRange): void => {
@@ -81,7 +93,7 @@ export function rankFiles(clones: readonly IClone[]): IFileDuplication[] {
   return [...lines.entries()]
     .map(([file, covered]) => ({
       file,
-      duplicatedLines: covered.size,
+      duplicatedLines: covered,
       clones: cloneCount.get(file) ?? 0,
       partners: partners.get(file)?.size ?? 0,
     }))

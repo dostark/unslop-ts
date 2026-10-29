@@ -7,6 +7,7 @@
  * @related-files [src/metrics/context.ts, src/metrics/function_metrics.ts, src/report/health.ts]
  */
 
+import { BoundedReadError, readFileBounded } from "./bounded_io.ts";
 import { measurementContextOf, parseSourceText } from "../metrics/context.ts";
 import { functionUnits } from "../metrics/function_metrics.ts";
 import type { IFunctionUnit, IMeasurementContext } from "../metrics/types.ts";
@@ -33,9 +34,14 @@ function hexOf(digest: ArrayBuffer): string {
 
 /** Reads one source file once under the size bound, then parses that same read. */
 export async function parseHealthFile(absolutePath: string, relativePath: string): Promise<IParsedHealthFile> {
-  const bytes = await Deno.readFile(absolutePath);
-  if (bytes.byteLength > MAX_SOURCE_BYTES) {
-    throw new Error(`${relativePath}: the file exceeds the ${MAX_SOURCE_BYTES} byte source bound.`);
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = await readFileBounded(absolutePath, MAX_SOURCE_BYTES);
+  } catch (error) {
+    if (error instanceof BoundedReadError) {
+      throw new Error(`${relativePath}: the file exceeds the ${MAX_SOURCE_BYTES} byte source bound.`);
+    }
+    throw error;
   }
   const text = new TextDecoder().decode(bytes);
   const tree = parseSourceText(text, relativePath);

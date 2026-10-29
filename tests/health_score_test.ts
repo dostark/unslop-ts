@@ -297,3 +297,88 @@ Deno.test("health-cycle-score-population: one two-file cycle among 100 files sco
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+const BIG_END = Number.MAX_SAFE_INTEGER;
+
+Deno.test("health-clone-finite-ranges: invalid ranges become attributed absences and huge ranges end promptly", async () => {
+  const tokenLines = new Map([["a.ts", new Set([1, 2, 3])], ["b.ts", new Set([4, 6, 9])]]);
+  const huge = {
+    id: "h",
+    lines: 1,
+    first: { file: "a.ts", start: 1, end: BIG_END },
+    second: { file: "b.ts", start: 5, end: BIG_END },
+  };
+  assertEquals(duplicatedLinesOf([huge], tokenLines), 5);
+
+  const settings: IDuplicateCodeSettings = {
+    jscpdVersion: "5.4.2",
+    minLines: 5,
+    minTokens: 50,
+    maxGapLines: 0,
+    baseline: null,
+    crossGroups: false,
+    groups: [{ name: "a", paths: ["a.ts"], ignore: [], threshold: 100, minLines: 5, maxGapLines: 0, pattern: null }],
+  };
+  const reportWith = (first: string, second: string): TJscpdRunner => async (_args, outputDir) => {
+    await Deno.writeTextFile(
+      join(outputDir, "jscpd-report.json"),
+      '{"statistics":{"total":{"percentage":0,"duplicatedLines":0,"sources":1,"lines":10}},"duplicates":[' +
+        `{"lines":5,"firstFile":${first},"secondFile":${second}}]}`,
+    );
+  };
+  const range = (start: string, end: string): string => `{"name":"a.ts","start":${start},"end":${end}}`;
+  const invalid = [
+    range("1", "1e309"),
+    range("-3", "4"),
+    range("9", "2"),
+    range("1.5", "4"),
+    range("0", "4"),
+    range('"1"', "4"),
+  ];
+  for (const first of invalid) {
+    const measured = await measureDuplication({
+      rootPath: Deno.cwd(),
+      settings,
+      runner: reportWith(first, range("1", "5")),
+      tokenLines,
+      snapshotDigest: () => Promise.resolve("same"),
+    });
+    assertEquals(measured.available, false, first);
+    assertStringIncludes(measured.reason ?? "", "invalid clone range");
+  }
+  const accepted = await measureDuplication({
+    rootPath: Deno.cwd(),
+    settings,
+    runner: reportWith(range("1", String(BIG_END)), range("1", "5")),
+    tokenLines,
+    snapshotDigest: () => Promise.resolve("same"),
+  });
+  assertEquals(accepted.available, true, accepted.reason ?? "");
+});
+
+Deno.test("health-runner-stream-bounds: a runner that floods stderr or stalls is killed and rejected", async () => {
+  const root = await Deno.makeTempDir({ prefix: "unslop_jscpd_flood_" });
+  try {
+    await Deno.mkdir(join(root, "node_modules/jscpd/bin"), { recursive: true });
+    await Deno.writeTextFile(
+      join(root, "node_modules/jscpd/package.json"),
+      JSON.stringify({ name: "jscpd", version: "5.4.2", bin: "bin/jscpd.js" }),
+    );
+    const marker = join(root, "marker");
+    const bin = join(root, "node_modules/jscpd/bin/jscpd.js");
+    const limits = { deadlineMs: 1_000, maxStdoutBytes: 1024 * 1024, maxStderrBytes: 256 * 1024 };
+    await Deno.writeTextFile(
+      bin,
+      `const fs = require("node:fs");\nconst chunk = "x".repeat(65536);\n` +
+        `for (let index = 0; index < 64; index++) fs.writeSync(2, chunk);\n` +
+        `fs.writeFileSync(${JSON.stringify(marker)}, "done");\n`,
+    );
+    const runner = await localJscpdRunner(root, "5.4.2", limits);
+    await assertThrowsAsync(() => runner(["--output", root], root), "output exceeds");
+    assertEquals(await Deno.stat(marker).then(() => true, () => false), false);
+    await Deno.writeTextFile(bin, `setTimeout(() => {}, 60000);\n`);
+    await assertThrowsAsync(() => runner(["--output", root], root), "deadline");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

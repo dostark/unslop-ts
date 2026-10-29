@@ -7,10 +7,11 @@
  * @related-files [src/report/health.ts, src/report/constants.ts]
  */
 
+import { type IChildLimits, runBounded } from "./bounded_io.ts";
 import {
   CHURN_HALF_LIFE_DAYS,
-  GIT_DEADLINE_MS,
-  MAX_GIT_HISTORY_BYTES,
+  GIT_LIMITS,
+  MAX_GIT_PROBE_BYTES,
   MAX_GIT_STDERR_BYTES,
   SECONDS_PER_DAY,
 } from "./constants.ts";
@@ -148,33 +149,34 @@ function churnOf(
   return files;
 }
 
-/** Runs one Git command and returns its stdout, or a classified failure. */
+/** Why a bounded Git call ended without a successful exit. */
+const GIT_STOP_REASONS = {
+  "stdout-overflow": "git-output-too-large",
+  "stderr-overflow": "git-output-too-large",
+  timeout: "git-command-timeout",
+} as const;
+
+/** Runs one Git command under the byte and time limits and returns its stdout, or a classified failure. */
 async function runGit(
   root: string,
   args: readonly string[],
-  signal?: AbortSignal,
+  limits: IChildLimits,
 ): Promise<{ ok: true; stdout: string } | { ok: false; reason: string }> {
-  let output: Deno.CommandOutput;
+  let result;
   try {
-    output = await new Deno.Command("git", {
-      args: [...args],
-      cwd: root,
-      env: { LD_LIBRARY_PATH: "" },
-      stdout: "piped",
-      stderr: "piped",
-      signal,
-    }).output();
+    result = await runBounded("git", args, { cwd: root, env: { LD_LIBRARY_PATH: "" } }, limits);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: `git-command-failed: ${message}` };
   }
-  if (!output.success) {
-    const stderr = new TextDecoder().decode(output.stderr.slice(0, MAX_GIT_STDERR_BYTES)).trim();
+  if (result.status !== "exited") return { ok: false, reason: GIT_STOP_REASONS[result.status] };
+  if (result.code !== 0) {
+    const stderr = new TextDecoder().decode(result.stderr.slice(0, MAX_GIT_STDERR_BYTES)).trim();
     if (stderr.includes("not a git repository")) return { ok: false, reason: "not-a-git-repository" };
     if (stderr.toLowerCase().includes("permission denied")) return { ok: false, reason: "permission-denied" };
-    return { ok: false, reason: `git-command-failed: ${stderr || `exit ${output.code}`}` };
+    return { ok: false, reason: `git-command-failed: ${stderr || `exit ${result.code}`}` };
   }
-  return { ok: true, stdout: new TextDecoder().decode(output.stdout) };
+  return { ok: true, stdout: new TextDecoder().decode(result.stdout) };
 }
 
 /** Reads the fixed-argv history of one measured root. Never throws for a missing repository. */
@@ -183,6 +185,7 @@ export async function collectChurn(
   sinceEpoch: number,
   nowEpoch: number,
   snapshot: ReadonlySet<string>,
+  limits: IChildLimits = GIT_LIMITS,
 ): Promise<IChurnHistory> {
   const unavailable = (reason: string): IChurnHistory => ({
     available: false,
@@ -191,15 +194,16 @@ export async function collectChurn(
     empty: false,
     files: new Map(),
   });
-  const top = await runGit(rootPath, ["rev-parse", "--show-toplevel"]);
+  const probe: IChildLimits = { ...limits, maxStdoutBytes: Math.min(limits.maxStdoutBytes, MAX_GIT_PROBE_BYTES) };
+  const top = await runGit(rootPath, ["rev-parse", "--show-toplevel"], probe);
   if (!top.ok) return unavailable(top.reason);
-  const prefixResult = await runGit(rootPath, ["rev-parse", "--show-prefix"]);
+  const prefixResult = await runGit(rootPath, ["rev-parse", "--show-prefix"], probe);
   if (!prefixResult.ok) return unavailable(prefixResult.reason);
   const prefix = prefixResult.stdout.trim();
-  const shallowResult = await runGit(rootPath, ["rev-parse", "--is-shallow-repository"]);
+  const shallowResult = await runGit(rootPath, ["rev-parse", "--is-shallow-repository"], probe);
   if (!shallowResult.ok) return unavailable(shallowResult.reason);
   const shallow = shallowResult.stdout.trim() === "true";
-  const head = await runGit(rootPath, ["rev-parse", "--verify", "HEAD"]);
+  const head = await runGit(rootPath, ["rev-parse", "--verify", "HEAD"], probe);
   if (!head.ok) {
     return { available: true, reason: null, shallow, empty: true, files: new Map() };
   }
@@ -220,11 +224,11 @@ export async function collectChurn(
       "--",
       ".",
     ],
-    AbortSignal.timeout(GIT_DEADLINE_MS),
+    limits,
   );
-  if (!log.ok) return { ...unavailable(log.reason), shallow };
-  if (log.stdout.length > MAX_GIT_HISTORY_BYTES) {
-    return { ...unavailable("history-output-too-large"), shallow };
+  if (!log.ok) {
+    const reason = log.reason === "git-output-too-large" ? "history-output-too-large" : log.reason;
+    return { ...unavailable(reason), shallow };
   }
   const commits = parseHistory(log.stdout);
   const pathOf = (raw: string): string | null => {

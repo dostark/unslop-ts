@@ -7,6 +7,8 @@
  * @related-files [src/cli/commands/health.ts, src/report/health.ts]
  */
 
+import type { IChildLimits } from "./bounded_io.ts";
+
 /** The number of findings the text and JSON views display by default. */
 export const DEFAULT_HEALTH_TOP = 20;
 
@@ -37,8 +39,20 @@ export const MAX_GIT_HISTORY_BYTES = 64 * 1024 * 1024;
 /** The largest retained Git stderr. */
 export const MAX_GIT_STDERR_BYTES = 8 * 1024;
 
+/** The largest stderr a child may print before it is stopped. */
+const MAX_CHILD_STDERR_BYTES = 256 * 1024;
+
+/** The largest stdout of a preliminary Git call such as `rev-parse`. */
+export const MAX_GIT_PROBE_BYTES = 4 * 1024;
+
+/** The largest stdout of the local duplication runner. */
+const MAX_RUNNER_STDOUT_BYTES = 4 * 1024 * 1024;
+
+/** The largest jscpd report read back from the runner output directory. */
+export const MAX_JSCPD_REPORT_BYTES = 256 * 1024 * 1024;
+
 /** The Git child deadline in milliseconds. */
-export const GIT_DEADLINE_MS = 120 * 1000;
+const GIT_DEADLINE_MS = 120 * 1000;
 
 /** The structural fan-in above which a file reads as highly coupled. */
 export const COUPLING_FAN_IN_LIMIT = 20;
@@ -53,3 +67,17 @@ export const HEALTH_WALK_SKIP_PATTERNS: readonly string[] = [
   "/dist(/|$)",
   "/tests_node(/|$)",
 ];
+
+/** The limits every Git child runs under. */
+export const GIT_LIMITS: IChildLimits = {
+  deadlineMs: GIT_DEADLINE_MS,
+  maxStdoutBytes: MAX_GIT_HISTORY_BYTES,
+  maxStderrBytes: MAX_CHILD_STDERR_BYTES,
+};
+
+/** The limits the local duplication runner runs under. */
+export const RUNNER_LIMITS: IChildLimits = {
+  deadlineMs: 120 * 1000,
+  maxStdoutBytes: MAX_RUNNER_STDOUT_BYTES,
+  maxStderrBytes: MAX_CHILD_STDERR_BYTES,
+};
