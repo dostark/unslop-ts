@@ -6,8 +6,18 @@
  * @related-files [src/cli/rule_report.ts]
  */
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
-import { type ILintDiagnostic, parseValue, rankFindings, summarizeFiles } from "../src/cli/rule_report.ts";
+import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
+import { join } from "@std/path";
+import {
+  countsByOwner,
+  type ILintDiagnostic,
+  ownerOf,
+  parseDenoLintOutput,
+  parseValue,
+  rankFindings,
+  summarizeFiles,
+  workspaceMembersOf,
+} from "../src/cli/rule_report.ts";
 import { DEMO_PLUGIN_NAME, runDeno, withDemoProject } from "./helpers/demo_project.ts";
 
 Deno.test("parseValue reads the complexity value", () => {
@@ -118,4 +128,98 @@ Deno.test("size-report-ranking: a size-only breach reaches the command with its 
     assertEquals(report.topFiles[0].functions[0].rule, rule);
     assertEquals(report.topFiles[0].functions[0].value, 61);
   });
+});
+
+Deno.test("rule-report-generic-owner: nested members, globs, file URLs and the root bucket", async () => {
+  const root = await Deno.makeTempDir({ prefix: "unslop_owner_" });
+  try {
+    await Deno.mkdir(join(root, "packages/alpha/nested"), { recursive: true });
+    await Deno.mkdir(join(root, "apps/beta"), { recursive: true });
+    await Deno.writeTextFile(
+      join(root, "deno.json"),
+      JSON.stringify({ workspace: ["./packages/*", "./apps/beta", "./missing/glob/*"] }),
+    );
+    const members = await workspaceMembersOf(root, join(root, "deno.json"));
+    assertEquals(members, ["apps/beta", "packages/alpha"]);
+    assertEquals(
+      ownerOf(`file://${join(root, "packages/alpha/nested/a.ts")}`, root, members),
+      "packages/alpha",
+    );
+    assertEquals(ownerOf(join(root, "packages/alpha/a.ts"), root, members), "packages/alpha");
+    assertEquals(ownerOf(join(root, "scripts/a.ts"), root, members), ".");
+    assertEquals(ownerOf("file:///tmp/elsewhere/a.ts", root, members), ".");
+    const counts = countsByOwner([
+      { filename: join(root, "packages/alpha/a.ts"), code: "demo/a" },
+      { filename: join(root, "packages/alpha/b.ts"), code: "demo/a" },
+      { filename: join(root, "scripts/c.ts"), code: "demo/a" },
+    ], (file) => ownerOf(file, root, members));
+    assertEquals(counts, { "demo/a": { "packages/alpha": 2, ".": 1 } });
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("rule-report-completeness: malformed, failed and empty scans cannot pass", () => {
+  const valid = JSON.stringify({
+    diagnostics: [{ filename: "a.ts", code: "demo/a", message: "complexity 16" }],
+    errors: [],
+    checked_files: ["a.ts"],
+  });
+  assertEquals(parseDenoLintOutput(valid, 1, "").checked_files.length, 1);
+  assertEquals(
+    parseDenoLintOutput(JSON.stringify({ diagnostics: [], errors: [], checked_files: ["a.ts"] }), 0, "")
+      .diagnostics.length,
+    0,
+  );
+  assertThrows(() => parseDenoLintOutput("not json", 0, ""), Error, "no valid JSON");
+  assertThrows(() => parseDenoLintOutput(valid, 2, "boom"), Error, "status 2");
+  assertThrows(
+    () =>
+      parseDenoLintOutput(
+        JSON.stringify({ diagnostics: [], errors: [{ message: "parse" }], checked_files: ["a.ts"] }),
+        1,
+        "",
+      ),
+    Error,
+    "error(s)",
+  );
+  assertThrows(
+    () => parseDenoLintOutput(JSON.stringify({ diagnostics: [], errors: [], checked_files: [] }), 0, ""),
+    Error,
+    "checked no files",
+  );
+  assertThrows(
+    () => parseDenoLintOutput(JSON.stringify({ diagnostics: [], errors: [], checked_files: ["a.ts"] }), 1, ""),
+    Error,
+    "without any diagnostic",
+  );
+  assertThrows(
+    () => parseDenoLintOutput(JSON.stringify({ diagnostics: [] }), 0, ""),
+    Error,
+    "missing",
+  );
+});
+
+Deno.test("rule-report-all-diagnostics: an unrankable diagnostic still counts and top never lowers the gate", () => {
+  const diagnostics: readonly ILintDiagnostic[] = [
+    {
+      filename: "a.ts",
+      code: "demo/a",
+      message: "Function f has 61 lines (limit 60).",
+      range: { start: { line: 1 } },
+    },
+    {
+      filename: "b.ts",
+      code: "demo/a",
+      message: "A boolean-wrapped assertion hides the failing value.",
+      range: { start: { line: 2 } },
+    },
+  ];
+  const ranked = rankFindings(diagnostics);
+  assertEquals(ranked.length, 1);
+  const summary = summarizeFiles(ranked, 1, 1, diagnostics.length);
+  assertEquals(summary.selected, 2);
+  assertEquals(summary.total, 1);
+  assertEquals(summary.topFiles.length, 1);
+  assertEquals(summary.topFiles[0].functions.length, 1);
 });
