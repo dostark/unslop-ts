@@ -184,9 +184,9 @@ Deno.test("rule-report-completeness: malformed, failed and empty scans cannot pa
     "error(s)",
   );
   assertThrows(
-    () => parseDenoLintOutput(JSON.stringify({ diagnostics: [], errors: [], checked_files: [] }), 0, ""),
+    () => parseDenoLintOutput(JSON.stringify({ diagnostics: [], errors: [], checked_files: [] }), 1, ""),
     Error,
-    "checked no files",
+    "checked-file population",
   );
   assertThrows(
     () => parseDenoLintOutput(JSON.stringify({ diagnostics: [], errors: [], checked_files: ["a.ts"] }), 1, ""),

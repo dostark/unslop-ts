@@ -112,7 +112,8 @@ export function parseDenoLintOutput(stdout: string, status: number, stderr: stri
   }
   let value: unknown;
   try {
-    value = JSON.parse(stdout);
+    // The plugin prints one informational banner line before the JSON report.
+    value = JSON.parse(stdout.replace(/^\[[^\]]+-lint\][^\n]*\n/, ""));
   } catch {
     throw new Error("deno lint produced no valid JSON report");
   }
@@ -121,10 +122,17 @@ export function parseDenoLintOutput(stdout: string, status: number, stderr: stri
   if (!Array.isArray(report.diagnostics) || !Array.isArray(report.errors) || !Array.isArray(report.checked_files)) {
     throw new Error("the deno lint report is missing its diagnostics, errors or checked_files");
   }
-  if (report.errors.length > 0) {
-    throw new Error(`deno lint reported ${report.errors.length} error(s): ${stderr.slice(0, MAX_STDERR)}`);
+  const realErrors = report.errors.filter((entry) => !isSelectionNotice(entry));
+  if (realErrors.length > 0) {
+    throw new Error(
+      `deno lint reported ${realErrors.length} error(s) ${JSON.stringify(realErrors).slice(0, 400)}: ` +
+        stderr.slice(0, MAX_STDERR),
+    );
   }
-  if (report.checked_files.length === 0) throw new Error("deno lint checked no files");
+  // A clean Deno JSON report omits `checked_files`; a failing one must list the checked population.
+  if (status === 1 && report.checked_files.length === 0) {
+    throw new Error("deno lint exited 1 without a checked-file population");
+  }
   if (status === 1 && report.diagnostics.length === 0) {
     throw new Error("deno lint exited 1 without any diagnostic");
   }
@@ -133,6 +141,11 @@ export function parseDenoLintOutput(stdout: string, status: number, stderr: stri
     errors: report.errors,
     checked_files: report.checked_files as string[],
   };
+}
+
+/** True when the entry is the plugin's informational selection banner rather than a scan failure. */
+function isSelectionNotice(entry: unknown): boolean {
+  return JSON.stringify(entry).includes("_LINT_RULES active:");
 }
 
 /** The generic ownership bucket of one file: the longest containing workspace member, or the root bucket `.`. */
@@ -146,6 +159,20 @@ export function ownerOf(file: string, rootPath: string, members: readonly string
     if (best === "." || normalized.length > best.length) best = normalized;
   }
   return best;
+}
+
+/** Every workspace member, each ancestor bucket, each top-level source directory and the root bucket. */
+function bucketsOf(rootPath: string, members: readonly string[]): string[] {
+  const buckets = new Set<string>(["."]);
+  for (const member of members) {
+    const parts = member.split("/");
+    for (let index = 1; index <= parts.length; index++) buckets.add(parts.slice(0, index).join("/"));
+  }
+  for (const entry of Deno.readDirSync(rootPath)) {
+    if (!entry.isDirectory || entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    buckets.add(entry.name);
+  }
+  return [...buckets].sort();
 }
 
 /** The workspace member roots of the descriptor's lint configuration. */
@@ -194,8 +221,34 @@ export function countsByOwner(
   return counts;
 }
 
+/** True when at least one lintable source file sits under the requested roots. */
+async function hasLintableFile(roots: readonly string[]): Promise<boolean> {
+  const extensions = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
+  const skip = new Set(["node_modules", ".git", "dist", "coverage"]);
+  const visit = async (path: string): Promise<boolean> => {
+    let stat: Deno.FileInfo;
+    try {
+      stat = await Deno.stat(path);
+    } catch {
+      return false;
+    }
+    if (stat.isFile) return extensions.some((extension) => path.endsWith(extension));
+    if (!stat.isDirectory) return false;
+    for await (const entry of Deno.readDir(path)) {
+      if (entry.isDirectory && skip.has(entry.name)) continue;
+      if (await visit(join(path, entry.name))) return true;
+    }
+    return false;
+  };
+  for (const root of roots) {
+    if (await visit(root)) return true;
+  }
+  return false;
+}
+
 /** Runs `deno lint --json` for one rule over the given roots. The rule id is `<plugin>/<key>`. */
 async function runDenoLint(rule: string, roots: readonly string[]): Promise<ILintDiagnostic[]> {
+  if (!(await hasLintableFile(roots))) throw new Error("the requested scan contains no lintable file");
   const command = new Deno.Command(Deno.execPath(), {
     args: ["lint", "--json", ...roots],
     env: { [selectionEnvNameForRule(rule)]: rule },
@@ -237,7 +290,7 @@ async function evaluateReportCeilings(
   const rootPath = fromFileUrl(descriptor.rootUrl);
   const members = await workspaceMembersOf(rootPath, fromFileUrl(descriptor.lintConfigUrl));
   const knownRules = Object.keys(compiled.rules);
-  const knownPackages = [...members, "."];
+  const knownPackages = bucketsOf(rootPath, members);
   const ceilings = parseCeilings(await Deno.readTextFile(join(root, ceilingsPath)), knownRules, knownPackages);
   const diagnostics = await runDenoLint(rule, roots);
   const counts = countsByOwner(diagnostics, (file) => ownerOf(file, rootPath, members));
