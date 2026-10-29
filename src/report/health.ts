@@ -15,7 +15,9 @@ import { measureFunction, ownedLineNumbers } from "../metrics/function_metrics.t
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
+import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
 import { deadRatioOf, exportPopulationOf } from "./exports.ts";
+import { MAX_GIT_HISTORY_BYTES } from "./constants.ts";
 import { type ILcovCoverage, MAX_LCOV_BYTES, parseLcov } from "./lcov.ts";
 import { buildHealthGraph, type IHealthGraph } from "./graph.ts";
 import {
@@ -27,6 +29,7 @@ import {
   type IHealthError,
   type IHealthFileScore,
   type IHealthFinding,
+  type IHealthHotspotSummary,
   type IHealthReport,
   type IHealthVitalSigns,
 } from "./health_model.ts";
@@ -89,6 +92,12 @@ export interface ICollectHealthInput {
   readonly coverageSha256: string | null;
   /** The optional adjacent manifest of measured source hashes, or null. */
   readonly coverageManifest: Record<string, string> | null;
+  /** The epoch boundary of the history window. */
+  readonly sinceEpoch: number;
+  /** The commits a file needs before it qualifies as a hotspot. */
+  readonly minCommits: number;
+  /** The captured UTC clock of this run, in epoch seconds. */
+  readonly nowEpoch: number;
 }
 
 /** The measured values a finding reports. */
@@ -476,6 +485,65 @@ export async function collectFunctionRows(input: ICollectHealthInput): Promise<I
   return { rows, errors, excluded };
 }
 
+/** The per-file scores and the total function count. */
+function fileScoresOf(
+  facts: ReadonlyMap<string, IFileFacts>,
+  exports: ReturnType<typeof exportPopulationOf>,
+  graph: IHealthGraph,
+): { scores: IHealthFileScore[]; functions: number } {
+  let functions = 0;
+  const scores: IHealthFileScore[] = [];
+  for (const [path, measured] of facts) {
+    functions += measured.functions;
+    const exportsForPath = exports.byPath.get(path) ?? { total: 0, unused: 0 };
+    const deadExportRatio = deadRatioOf(exportsForPath.total, exportsForPath.unused);
+    const fanOut = graph.fanOut.get(path) ?? 0;
+    scores.push({
+      path,
+      lines: measured.lines,
+      cyclomatic: measured.cyclomatic,
+      density: measured.lines === 0 ? 0 : measured.cyclomatic / measured.lines,
+      dead_export_ratio: deadExportRatio,
+      fan_in: graph.fanIn.get(path) ?? 0,
+      fan_out: fanOut,
+      mi: maintainabilityIndexOf({
+        fileLines: measured.lines,
+        cyclomatic: measured.cyclomatic,
+        deadExportRatio,
+        fanOut,
+      }),
+    });
+  }
+  scores.sort((left, right) => left.path.localeCompare(right.path));
+  return { scores, functions };
+}
+
+/** The hotspot scores and their history status. */
+async function hotspotReportOf(
+  input: ICollectHealthInput,
+  parsed: ReadonlyMap<string, IParsedHealthFile>,
+  facts: ReadonlyMap<string, IFileFacts>,
+): Promise<{ hotspots: readonly IHotspotScore[]; summary: IHealthHotspotSummary }> {
+  const churn = await collectChurn(input.rootPath, input.sinceEpoch, input.nowEpoch, new Set(parsed.keys()));
+  const densities = new Map([...facts].map(([path, fact]) => [
+    path,
+    fact.lines === 0 ? 0 : fact.cyclomatic / fact.lines,
+  ]));
+  const hotspots = hotspotScoresOf(churn, densities, input.minCommits);
+  return {
+    hotspots,
+    summary: {
+      available: churn.available,
+      reason: churn.reason,
+      shallow: churn.shallow,
+      since: input.sinceEpoch,
+      min_commits: input.minCommits,
+      population: churn.files.size,
+      qualified: hotspots.length,
+    },
+  };
+}
+
 /** The coverage input facts of one report, with the freshness limits stated. */
 async function coverageSummaryOf(
   input: ICollectHealthInput,
@@ -529,40 +597,20 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
       }),
     );
   }
-  let functions = 0;
-  const fileScores: IHealthFileScore[] = [];
-  for (const [path, measured] of facts) {
-    functions += measured.functions;
-    const exportsForPath = exports.byPath.get(path) ?? { total: 0, unused: 0 };
-    const deadExportRatio = deadRatioOf(exportsForPath.total, exportsForPath.unused);
-    const fanOut = graph.fanOut.get(path) ?? 0;
-    fileScores.push({
-      path,
-      lines: measured.lines,
-      cyclomatic: measured.cyclomatic,
-      density: measured.lines === 0 ? 0 : measured.cyclomatic / measured.lines,
-      dead_export_ratio: deadExportRatio,
-      fan_in: graph.fanIn.get(path) ?? 0,
-      fan_out: fanOut,
-      mi: maintainabilityIndexOf({
-        fileLines: measured.lines,
-        cyclomatic: measured.cyclomatic,
-        deadExportRatio,
-        fanOut,
-      }),
-    });
-  }
-  fileScores.sort((left, right) => left.path.localeCompare(right.path));
+  const { scores: fileScores, functions } = fileScoresOf(facts, exports, graph);
   findings.sort(comparatorOf(input.sort));
   const reportFindings: IHealthFinding[] = findings.map(({ values: _values, ...finding }) => finding);
   const deadFiles = await deadFilesOf(input.rootPath, new Set(parsed.keys()));
   const coverageSummary = await coverageSummaryOf(input, coverage, parsed);
+  const hotspotReport = await hotspotReportOf(input, parsed, facts);
   return {
     schema_version: HEALTH_SCHEMA_VERSION,
     formula_version: HEALTH_FORMULA_VERSION,
     tool_version: TOOL_VERSION,
     findings: reportFindings,
     file_scores: fileScores,
+    hotspots: hotspotReport.hotspots,
+    hotspot_summary: hotspotReport.summary,
     summary: {
       analyzed_files: parsed.size,
       excluded_files: excluded,
@@ -592,6 +640,10 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
     },
     vital_signs: vitalSignsOf(bands, functions),
     errors,
-    limits: { source_bytes: MAX_SOURCE_BYTES, coverage_bytes: MAX_LCOV_BYTES },
+    limits: {
+      source_bytes: MAX_SOURCE_BYTES,
+      coverage_bytes: MAX_LCOV_BYTES,
+      history_bytes: MAX_GIT_HISTORY_BYTES,
+    },
   };
 }

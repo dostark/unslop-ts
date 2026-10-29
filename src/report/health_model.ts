@@ -61,6 +61,26 @@ export type CoverageReason = "measured" | "no_input" | "file_missing" | "no_exec
 /** The precision a measured coverage sample claims. */
 export type CoveragePrecision = "line" | "line_ambiguous";
 
+/** One file hotspot: the qualified churn and density normalized over the population. */
+export interface IHealthHotspot {
+  readonly path: string;
+  readonly commits: number;
+  readonly churn: number;
+  readonly density: number;
+  readonly score: number;
+}
+
+/** The history status and the qualifying population of the hotspot report. */
+export interface IHealthHotspotSummary {
+  readonly available: boolean;
+  readonly reason: string | null;
+  readonly shallow: boolean;
+  readonly since: number;
+  readonly min_commits: number;
+  readonly population: number;
+  readonly qualified: number;
+}
+
 /** The coverage input facts of one report. */
 export interface IHealthCoverageSummary {
   readonly source: "none" | "lcov";
@@ -154,6 +174,7 @@ export interface IHealthError {
 export interface IHealthLimits {
   readonly source_bytes: number;
   readonly coverage_bytes: number;
+  readonly history_bytes: number;
 }
 
 /** The complete health report this checkpoint writes. */
@@ -163,6 +184,8 @@ export interface IHealthReport {
   readonly tool_version: string;
   readonly findings: readonly IHealthFinding[];
   readonly file_scores: readonly IHealthFileScore[];
+  readonly hotspots: readonly IHealthHotspot[];
+  readonly hotspot_summary: IHealthHotspotSummary;
   readonly summary: IHealthSummary;
   readonly vital_signs: IHealthVitalSigns;
   readonly errors: readonly IHealthError[];
@@ -264,6 +287,26 @@ export const HealthGraphSummarySchema: z.ZodType<IHealthGraphSummary, IHealthGra
   complete: z.boolean(),
 }).strict();
 
+/** One file hotspot. */
+const HealthHotspotSchema: z.ZodType<IHealthHotspot, IHealthHotspot> = z.object({
+  path: z.string().min(1),
+  commits: nonNegativeInteger,
+  churn: finite,
+  density: finite,
+  score: finite,
+}).strict();
+
+/** The history status of one report. */
+const HealthHotspotSummarySchema: z.ZodType<IHealthHotspotSummary, IHealthHotspotSummary> = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).nullable(),
+  shallow: z.boolean(),
+  since: nonNegativeInteger,
+  min_commits: oneBased,
+  population: nonNegativeInteger,
+  qualified: nonNegativeInteger,
+}).strict();
+
 /** The coverage input facts of one report. */
 const HealthCoverageSummarySchema: z.ZodType<IHealthCoverageSummary, IHealthCoverageSummary> = z.object({
   source: z.enum(["none", "lcov"]),
@@ -299,6 +342,7 @@ export const HealthErrorSchema: z.ZodType<IHealthError, IHealthError> = z.object
 export const HealthLimitsSchema: z.ZodType<IHealthLimits, IHealthLimits> = z.object({
   source_bytes: oneBased,
   coverage_bytes: oneBased,
+  history_bytes: oneBased,
 }).strict();
 
 /** The complete health report this checkpoint writes. */
@@ -308,6 +352,8 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   tool_version: z.string().min(1),
   findings: z.array(HealthFindingSchema),
   file_scores: z.array(HealthFileScoreSchema),
+  hotspots: z.array(HealthHotspotSchema),
+  hotspot_summary: HealthHotspotSummarySchema,
   summary: HealthSummarySchema,
   vital_signs: HealthVitalSignsSchema,
   errors: z.array(HealthErrorSchema),

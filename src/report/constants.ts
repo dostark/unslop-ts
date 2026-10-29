@@ -18,3 +18,24 @@ export const DEFAULT_HEALTH_FORMAT = "text";
 
 /** The CRAP limit the report applies by default. */
 export const DEFAULT_MAX_CRAP = 30;
+
+/** The default history window in days. */
+export const DEFAULT_SINCE_DAYS = 180;
+
+/** The default number of commits a file needs to qualify as a hotspot. */
+export const DEFAULT_MIN_COMMITS = 3;
+
+/** The churn half-life in days. */
+export const CHURN_HALF_LIFE_DAYS = 90;
+
+/** The number of seconds in one day. */
+export const SECONDS_PER_DAY = 86400;
+
+/** The largest accepted Git history output. */
+export const MAX_GIT_HISTORY_BYTES = 64 * 1024 * 1024;
+
+/** The largest retained Git stderr. */
+export const MAX_GIT_STDERR_BYTES = 8 * 1024;
+
+/** The Git child deadline in milliseconds. */
+export const GIT_DEADLINE_MS = 120 * 1000;

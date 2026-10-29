@@ -285,3 +285,50 @@ Deno.test("health-real-lcov: real Deno coverage changes the CRAP value and the s
     }
   });
 });
+
+/** Runs Git inside one fixture with an isolated configuration. */
+async function gitIn(cwd: string, args: readonly string[], env: Record<string, string> = {}): Promise<void> {
+  const output = await new Deno.Command("git", {
+    args: [...args],
+    cwd,
+    env: {
+      LD_LIBRARY_PATH: "",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_AUTHOR_NAME: "Test",
+      GIT_AUTHOR_EMAIL: "test@example.com",
+      GIT_COMMITTER_NAME: "Test",
+      GIT_COMMITTER_EMAIL: "test@example.com",
+      ...env,
+    },
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  if (!output.success) throw new Error(`git ${args.join(" ")}: ${new TextDecoder().decode(output.stderr)}`);
+}
+
+Deno.test("health-hotspot-cli: the real --since and --min-commits flags change CLI hotspots", async () => {
+  await withHealthProject(MAIN_FILES, async (dir) => {
+    const plain = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(plain.hotspot_summary.available, false);
+    assertEquals(plain.hotspot_summary.reason, "not-a-git-repository");
+    assertEquals(plain.hotspots, []);
+
+    await gitIn(dir, ["init", "-b", "main"]);
+    await gitIn(dir, ["add", "-A"]);
+    await gitIn(dir, ["commit", "-m", "first"]);
+    const wide = parseReport((await health(dir, ["--format=json", "--since=365d", "--min-commits=1"])).stdout);
+    assertEquals(wide.hotspot_summary.available, true);
+    assertEquals(wide.hotspot_summary.shallow, false);
+    assertEquals(wide.hotspot_summary.qualified > 0, true);
+    assertEquals(wide.hotspots[0].score, 100);
+
+    const strict = parseReport((await health(dir, ["--format=json", "--since=365d", "--min-commits=2"])).stdout);
+    assertEquals(strict.hotspots, []);
+    assertEquals(strict.hotspot_summary.qualified, 0);
+    assertEquals(strict.hotspot_summary.min_commits, 2);
+
+    const narrow = parseReport((await health(dir, ["--format=json", "--since=30d", "--min-commits=1"])).stdout);
+    assertEquals(narrow.hotspot_summary.since > wide.hotspot_summary.since, true);
+  });
+});

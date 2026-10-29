@@ -55,6 +55,18 @@ export {
   type RuntimeReach,
   UNREACHABLE_COVERAGE_PERCENT,
 } from "./crap.ts";
+export {
+  churnWeightOf,
+  collectChurn,
+  hotspotScoresOf,
+  type IChurnFile,
+  type IChurnHistory,
+  type IGitCommit,
+  type IGitCommitFile,
+  type IHotspotScore,
+  parseHistory,
+  parseSince,
+} from "./churn.ts";
 export { type ILcovCoverage, type ILcovFileCoverage, parseLcov } from "./lcov.ts";
 export {
   HEALTH_FORMULA_VERSION,

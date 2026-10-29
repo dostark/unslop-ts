@@ -26,7 +26,10 @@ import {
   DEFAULT_HEALTH_SORT,
   DEFAULT_HEALTH_TOP,
   DEFAULT_MAX_CRAP,
+  DEFAULT_MIN_COMMITS,
+  DEFAULT_SINCE_DAYS,
 } from "../../report/constants.ts";
+import { parseSince } from "../../report/churn.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
 import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
 import type { IHealthReport } from "../../report/health_model.ts";
@@ -49,6 +52,8 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   "count-nullish",
   "top",
   "sort",
+  "since",
+  "min-commits",
 ]);
 
 /** The formats the command writes. */
@@ -189,6 +194,34 @@ function settingsOf(compiled: ICompiledConfig, pluginName: string, values: Map<s
   };
 }
 
+/** The history window and qualification of one run. */
+function historyWindowOf(
+  values: Map<string, string>,
+  now: Date,
+): { sinceEpoch: number; minCommits: number } {
+  const minCommits = values.has("min-commits")
+    ? positiveInteger("min-commits", values.get("min-commits") ?? "")
+    : DEFAULT_MIN_COMMITS;
+  try {
+    return {
+      sinceEpoch: parseSince(values.get("since") ?? `${DEFAULT_SINCE_DAYS}d`, now),
+      minCommits,
+    };
+  } catch (error) {
+    throw usage(error instanceof Error ? error.message : String(error));
+  }
+}
+
+/** Collects the report, turning an input rejection into an attributed failure. */
+async function reportOrFail(input: Parameters<typeof collectHealth>[0]): Promise<IHealthReport> {
+  try {
+    return await collectHealth(input);
+  } catch (error) {
+    const message = error instanceof LcovError || error instanceof Error ? error.message : String(error);
+    throw new CliError(FAILURE_EXIT, `health input rejected: ${message}`);
+  }
+}
+
 /** The canonical root the descriptor names, resolved through the filesystem. */
 async function canonicalRoot(url: URL): Promise<string> {
   try {
@@ -211,6 +244,12 @@ function renderText(report: IHealthReport, top: number): string {
     `findings: ${report.summary.findings_population}`,
     `maxima: cyclomatic ${options.max_cyclomatic}, cognitive ${options.max_cognitive}, lines ${options.max_lines}, ` +
     `crap ${options.max_crap} (variant ${options.variant}, count-nullish ${options.count_nullish})`,
+    `hotspots: ${
+      report.hotspot_summary.available
+        ? `${report.hotspot_summary.qualified} qualified of ${report.hotspot_summary.population} file(s), ` +
+          `${report.hotspot_summary.shallow ? "shallow history" : "full history"}`
+        : `unavailable (${report.hotspot_summary.reason ?? "unknown"})`
+    }`,
     `coverage: ${report.summary.coverage.source} ` +
     `(${report.summary.coverage.matched_files} matched, ${report.summary.coverage.unmatched_files} unmatched, ` +
     `revision ${report.summary.coverage.revision})`,
@@ -224,6 +263,12 @@ function renderText(report: IHealthReport, top: number): string {
     `${report.summary.dead_exports.unused}/${report.summary.dead_exports.total}, dead files ` +
     `${report.summary.dead_files.available ? String(report.summary.dead_files.count) : "unavailable"}`,
   ];
+  for (const hotspot of report.hotspots.slice(0, top)) {
+    lines.push(
+      `  hotspot ${hotspot.path} — score ${hotspot.score.toFixed(1)}, churn ${hotspot.churn.toFixed(2)}, ` +
+        `density ${hotspot.density.toFixed(2)}, commits ${hotspot.commits}`,
+    );
+  }
   for (const finding of report.findings.slice(0, top)) {
     lines.push(
       `  ${finding.path}:${finding.line} ${finding.name} — cyclomatic ${finding.cyclomatic}, ` +
@@ -245,6 +290,8 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     throw usage(`unknown variant '${values.get("variant")}'`);
   }
   const top = values.has("top") ? positiveInteger("top", values.get("top") ?? "") : DEFAULT_HEALTH_TOP;
+  const now = new Date();
+  const { sinceEpoch, minCommits } = historyWindowOf(values, now);
 
   const descriptor = await loadConfigDescriptor(
     Deno.cwd(),
@@ -259,23 +306,20 @@ export async function runHealth(args: readonly string[]): Promise<number> {
 
   const settings = settingsOf(compiled, descriptor.pluginName, values);
   const coverage = await coverageInputOf(values.get("coverage"), rootPath);
-  let report: IHealthReport;
-  try {
-    report = await collectHealth({
-      rootPath,
-      ignoreGlobs: (compiled.catalog.ignore ?? []).map((entry) => entry.glob),
-      scopes: compiled.catalog.scopes,
-      settings,
-      sort,
-      coverageText: coverage.text,
-      coverageSha256: coverage.sha256,
-      coverageManifest: coverage.manifest,
-      testGlobs: compiled.catalog.scopes.test,
-    });
-  } catch (error) {
-    const message = error instanceof LcovError || error instanceof Error ? error.message : String(error);
-    throw new CliError(FAILURE_EXIT, `health input rejected: ${message}`);
-  }
+  const report = await reportOrFail({
+    rootPath,
+    ignoreGlobs: (compiled.catalog.ignore ?? []).map((entry) => entry.glob),
+    scopes: compiled.catalog.scopes,
+    settings,
+    sort,
+    coverageText: coverage.text,
+    coverageSha256: coverage.sha256,
+    coverageManifest: coverage.manifest,
+    testGlobs: compiled.catalog.scopes.test,
+    sinceEpoch,
+    minCommits,
+    nowEpoch: Math.floor(now.getTime() / 1000),
+  });
 
   if (format === "json") {
     print(`${JSON.stringify({ ...report, findings: report.findings.slice(0, top) }, null, 2)}\n`);
