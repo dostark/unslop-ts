@@ -12,8 +12,9 @@
  *   deno run -A src/cli/rule_report.ts --rule=<id> --descriptor=<entry> --ceilings=<file> [--json] [--fail]
  */
 
-import { fromFileUrl, join, relative } from "@std/path";
+import { fromFileUrl, join, relative, resolve } from "@std/path";
 import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
+import { parseTraceStderr, traceEnvName } from "../engine/trace.ts";
 import { evaluateCeilings, type ICeilings, type IEvaluation, parseCeilings, projectCeilings } from "./rule_ceiling.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
 
@@ -58,6 +59,7 @@ export interface ILintReport {
 const DEFAULTS = { topFiles: 5, topFns: 5 };
 const VALUE_PATTERN = /(?:complexity|score)\s+(\d+)|has\s+(\d+)\s+lines?/;
 const MAX_STDERR = 8 * 1024;
+const LINTABLE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 
 /** The numeric value a rule message carries: a complexity, a score, or a line count. */
 export function parseValue(message: string): number | null {
@@ -223,7 +225,6 @@ export function countsByOwner(
 
 /** True when at least one lintable source file sits under the requested roots. */
 async function hasLintableFile(roots: readonly string[]): Promise<boolean> {
-  const extensions = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
   const skip = new Set(["node_modules", ".git", "dist", "coverage"]);
   const visit = async (path: string): Promise<boolean> => {
     let stat: Deno.FileInfo;
@@ -232,7 +233,7 @@ async function hasLintableFile(roots: readonly string[]): Promise<boolean> {
     } catch {
       return false;
     }
-    if (stat.isFile) return extensions.some((extension) => path.endsWith(extension));
+    if (stat.isFile) return LINTABLE_EXTENSIONS.some((extension) => path.endsWith(extension));
     if (!stat.isDirectory) return false;
     for await (const entry of Deno.readDir(path)) {
       if (entry.isDirectory && skip.has(entry.name)) continue;
@@ -246,21 +247,81 @@ async function hasLintableFile(roots: readonly string[]): Promise<boolean> {
   return false;
 }
 
+const RULE_ID_SEPARATOR = "/";
+const MAX_MISSING_LISTED = 5;
+
+/** The host observations that prove a plugin evaluated one rule over a population. */
+export interface IRuleEvidenceInput {
+  readonly rule: string;
+  readonly runId: string;
+  readonly stderr: string;
+  readonly checkedFiles: readonly string[];
+  readonly cwd: string;
+}
+
+/** The working-directory-relative path of a file the host reported. */
+function relativeFile(file: string, cwd: string): string {
+  const path = file.startsWith("file:") ? fromFileUrl(file) : file;
+  return relative(cwd, path).replaceAll("\\", "/");
+}
+
+/**
+ * Fails unless the lint plugin itself reported that the rule ran on files. Absent diagnostics prove nothing,
+ * so the trace records are the only accepted evidence: a plugin that never loaded or a rule that its selection
+ * switched off leaves no terminal record, and a listed lint file without a record was never evaluated.
+ */
+export function assertRuleEvidence(input: IRuleEvidenceInput): void {
+  const { records } = parseTraceStderr(input.stderr, input.runId);
+  if (records.length === 0) {
+    throw new Error(
+      `the lint plugin reported no observation for ${input.rule}: it is absent from the lint config or did not load`,
+    );
+  }
+  const terminal = records.filter((record) => record.kind !== "observed" && record.rule === input.rule);
+  if (terminal.length === 0) {
+    throw new Error(`the lint plugin did not evaluate ${input.rule}: the rule is inactive or its selection is off`);
+  }
+  if (!terminal.some((record) => record.kind === "checked")) {
+    throw new Error(`no file in the requested roots is in the scope of ${input.rule}`);
+  }
+  const evaluated = new Set(terminal.map((record) => record.file));
+  const missing = input.checkedFiles
+    .filter((file) => LINTABLE_EXTENSIONS.some((extension) => file.endsWith(extension)))
+    .map((file) => relativeFile(file, input.cwd))
+    .filter((file) => !evaluated.has(file));
+  if (missing.length > 0) {
+    throw new Error(`incomplete coverage: ${missing.slice(0, MAX_MISSING_LISTED).join(", ")}`);
+  }
+}
+
+/** Where one lint scan runs: the descriptor root with its own lint config, or the caller's directory. */
+interface IScanTarget {
+  readonly cwd: string;
+  readonly configPath: string | null;
+}
+
 /** Runs `deno lint --json` for one rule over the given roots. The rule id is `<plugin>/<key>`. */
-async function runDenoLint(rule: string, roots: readonly string[]): Promise<ILintDiagnostic[]> {
-  if (!(await hasLintableFile(roots))) throw new Error("the requested scan contains no lintable file");
+async function runDenoLint(
+  rule: string,
+  roots: readonly string[],
+  target: IScanTarget | null = null,
+): Promise<ILintDiagnostic[]> {
+  const cwd = target?.cwd ?? Deno.cwd();
+  const scanRoots = target === null ? roots : roots.map((root) => resolve(Deno.cwd(), root));
+  if (!(await hasLintableFile(scanRoots))) throw new Error("the requested scan contains no lintable file");
+  const runId = `rule-report-${crypto.randomUUID()}`;
+  const pluginName = rule.split(RULE_ID_SEPARATOR)[0];
   const command = new Deno.Command(Deno.execPath(), {
-    args: ["lint", "--json", ...roots],
-    env: { [selectionEnvNameForRule(rule)]: rule },
+    args: ["lint", "--json", ...(target?.configPath ? ["--config", target.configPath] : []), ...scanRoots],
+    cwd,
+    env: { [selectionEnvNameForRule(rule)]: rule, [traceEnvName(pluginName)]: runId },
     stdout: "piped",
     stderr: "piped",
   });
   const output = await command.output();
-  const report = parseDenoLintOutput(
-    new TextDecoder().decode(output.stdout),
-    output.code,
-    new TextDecoder().decode(output.stderr),
-  );
+  const stderr = new TextDecoder().decode(output.stderr);
+  const report = parseDenoLintOutput(new TextDecoder().decode(output.stdout), output.code, stderr);
+  assertRuleEvidence({ rule, runId, stderr, checkedFiles: report.checked_files, cwd });
   return report.diagnostics.filter((diagnostic) => diagnostic.code === rule);
 }
 
@@ -292,7 +353,8 @@ async function evaluateReportCeilings(
   const knownRules = Object.keys(compiled.rules);
   const knownPackages = bucketsOf(rootPath, members);
   const ceilings = parseCeilings(await Deno.readTextFile(join(root, ceilingsPath)), knownRules, knownPackages);
-  const diagnostics = await runDenoLint(rule, roots);
+  const target = { cwd: rootPath, configPath: fromFileUrl(descriptor.lintConfigUrl) };
+  const diagnostics = await runDenoLint(rule, roots, target);
   const counts = countsByOwner(diagnostics, (file) => ownerOf(file, rootPath, members));
   return {
     selected: diagnostics.length,
