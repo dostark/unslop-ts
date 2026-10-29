@@ -266,6 +266,25 @@
     ]
   },
   {
+    "rule": "max-function-lines",
+    "valid": [
+      "export function run(): void {\n  void 0;\n}\n"
+    ],
+    "invalid": [
+      {
+        "code": "export function run(): void {\n  void 0;\n  void 0;\n}\n",
+        "options": [
+          {
+            "max": 3
+          }
+        ],
+        "line": 1,
+        "column": 8,
+        "message": "Function run has 4 lines (limit 3)."
+      }
+    ]
+  },
+  {
     "rule": "max-class-size",
     "valid": [
       "export const value = 1;\n"

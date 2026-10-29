@@ -374,6 +374,8 @@ Keep functions and classes small enough to read in one pass.
   expression, and logical operator run, plus one per level of nesting. `else if` and `else` add one without a
   nesting surcharge. A labeled jump and a direct recursive call add one each. The default limit is 15, and
   each function starts at nesting zero.
+- **Function size:** a function owns at most 60 code-token lines by default. Comments and blank lines never
+  count, and a nested function body belongs to that function, not to its parent.
 - **Class size:** a class of at least 200 lines gets a score from its method count, constructor parameters,
   length, longest method, imports, and fields. A score of 60 or more is a god object. Split it into focused
   classes.
@@ -383,6 +385,7 @@ Keep functions and classes small enough to read in one pass.
 | `max-params`                | A function with more parameters than the limit (opt-in) |
 | `max-cyclomatic-complexity` | A function whose complexity exceeds the limit           |
 | `max-cognitive-complexity`  | A function whose cognitive complexity exceeds the limit |
+| `max-function-lines`        | A function with more code-token lines than the limit    |
 | `max-class-size`            | A class whose size score reaches the threshold (opt-in) |
 
 ## Optional Parameters {#optional-parameters}

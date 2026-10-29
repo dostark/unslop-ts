@@ -14,9 +14,10 @@
 import { fromFileUrl, relative } from "@std/path";
 import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 
-/** One ranked finding. */
+/** One ranked finding, with the rule that reported it. */
 export interface IRankedFinding {
   readonly file: string;
+  readonly rule: string;
   readonly line: number;
   readonly value: number;
   readonly message: string;
@@ -29,8 +30,10 @@ export interface IFileSummary {
   readonly functions: readonly IRankedFinding[];
 }
 
-/** The whole report. */
+/** The whole report: every selected diagnostic, plus the ranked and top-limited views. */
 export interface IReportSummary {
+  /** Every diagnostic the selected rule reported, before ranking or top limiting. */
+  readonly selected: number;
   readonly total: number;
   readonly topFiles: readonly IFileSummary[];
 }
@@ -47,12 +50,13 @@ interface ILintReport {
 }
 
 const DEFAULTS = { topFiles: 5, topFns: 5 };
-const VALUE_PATTERN = /(?:complexity|score)\s+(\d+)/;
+const VALUE_PATTERN = /(?:complexity|score)\s+(\d+)|has\s+(\d+)\s+lines?/;
 
-/** The numeric value a rule message carries, or null. */
+/** The numeric value a rule message carries: a complexity, a score, or a line count. */
 export function parseValue(message: string): number | null {
   const match = VALUE_PATTERN.exec(message);
-  return match ? Number(match[1]) : null;
+  if (match === null) return null;
+  return Number(match[1] ?? match[2]);
 }
 
 /** Ranks diagnostics by their message value, highest first. */
@@ -63,6 +67,7 @@ export function rankFindings(diagnostics: readonly ILintDiagnostic[]): IRankedFi
     if (value === null) continue;
     ranked.push({
       file: diagnostic.filename ?? "",
+      rule: diagnostic.code ?? "",
       line: diagnostic.range?.start?.line ?? 0,
       value,
       message: diagnostic.message ?? "",
@@ -76,6 +81,7 @@ export function summarizeFiles(
   ranked: readonly IRankedFinding[],
   topFiles = DEFAULTS.topFiles,
   topFns = DEFAULTS.topFns,
+  selected = ranked.length,
 ): IReportSummary {
   const byFile = new Map<string, IRankedFinding[]>();
   for (const finding of ranked) {
@@ -89,7 +95,7 @@ export function summarizeFiles(
     functions: [...findings].sort((a, b) => b.value - a.value).slice(0, topFns),
   }));
   summaries.sort((a, b) => b.max - a.max);
-  return { total: ranked.length, topFiles: summaries.slice(0, topFiles) };
+  return { selected, total: ranked.length, topFiles: summaries.slice(0, topFiles) };
 }
 
 /** Runs `deno lint --json` for one rule over the given roots and returns its diagnostics. The rule id is `<plugin>/<key>`. */
@@ -130,10 +136,16 @@ async function main(): Promise<void> {
     ...finding,
     file: relative(root, finding.file.startsWith("file://") ? fromFileUrl(finding.file) : finding.file),
   }));
-  const summary = summarizeFiles(ranked, topFiles, topFns);
+  const summary = summarizeFiles(ranked, topFiles, topFns, findings.length);
 
   if (asJson) {
-    console.log(JSON.stringify({ rule, total: summary.total, topFiles: summary.topFiles }, null, 2));
+    console.log(
+      JSON.stringify(
+        { rule, selected: summary.selected, total: summary.total, topFiles: summary.topFiles },
+        null,
+        2,
+      ),
+    );
   } else {
     console.log(`📊 ${rule}: ${summary.total} finding(s) above the catalog limit`);
     for (const file of summary.topFiles) {

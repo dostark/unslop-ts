@@ -147,6 +147,13 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "max-function-lines",
+    name: "a function with many statements",
+    source: "export function pick(): number {\n  let total = 0;\n" + "  total += 1;\n".repeat(60) +
+      "  return total;\n}\n",
+    expectedBuiltins: {},
+  },
+  {
     rule: "max-class-size",
     name: "a class with methods",
     source: "export class Big {\n  one(): number {\n    return 1;\n  }\n  two(): number {\n    return 2;\n  }\n}\n",

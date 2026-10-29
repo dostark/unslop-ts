@@ -27,6 +27,7 @@ import {
 } from "./test_assertion_rules.ts";
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createMaxCognitiveComplexity } from "./max_cognitive_complexity.ts";
+import { createMaxFunctionLines } from "./max_function_lines.ts";
 import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
 import {
@@ -246,6 +247,19 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       },
       requiresTestGlobs: false,
       create: createMaxCognitiveComplexity,
+    },
+    "max-function-lines": {
+      overlaps: [{ ecosystem: "eslint", rule: "max-lines-per-function", kind: "related" }],
+      meta: {
+        description: "A function with more code-token lines than the limit.",
+        category: "complexity",
+        docs: "#complexity-rules",
+        preset: "recommended",
+        limits:
+          "Lines are code-token lines, so comments and blank lines never count, and nested functions are scored alone.",
+      },
+      requiresTestGlobs: false,
+      create: createMaxFunctionLines,
     },
     "max-class-size": {
       overlaps: [{ ecosystem: "eslint", rule: "max-classes-per-file", kind: "related" }],

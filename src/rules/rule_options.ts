@@ -13,6 +13,7 @@ import {
   DEFAULT_COUNT_NULLISH,
   DEFAULT_MAX_COGNITIVE,
   DEFAULT_MAX_CYCLOMATIC,
+  DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_METRIC_VARIANT,
   METRIC_VARIANTS,
 } from "../metrics/constants.ts";
@@ -76,6 +77,10 @@ const MaxCyclomaticComplexityOptions = z.object({
 const MaxCognitiveComplexityOptions = z.object({
   max: z.number().int().positive().default(DEFAULT_MAX_COGNITIVE),
   countNullish: z.boolean().default(DEFAULT_COUNT_NULLISH),
+}).strict();
+
+const MaxFunctionLinesOptions = z.object({
+  max: z.number().int().positive().default(DEFAULT_MAX_FUNCTION_LINES),
 }).strict();
 
 const MaxClassSizeOptions = z.object({
@@ -234,6 +239,7 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "no-constant-substring-assert": NoConstantSubstringAssertOptions,
   "max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
   "max-cognitive-complexity": MaxCognitiveComplexityOptions,
+  "max-function-lines": MaxFunctionLinesOptions,
   "max-class-size": MaxClassSizeOptions,
   "require-optional-wrapper": RequireOptionalWrapperOptions,
   "import-inside-statement": ImportCallOptions,

@@ -91,7 +91,7 @@ Deno.test("an option schema without a rule throws a RuleRegistryError naming the
   assertStringIncludes(error.message, "orphan");
 });
 
-const TYPESCRIPT_PACK_RULE_COUNT = 38;
+const TYPESCRIPT_PACK_RULE_COUNT = 39;
 const DENO_PACK_RULE_KEYS = [
   "ignore-needs-reason",
   "no-forbidden-lint-ignore",

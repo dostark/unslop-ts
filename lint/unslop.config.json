@@ -9,6 +9,12 @@
     "ignore": []
   },
   "rules": {
+    "self/max-function-lines": {
+      "level": "error",
+      "options": {
+        "max": 90
+      }
+    },
     "self/max-cognitive-complexity": {
       "level": "error",
       "options": {

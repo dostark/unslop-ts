@@ -18,6 +18,10 @@ Deno.test("parseValue reads the class-size score", () => {
   assertEquals(parseValue("Class C score 72 (limit 60; 5 methods, 300 lines)."), 72);
 });
 
+Deno.test("parseValue reads the function line count", () => {
+  assertEquals(parseValue("Function f has 61 lines (limit 60)."), 61);
+});
+
 Deno.test("parseValue returns null when the message carries no value", () => {
   assertEquals(parseValue("A boolean-wrapped assertion hides the failing value."), null);
 });
@@ -56,6 +60,19 @@ Deno.test("summarizeFiles groups by file and keeps the top functions", () => {
   assertEquals(summary.topFiles[0].functions.map((f) => f.value), [40, 20]);
 });
 
+Deno.test("rankFindings keeps the rule id of each finding", () => {
+  const [ranked] = rankFindings([diagnostic("a.ts", 1, 20)]);
+  assertEquals(ranked.rule, "demo/max-cyclomatic-complexity");
+});
+
+Deno.test("summarizeFiles keeps every selected diagnostic apart from the ranked view", () => {
+  const ranked = rankFindings([diagnostic("a.ts", 1, 40), diagnostic("a.ts", 2, 20)]);
+  const summary = summarizeFiles(ranked, 5, 1, 3);
+  assertEquals(summary.selected, 3);
+  assertEquals(summary.total, 2);
+  assertEquals(summary.topFiles[0].functions.length, 1);
+});
+
 Deno.test("summarizeFiles limits the number of top files", () => {
   const ranked = rankFindings([diagnostic("a.ts", 1, 40), diagnostic("b.ts", 2, 30), diagnostic("c.ts", 3, 20)]);
   const summary = summarizeFiles(ranked, 2, 5);
@@ -63,6 +80,7 @@ Deno.test("summarizeFiles limits the number of top files", () => {
 });
 
 const BRANCHING_SOURCE = "export function pick(flag: boolean): number {\n  if (flag) return 1;\n  return 2;\n}\n";
+const LONG_SOURCE = "export function long(): void {\n" + "  void 0;\n".repeat(59) + "}\n";
 
 Deno.test("rule_report run from another cwd reports paths relative to that cwd and selects the rule by plugin name", async () => {
   const script = new URL("../src/cli/rule_report.ts", import.meta.url).href;
@@ -71,5 +89,33 @@ Deno.test("rule_report run from another cwd reports paths relative to that cwd a
     const result = await runDeno(["run", "-A", script, `--rule=${rule}`, "--roots=branching.ts"], dir);
     assertStringIncludes(result.stdout, `${rule}: 1 finding(s)`);
     assertStringIncludes(result.stdout, "- branching.ts: 2");
+  });
+});
+
+Deno.test("size-report-ranking: a size-only breach reaches the command with its value and full counts", async () => {
+  const script = new URL("../src/cli/rule_report.ts", import.meta.url).href;
+  const rule = `${DEMO_PLUGIN_NAME}/max-function-lines`;
+  await withDemoProject({ files: { "long_one.ts": LONG_SOURCE, "long_two.ts": LONG_SOURCE } }, async (dir) => {
+    const result = await runDeno([
+      "run",
+      "-A",
+      script,
+      `--rule=${rule}`,
+      "--roots=.",
+      "--topFiles=1",
+      "--topFns=1",
+      "--json",
+    ], dir);
+    const report = JSON.parse(result.stdout) as {
+      selected: number;
+      total: number;
+      topFiles: { file: string; functions: { rule: string; value: number }[] }[];
+    };
+    assertEquals(report.selected, 2);
+    assertEquals(report.total, 2);
+    assertEquals(report.topFiles.length, 1);
+    assertEquals(report.topFiles[0].functions.length, 1);
+    assertEquals(report.topFiles[0].functions[0].rule, rule);
+    assertEquals(report.topFiles[0].functions[0].value, 61);
   });
 });

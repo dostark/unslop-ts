@@ -85,7 +85,8 @@ function parseSource(text: string, filename: string): ParseResult {
 /** True when the token is code that a line count and a metric must keep. */
 function isMeasuredToken(token: IParserToken, text: string): boolean {
   const label = token.type.label;
-  if (label === null || label === END_OF_FILE_LABEL) return false;
+  // A comment token carries no label, so only a string label marks code.
+  if (typeof label !== "string" || label === END_OF_FILE_LABEL) return false;
   if (label !== JSX_TEXT_LABEL) return true;
   return text.slice(token.start, token.end).trim().length > 0;
 }

@@ -35,6 +35,12 @@
         "countNullish": true
       }
     ],
+    "demo/max-function-lines": [
+      "error",
+      {
+        "max": 60
+      }
+    ],
     "demo/max-class-size": "off",
     "demo/require-optional-wrapper": "off",
     "demo/import-inside-statement": [
@@ -131,6 +137,7 @@
         "demo/no-constant-substring-assert": "docs/style_guide.md#test-assertions",
         "demo/max-cyclomatic-complexity": "docs/style_guide.md#complexity-rules",
         "demo/max-cognitive-complexity": "docs/style_guide.md#complexity-rules",
+        "demo/max-function-lines": "docs/style_guide.md#complexity-rules",
         "demo/max-class-size": "docs/style_guide.md#complexity-rules",
         "demo/require-optional-wrapper": "docs/style_guide.md#optional-parameters",
         "demo/import-inside-statement": "docs/style_guide.md#imports-at-the-top",

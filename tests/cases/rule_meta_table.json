@@ -133,6 +133,12 @@
       "docs": "#complexity-rules"
     },
     {
+      "id": "max-function-lines",
+      "category": "complexity",
+      "preset": "recommended",
+      "docs": "#complexity-rules"
+    },
+    {
       "id": "max-params",
       "category": "complexity",
       "preset": "strict",
