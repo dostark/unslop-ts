@@ -61,16 +61,20 @@ export function churnWeightOf(committerTime: number, now: number): number {
   return 0.5 ** (age / SECONDS_PER_DAY / CHURN_HALF_LIFE_DAYS);
 }
 
-/** Parses `180d`, `6m` or an ISO date into an epoch boundary. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** Parses `180d`, `6m` or an ISO date into a safe-integer epoch boundary. */
 export function parseSince(value: string, now: Date): number {
   const duration = /^(\d+)([dm])$/.exec(value);
   if (duration !== null) {
     const amount = Number(duration[1]);
-    if (!Number.isInteger(amount) || amount <= 0) throw new Error(`--since needs a positive duration: '${value}'`);
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error(`--since needs a positive duration: '${value}'`);
     const days = duration[2] === "m" ? amount * 30 : amount;
-    return Math.floor(now.getTime() / 1000) - days * SECONDS_PER_DAY;
+    const epoch = Math.floor(now.getTime() / 1000) - days * SECONDS_PER_DAY;
+    if (!Number.isSafeInteger(epoch)) throw new Error(`--since duration is out of range: '${value}'`);
+    return epoch;
   }
-  const parsed = Date.parse(value);
+  const parsed = ISO_DATE.test(value) ? Date.parse(value) : Number.NaN;
   if (Number.isNaN(parsed)) throw new Error(`--since needs a day/month duration or an ISO date: '${value}'`);
   return Math.floor(parsed / 1000);
 }

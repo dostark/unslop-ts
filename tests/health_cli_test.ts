@@ -430,6 +430,55 @@ Deno.test("health-freshness-cli: only a complete matching manifest emits revisio
   }
 });
 
+Deno.test("health-cli-strict-values: malformed values are usage errors and boundary values round-trip", async () => {
+  const unsafe = "9007199254740993";
+  const overflow = "9".repeat(400);
+  const rejected = [
+    "--count-nullish=tru",
+    "--count-nullish=TRUE",
+    "--count-nullish=1",
+    `--max-cyclomatic=${overflow}`,
+    `--max-cognitive=${unsafe}`,
+    `--max-lines=${unsafe}`,
+    `--top=${overflow}`,
+    `--min-commits=${unsafe}`,
+    "--max-cyclomatic=0",
+    "--max-crap=Infinity",
+    `--max-crap=1${"0".repeat(400)}`,
+    "--max-crap=1e400",
+    "--min-score=NaN",
+    "--min-score=101",
+    `--since=${overflow}d`,
+    `--since=${unsafe}m`,
+    "--since=0d",
+    "--since=notadate",
+    "--since=1",
+    "--since=2026-13-45",
+  ];
+  await withHealthProject(MAIN_FILES, async (dir) => {
+    for (const flag of rejected) {
+      const result = await health(dir, ["--format=json", flag]);
+      assertEquals(result.code, 2, `${flag}: ${result.stderr}`);
+      assertEquals(result.stdout, "", flag);
+    }
+    const accepted = await health(dir, [
+      "--format=json",
+      "--count-nullish=false",
+      "--max-cyclomatic=9007199254740991",
+      "--max-cognitive=1",
+      "--max-lines=1",
+      "--max-crap=0.5",
+      "--since=2026-01-01",
+      "--min-commits=9007199254740991",
+    ]);
+    assertEquals(accepted.code, 0, accepted.stderr);
+    const report = parseReport(accepted.stdout);
+    assertEquals(report.summary.options.max_cyclomatic, Number.MAX_SAFE_INTEGER);
+    assertEquals(report.summary.options.count_nullish, false);
+    assertEquals(report.summary.options.max_crap, 0.5);
+  });
+});
+
 Deno.test("health-cycle-cli: the command exposes the exact cycle and coupling populations", async () => {
   const files: Readonly<Record<string, string>> = {
     "packages/x/src/a.ts": 'import type { IThing } from "./types.ts";\n' +

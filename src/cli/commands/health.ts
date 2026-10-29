@@ -96,26 +96,40 @@ function flagValues(args: readonly string[]): Map<string, string> {
   return values;
 }
 
-/** Reads a positive integer flag. */
+const DECIMAL_INTEGER = /^\d+$/;
+const DECIMAL_NUMBER = /^\d+(\.\d+)?$/;
+const SCORE_MAX = 100;
+
+/** Reads a positive safe-integer flag. */
 function positiveInteger(name: string, value: string): number {
-  if (!/^\d+$/.test(value) || Number(value) <= 0) throw usage(`--${name} needs a positive integer`);
+  if (!DECIMAL_INTEGER.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
+    throw usage(`--${name} needs a positive integer within the safe range`);
+  }
   return Number(value);
 }
 
 /** Reads a score threshold in the closed zero-to-one-hundred range. */
 function scoreThreshold(name: string, value: string): number {
   const number = Number(value);
-  if (!Number.isFinite(number) || number < 0 || number > 100) {
-    throw usage(`--${name} needs a finite number in [0, 100]`);
+  if (!DECIMAL_NUMBER.test(value) || !Number.isFinite(number) || number > SCORE_MAX) {
+    throw usage(`--${name} needs a finite number in [0, ${SCORE_MAX}]`);
   }
   return number;
 }
 
-/** Reads a positive finite number flag. */
+/** Reads a positive finite decimal number flag. */
 function positiveFinite(name: string, value: string): number {
   const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) throw usage(`--${name} needs a positive number`);
+  if (!DECIMAL_NUMBER.test(value) || !Number.isFinite(number) || number <= 0) {
+    throw usage(`--${name} needs a positive finite decimal number`);
+  }
   return number;
+}
+
+/** Reads a boolean flag that is exactly `true` or `false`. */
+function booleanFlag(name: string, value: string): boolean {
+  if (value !== "true" && value !== "false") throw usage(`--${name} needs exactly true or false`);
+  return value === "true";
 }
 
 /** The adjacent manifest of measured source hashes, when the coverage fixture supplies one. */
@@ -201,8 +215,10 @@ function settingsOf(compiled: ICompiledConfig, pluginName: string, values: Map<s
     ? cognitive.countNullish
     : DEFAULT_COUNT_NULLISH;
   const flagVariant = values.get("variant") ?? configuredVariant;
-  const flagNullish = values.has("count-nullish") ? values.get("count-nullish") === "true" : configuredNullish;
-  return {
+  const flagNullish = values.has("count-nullish")
+    ? booleanFlag("count-nullish", values.get("count-nullish") ?? "")
+    : configuredNullish;
+  return finiteSettings({
     maxCrap: values.has("max-crap") ? positiveFinite("max-crap", values.get("max-crap") ?? "") : DEFAULT_MAX_CRAP,
     maxCyclomatic: values.has("max-cyclomatic")
       ? positiveInteger("max-cyclomatic", values.get("max-cyclomatic") ?? "")
@@ -215,7 +231,21 @@ function settingsOf(compiled: ICompiledConfig, pluginName: string, values: Map<s
       : numberOption(lines, "max", DEFAULT_MAX_FUNCTION_LINES),
     variant: flagVariant as MetricVariant,
     countNullish: flagNullish,
+  });
+}
+
+/** Rejects a resolved option that is not a finite positive number, whether a flag or the catalog supplied it. */
+function finiteSettings(settings: IHealthSettings): IHealthSettings {
+  const limits = {
+    "max-cyclomatic": settings.maxCyclomatic,
+    "max-cognitive": settings.maxCognitive,
+    "max-lines": settings.maxLines,
+    "max-crap": settings.maxCrap,
   };
+  for (const [name, value] of Object.entries(limits)) {
+    if (!Number.isFinite(value) || value <= 0) throw usage(`the resolved --${name} must be a finite positive number`);
+  }
+  return settings;
 }
 
 /** The history window and qualification of one run. */
