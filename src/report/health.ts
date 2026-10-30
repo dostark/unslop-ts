@@ -11,7 +11,7 @@ import { join as platformJoin } from "@std/path";
 import { classifyPath, type ICatalogScopes } from "../engine/catalog.ts";
 import { matchesAnyGlob } from "../engine/glob.ts";
 import { join as posixJoin } from "../engine/posix_path.ts";
-import { measureFunction, ownedLineNumbers } from "../metrics/function_metrics.ts";
+import { measureFunction, moduleCyclomaticOf, ownedLineNumbers } from "../metrics/function_metrics.ts";
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
 import type { IDuplicateCodeSettings } from "../rules/whole_tree/options.ts";
 import type { TJscpdRunner } from "../rules/whole_tree/duplicate_code.ts";
@@ -43,6 +43,7 @@ import {
   type IHealthError,
   type IHealthFileScore,
   type IHealthFinding,
+  type IHealthGraphSummary,
   type IHealthHotspotSummary,
   type IHealthReport,
   type IHealthScore,
@@ -267,6 +268,7 @@ function uniqueLinesOf(file: IParsedHealthFile): number {
 interface IFileFacts {
   readonly functions: number;
   readonly cyclomatic: number;
+  readonly moduleCyclomatic: number;
   readonly lines: number;
   readonly critical: number;
   readonly overSize: number;
@@ -294,6 +296,20 @@ export interface IMeasuredFunction {
   readonly line_count: number;
   readonly param_count: number;
   readonly contributions: readonly IHealthContribution[];
+}
+
+/** The graph population and explicit scan-boundary counts exposed by the report. */
+function graphSummaryOf(graph: IHealthGraph): IHealthGraphSummary {
+  return {
+    internal_edges: graph.edges.length,
+    runtime_edges: graph.edges.filter((edge) => edge.kind === "runtime").length,
+    external_specifiers: graph.limitations.external,
+    excluded_source_specifiers: graph.limitations.excluded_source,
+    resource_specifiers: graph.limitations.resources,
+    unresolved_specifiers: graph.limitations.unresolved,
+    nonliteral_dynamic_imports: graph.limitations.nonliteral_dynamic,
+    complete: graph.complete,
+  };
 }
 
 /** The UTF-8 byte length of the line before an offset, which is how the external report counts columns. */
@@ -355,7 +371,13 @@ function measureFile(
   bands: Record<UnitSizeBand, number>,
   coverage: IFileCoverage,
 ): IFileFacts {
-  let cyclomatic = 0;
+  const moduleCyclomatic = moduleCyclomaticOf(
+    file.tree.program,
+    file.units,
+    metricOptions(input.settings),
+    file.context,
+  );
+  let cyclomatic = moduleCyclomatic;
   let critical = 0;
   let overSize = 0;
   const rows = measuredRowsOf(file, input.settings);
@@ -391,7 +413,7 @@ function measureFile(
       coverage_precision: sample.precision,
     });
   }
-  return { functions: file.units.length, cyclomatic, lines: uniqueLinesOf(file), critical, overSize };
+  return { functions: file.units.length, cyclomatic, moduleCyclomatic, lines: uniqueLinesOf(file), critical, overSize };
 }
 
 /** The severity order used by the severity sort. */
@@ -559,6 +581,7 @@ function fileScoresOf(
       path,
       lines: measured.lines,
       cyclomatic: measured.cyclomatic,
+      module_cyclomatic: measured.moduleCyclomatic,
       density: measured.lines === 0 ? 0 : measured.cyclomatic / measured.lines,
       dead_export_ratio: deadExportRatio,
       fan_in: graph.fanIn.get(path) ?? 0,
@@ -790,14 +813,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
       file_scores_population: fileScores.length,
       dead_exports: { total: exports.total, unused: exports.unused },
       dead_files: deadFiles,
-      graph: {
-        internal_edges: graph.edges.length,
-        runtime_edges: graph.edges.filter((edge) => edge.kind === "runtime").length,
-        external_specifiers: graph.limitations.external,
-        unresolved_specifiers: graph.limitations.unresolved,
-        nonliteral_dynamic_imports: graph.limitations.nonliteral_dynamic,
-        complete: graph.complete,
-      },
+      graph: graphSummaryOf(graph),
       coverage: coverageSummary,
       options: {
         max_cyclomatic: input.settings.maxCyclomatic,

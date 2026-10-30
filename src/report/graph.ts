@@ -24,6 +24,8 @@ export interface IGraphEdge {
 /** The specifiers the graph could not turn into internal edges. */
 export interface IGraphLimitations {
   readonly external: number;
+  readonly excluded_source: number;
+  readonly resources: number;
   readonly unresolved: number;
   readonly nonliteral_dynamic: number;
 }
@@ -134,7 +136,7 @@ function classifySpecifier(
   excluded: ReadonlySet<string>,
   resources: ReadonlySet<string>,
   aliases: Readonly<Record<string, string>>,
-  limitations: { external: number; unresolved: number },
+  limitations: { external: number; excluded_source: number; resources: number; unresolved: number },
 ): string | null {
   if (EXTERNAL_PREFIXES.some((prefix) => specifier.startsWith(prefix))) {
     limitations.external++;
@@ -142,11 +144,12 @@ function classifySpecifier(
   }
   const target = resolveSpecifier(specifier, fromPath, known, aliases);
   if (target === null) {
-    if (
-      resolveSpecifier(specifier, fromPath, resources, aliases) !== null ||
-      resolveSpecifier(specifier, fromPath, excluded, aliases) !== null
-    ) {
-      limitations.external++;
+    if (resolveSpecifier(specifier, fromPath, resources, aliases) !== null) {
+      limitations.resources++;
+      return null;
+    }
+    if (resolveSpecifier(specifier, fromPath, excluded, aliases) !== null) {
+      limitations.excluded_source++;
       return null;
     }
     if (specifier.startsWith(".") || aliasEntryOf(specifier, aliases) !== null) {
@@ -214,7 +217,7 @@ export function buildHealthGraph(
   resources: ReadonlySet<string> = new Set(),
 ): IHealthGraph {
   const known = new Set(files.keys());
-  const limitations = { external: 0, unresolved: 0, nonliteral_dynamic: 0 };
+  const limitations = { external: 0, excluded_source: 0, resources: 0, unresolved: 0, nonliteral_dynamic: 0 };
   const edges: IGraphEdge[] = [];
   for (const [path, file] of files) {
     const specifiers = specifiersOf(asNode(file.tree.program), limitations);
@@ -233,6 +236,8 @@ export function buildHealthGraph(
   }
   const limitationsOut: IGraphLimitations = {
     external: limitations.external,
+    excluded_source: limitations.excluded_source,
+    resources: limitations.resources,
     unresolved: limitations.unresolved,
     nonliteral_dynamic: limitations.nonliteral_dynamic,
   };

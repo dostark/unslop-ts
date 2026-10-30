@@ -16,10 +16,10 @@ import {
 } from "../metrics/types.ts";
 
 /** The report schema version this engine writes. */
-export const HEALTH_SCHEMA_VERSION = 1;
+export const HEALTH_SCHEMA_VERSION = 2;
 
 /** The formula version this engine writes. */
-export const HEALTH_FORMULA_VERSION = "unslop-health-v1";
+export const HEALTH_FORMULA_VERSION = "unslop-health-v2";
 
 /** The severity bands of one finding. */
 export type HealthSeverity = "moderate" | "high" | "critical";
@@ -164,6 +164,7 @@ export interface IHealthFileScore {
   readonly path: string;
   readonly lines: number;
   readonly cyclomatic: number;
+  readonly module_cyclomatic: number;
   readonly density: number;
   readonly dead_export_ratio: number;
   readonly fan_in: number;
@@ -183,6 +184,8 @@ export interface IHealthGraphSummary {
   readonly internal_edges: number;
   readonly runtime_edges: number;
   readonly external_specifiers: number;
+  readonly excluded_source_specifiers: number;
+  readonly resource_specifiers: number;
   readonly unresolved_specifiers: number;
   readonly nonliteral_dynamic_imports: number;
   readonly complete: boolean;
@@ -316,6 +319,7 @@ export const HealthFileScoreSchema: z.ZodType<IHealthFileScore, IHealthFileScore
   path: z.string().min(1),
   lines: nonNegativeInteger,
   cyclomatic: nonNegativeInteger,
+  module_cyclomatic: nonNegativeInteger,
   density: finite,
   dead_export_ratio: finite,
   fan_in: nonNegativeInteger,
@@ -335,6 +339,8 @@ export const HealthGraphSummarySchema: z.ZodType<IHealthGraphSummary, IHealthGra
   internal_edges: nonNegativeInteger,
   runtime_edges: nonNegativeInteger,
   external_specifiers: nonNegativeInteger,
+  excluded_source_specifiers: nonNegativeInteger,
+  resource_specifiers: nonNegativeInteger,
   unresolved_specifiers: nonNegativeInteger,
   nonliteral_dynamic_imports: nonNegativeInteger,
   complete: z.boolean(),

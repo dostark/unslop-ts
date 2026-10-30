@@ -155,6 +155,30 @@ export function functionUnits(program: IRuleNode, context: IMeasurementContext):
   return units;
 }
 
+/** Cyclomatic complexity of executable module code, excluding every function body. */
+export function moduleCyclomaticOf(
+  program: IRuleNode,
+  units: readonly IFunctionUnit[],
+  options: IMetricOptions,
+  context: IMeasurementContext,
+): number {
+  let decisions = 0;
+  const visit = (node: ILintNode, parent: ILintNode | null): void => {
+    if (FUNCTION_KINDS.has(node.type)) return;
+    if (cyclomaticKindOf(node, parent, options) !== null) decisions++;
+    forEachChildNode(node, (child) => visit(child, node));
+  };
+  visit(asNode(program), null);
+  if (options.variant === "extended") {
+    decisions += context.optionalChainOffsets.filter((offset) =>
+      !units.some((unit) =>
+        offset >= unit.range[0] && offset < unit.range[1]
+      )
+    ).length;
+  }
+  return CYCLOMATIC_BASE + decisions;
+}
+
 /** True when the node is the else branch of a parent `if`, which reads as `else-if`. */
 function isElseBranch(node: ILintNode, parent: ILintNode | null): boolean {
   return parent !== null && parent.type === "IfStatement" && parent.alternate === node;

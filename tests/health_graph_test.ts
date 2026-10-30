@@ -94,6 +94,17 @@ Deno.test("health-graph-projections: unresolved, external and nonliteral specifi
   assertEquals(graph.complete, false);
 });
 
+Deno.test("fix(health-graph): excluded source and resources remain visible outside the measured scope", async () => {
+  const snapshot = await snapshotOf({
+    "src/a.ts": 'import "./excluded.ts";\nimport data from "./data.json";\nimport "npm:external";\n',
+  });
+  const graph = buildHealthGraph(snapshot, {}, new Set(["src/excluded.ts"]), new Set(["src/data.json"]));
+  assertEquals(graph.limitations.excluded_source, 1);
+  assertEquals(graph.limitations.resources, 1);
+  assertEquals(graph.limitations.external, 1);
+  assertEquals(graph.complete, true);
+});
+
 Deno.test("health-export-population: suppressed sites stay, type exports leave, and zero exports give zero", async () => {
   await withAliasProject({
     "src/exports.ts": "// unslop-ignore-next-line unused-export\n" +

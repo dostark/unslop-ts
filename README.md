@@ -424,7 +424,7 @@ not request, store, or print credentials.
 
 ## Health report
 
-`unslop health` measures the whole project and prints one report with the `unslop-health-v1` schema.
+`unslop health` measures the configured project scope and prints a schema 2 report using formula `unslop-health-v2`.
 
 ```bash
 deno run --allow-read --allow-env --allow-run=git,node src/cli/unslop.ts health --format=json
@@ -448,13 +448,19 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
   partial manifest stays `unverified`, and a mismatched one is rejected.
 - **Graph:** the import graph resolves the import maps of the root and the workspace members, including
   `deno.jsonc` and workspace package exports. An entry that leaves the project root is ignored. Imports of
-  configured excluded source files and JSON assets are outside the measured graph and count as external. A
+  configured excluded source files and JSON assets are outside the measured graph and have separate counts from
+  genuinely external imports. A
   genuinely unresolved import or nonliteral dynamic import marks the graph incomplete, so its score signals
   become unavailable. A complete graph is complete within the configured scan scope.
+- **File complexity:** `module_cyclomatic` counts top-level decisions outside function bodies. File
+  `cyclomatic` adds this value to the sum of function values; the function population stays unchanged.
 - **History:** `--since` accepts a day count, a month count or an ISO date, and `--min-commits` sets the
   history floor. Git and the duplicate runner run under a deadline and byte limits.
 - **Score:** the project score starts at 100 and subtracts one capped penalty per signal. Grades are A at 85,
-  B at 70, C at 55 and D at 40. A partial report prints no grade, and `--min-score` fails on a partial score.
+  B at 70, C at 55 and D at 40. Nine supported signals enter the formula. Unused dependencies and prop drilling
+  are `not_measured`, carry no penalty, and do not make the supported-signal score partial. A partial report prints
+  no grade. Without `--min-score`, the score is advisory and does not affect the exit code. With `--min-score`,
+  a partial score or a score below the threshold exits 1; `--min-score=0` gates completeness only.
 
 The `./metrics` entry exports the measurement API: `createMeasurementContext`, `functionUnits`,
 `measureFunction`, `METRIC_CONTRIBUTION_KINDS` and the metric types. The `./report` entry exports the report

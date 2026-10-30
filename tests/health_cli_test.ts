@@ -127,8 +127,8 @@ Deno.test("health-findings-shape: named fields, worst severity and the full aggr
     const result = await health(dir, ["--format=json", "--top=1"]);
     assertEquals(result.code, 0, result.stderr);
     const report = parseReport(result.stdout);
-    assertEquals(report.schema_version, 1);
-    assertEquals(report.formula_version, "unslop-health-v1");
+    assertEquals(report.schema_version, 2);
+    assertEquals(report.formula_version, "unslop-health-v2");
     assertEquals(report.summary.analyzed_files, 3);
     assertEquals(report.summary.excluded_files, 2);
     assertEquals(report.summary.functions, 3);
@@ -151,6 +151,18 @@ Deno.test("health-parameter-optional-ownership: health reports the body-only cyc
   await withHealthProject({ "packages/x/src/default.ts": source }, async (dir) => {
     const report = parseReport((await health(dir, ["--format=json", "--variant=extended"])).stdout);
     assertEquals(report.findings.find((finding) => finding.name === "withDefault")?.cyclomatic, 3);
+  });
+});
+
+Deno.test("fix(health-module): top-level decisions contribute once to the file score", async () => {
+  const source = "const x = true;\nif (x) { console.log(x); }\n" +
+    "export function nested(): number { if (x) return 1; return 0; }\n";
+  await withHealthProject({ "packages/x/src/module.ts": source }, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    const score = report.file_scores.find((entry) => entry.path === "packages/x/src/module.ts");
+    assertEquals(score?.module_cyclomatic, 2);
+    assertEquals(score?.cyclomatic, 4);
+    assertEquals(report.summary.functions, 1);
   });
 });
 
@@ -247,6 +259,9 @@ Deno.test("fix(health-graph): excluded source and JSON imports do not disable gr
     assertEquals(result.code, 0, result.stderr);
     const report = parseReport(result.stdout);
     assertEquals(report.summary.graph.unresolved_specifiers, 0);
+    assertEquals(report.summary.graph.excluded_source_specifiers, 1);
+    assertEquals(report.summary.graph.resource_specifiers, 1);
+    assertEquals(report.summary.graph.external_specifiers, 1);
     assertEquals(report.summary.graph.complete, true);
     assertEquals(report.health_score.signals.find((signal) => signal.signal === "cycles")?.status, "measured");
     assertEquals(report.health_score.signals.find((signal) => signal.signal === "coupling")?.status, "measured");
@@ -585,6 +600,9 @@ Deno.test("fix(health-text): the report groups evidence and prints measured dupl
     assertStringIncludes(output, "external");
     assertStringIncludes(output, "dynamic");
     assertStringIncludes(output, "File scores");
+    assertStringIncludes(output, "advisory");
+    assertStringIncludes(output, "9 supported score signals");
+    assertStringIncludes(output, "complete within scan scope");
   }, DUPLICATE_RULE);
 });
 
@@ -623,6 +641,7 @@ Deno.test("health-min-score-exit: a partial score never passes a gate", async ()
     assertEquals(partial.health_score.grade, null);
     const gated = await health(dir, ["--min-score=0"]);
     assertEquals(gated.code, 1);
+    assertStringIncludes(gated.stdout, "gate: minimum score 0");
     const negative = await health(dir, ["--min-score=-1"]);
     assertEquals(negative.code, 2);
     const text = await health(dir, []);
@@ -669,7 +688,7 @@ Deno.test("the_readme_documents_every_health_flag", async () => {
   ) {
     assertStringIncludes(section, claim);
   }
-  assertStringIncludes(section, "unslop-health-v1");
+  assertStringIncludes(section, "unslop-health-v2");
   assertStringIncludes(section, "--allow-run=git,node");
   assertStringIncludes(section, "jscpd");
   assertStringIncludes(section, "./metrics");

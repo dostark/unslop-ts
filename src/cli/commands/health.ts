@@ -311,7 +311,7 @@ function signalLine(signal: IHealthScoreSignal): string {
 }
 
 /** The text view of one report, grouped by summary, score evidence and actionable details. */
-function renderText(report: IHealthReport, top: number): string {
+function renderText(report: IHealthReport, top: number, minScore: number | null): string {
   const { summary, vital_signs, health_score: score } = report;
   const options = summary.options;
   const bands = vital_signs.unit_size.bands;
@@ -322,6 +322,11 @@ function renderText(report: IHealthReport, top: number): string {
     "UNSLOP HEALTH",
     "=============",
     `Score ${score.value.toFixed(1)} / 100  (${score.status}; ${grade})`,
+    `Policy ${
+      minScore === null
+        ? "advisory: score does not affect exit status"
+        : `gate: minimum score ${minScore}; partial scores fail`
+    }`,
     `Formula ${report.formula_version} · schema ${report.schema_version} · tool ${report.tool_version}`,
     ...heading("OVERVIEW"),
     `  Scope       ${summary.analyzed_files} files analyzed · ${summary.excluded_files} excluded · ` +
@@ -332,8 +337,9 @@ function renderText(report: IHealthReport, top: number): string {
     `  Variant     ${options.variant} · count-nullish ${options.count_nullish}`,
     `  Coverage    ${summary.coverage.source} · ${summary.coverage.matched_files} matched · ` +
     `${summary.coverage.unmatched_files} unmatched · revision ${summary.coverage.revision}`,
-    `  Graph       ${summary.graph.complete ? "complete" : "incomplete"} · ` +
+    `  Graph       ${summary.graph.complete ? "complete within scan scope" : "incomplete"} · ` +
     `${summary.graph.internal_edges} internal edges · ${summary.graph.external_specifiers} external · ` +
+    `${summary.graph.excluded_source_specifiers} excluded source · ${summary.graph.resource_specifiers} resources · ` +
     `${summary.graph.unresolved_specifiers} unresolved · ` +
     `${summary.graph.nonliteral_dynamic_imports} nonliteral dynamic`,
     `  File scores ${summary.file_scores_population} files`,
@@ -343,6 +349,7 @@ function renderText(report: IHealthReport, top: number): string {
     `high-coupling files · ${summary.dead_exports.unused}/${summary.dead_exports.total} dead exports · ` +
     `${summary.dead_files.available ? summary.dead_files.count : "unavailable"} dead files`,
     ...heading("SCORE SIGNALS"),
+    "  9 supported score signals; unused dependencies and prop drilling are informational and outside the formula.",
     "  Signal                Observed  Population        Penalty / status",
     ...score.signals.map(signalLine),
     ...heading("HOTSPOTS"),
@@ -432,12 +439,12 @@ function publicEntriesOf(compiled: ICompiledConfig): readonly string[] {
 }
 
 /** Prints the report in the requested format. */
-function renderReport(report: IHealthReport, format: string, top: number): void {
+function renderReport(report: IHealthReport, format: string, top: number, minScore: number | null): void {
   if (format === "json") {
     print(`${JSON.stringify({ ...report, findings: report.findings.slice(0, top) }, null, 2)}\n`);
     return;
   }
-  print(`${renderText(report, top)}\n`);
+  print(`${renderText(report, top, minScore)}\n`);
 }
 
 /** Applies the requested score gate and returns its exit code. */
@@ -492,7 +499,7 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     duplicateRunner,
   });
 
-  renderReport(report, format, top);
+  renderReport(report, format, top, minScore);
   const gate = gateOf(report, minScore);
   if (gate !== 0) return gate;
   for (const error of report.errors) printError(`${error.path}: ${error.message}\n`);

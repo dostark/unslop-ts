@@ -271,7 +271,7 @@ export function scoreSignalsOf(input: IScoreInput): IHealthScoreSignal[] {
     unitSizeSignal(input),
     couplingSignal(input),
     duplicationSignal(input),
-    notMeasured("unused_dependencies", "fallow", "unsupported-in-unslop-health-v1"),
-    notMeasured("prop_drilling", "fallow", "unsupported-in-unslop-health-v1"),
+    notMeasured("unused_dependencies", "fallow", "unsupported-in-unslop-health-v2"),
+    notMeasured("prop_drilling", "fallow", "unsupported-in-unslop-health-v2"),
   ];
 }

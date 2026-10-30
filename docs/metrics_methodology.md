@@ -103,7 +103,8 @@ The health report uses a density-based file score, clamped to the range 0 to 100
 
 `MI = clamp(100 - 30 × (CC / LOC) × min(LOC / 50, 1) - 20 × deadExportRatio - min(4 × ln(fanOut + 1), 15))`
 
-`CC` sums the measured functions' cyclomatic values, `LOC` counts unique code-token lines in the file,
+`CC` sums the measured functions' cyclomatic values and the module's cyclomatic value. Module complexity
+starts at one and counts top-level decisions outside function bodies. `LOC` counts unique code-token lines in the file,
 `deadExportRatio` is the unused share of value exports, and `fanOut` counts distinct internal targets. An empty
 file has zero density. This is not the classic Halstead-volume maintainability index, and it must not be compared
 as though it were the same metric.
@@ -166,7 +167,8 @@ is an export site that no resolved import, re-export chain or public entry reach
 cycle count by all measured files, the same population as the vital sign.
 
 The report supports nine score signals. It marks unused dependencies and prop drilling `not_measured` because
-health v1 does not implement them. A supported signal, such as duplication, is `unavailable` when its input or
+health v2 does not implement them; they are outside the formula and do not affect completeness. A supported signal,
+such as duplication, is `unavailable` when its input or
 runner is missing. A missing LCOV file is reported separately as coverage source `none`; CRAP then uses static
 reachability estimates. Grades are A at 85 or more, B at 70, C at 55 and D at 40. A partial report has no grade.
 
