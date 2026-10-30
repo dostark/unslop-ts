@@ -75,7 +75,10 @@ The engine follows Campbell's cognitive complexity model (SonarSource 2018). A s
 An `if` body, a loop body, a `catch` body, a `switch` case body and a ternary branch each raise the nesting by
 one. A logical run is a maximal chain of one operator. `countNullish` controls whether a `??` run counts. A call
 to the unit's own name counts as recursion once. A nested function declaration, a class declaration, a variable, a
-parameter or a `catch` binding with the same name shadows the call, so it adds nothing.
+parameter or a `catch` binding with the same name shadows the call, so it adds nothing. The check is function-wide:
+a binding anywhere in the unit blocks the recursion count, even in a scope that does not contain the call. This is
+the conservative reading of an uncertain binding, and it can lower a cognitive value. The worked example
+`recursion-shadow` shows it.
 
 ### Differences from the paper, SonarJS and fallow
 
@@ -239,6 +242,30 @@ function scan(rows: number[][]): number {
   "expected": { "scan": { "cyclomatic": 4, "cognitive": 6, "lines": 11, "params": 1 } }
 }
 ```
+
+<!-- metric-example: recursion-shadow -->
+
+```ts
+function walk(node: { next: unknown } | null): unknown {
+  try {
+    return node?.next;
+  } catch (walk) {
+    return walk;
+  }
+  return walk(node);
+}
+```
+
+```json
+{
+  "id": "recursion-shadow",
+  "options": { "variant": "extended", "countNullish": true },
+  "expected": { "walk": { "cyclomatic": 3, "cognitive": 1, "lines": 8, "params": 1 } }
+}
+```
+
+The `catch (walk)` binding shadows the final call, so the function measures cognitive 1. Without the binding the call
+adds a recursion point and the value is 2.
 
 The outer loop adds 1, the inner loop adds 2 and the `if` adds 3, for a cognitive count of 6.
 

@@ -278,3 +278,9 @@ Deno.test("the calibration record names the pinned counts and differences", asyn
     assert(text.includes(fact), `missing calibration fact: ${fact}`);
   }
 });
+
+Deno.test("methodology-shadow-example: the shadowing limit is stated as function-wide with a measured example", async () => {
+  const text = await methodologyText();
+  assert(text.includes("recursion-shadow"), "the shadow example is present");
+  assert(text.includes("function-wide"), "the shadow check is described as function-wide");
+});

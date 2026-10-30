@@ -42,6 +42,11 @@ const TYPE_DECLARATIONS: ReadonlySet<string> = new Set([
   "TSModuleDeclaration",
 ]);
 
+/** True when the declaration only declares a type, so it adds no runtime value. */
+function isTypeDeclaration(declaration: unknown): boolean {
+  return isNodeLike(declaration) && TYPE_DECLARATIONS.has(asNode(declaration).type);
+}
+
 /** Adds every binding name of an exported pattern to the site list. */
 function patternSites(
   value: unknown,
@@ -131,7 +136,7 @@ export function valueExportSitesOf(file: IParsedHealthFile): IValueExportSite[] 
       continue;
     }
     if (node.type === "ExportDefaultDeclaration") {
-      add("default", "default", node);
+      if (!isTypeDeclaration(node.declaration)) add("default", "default", node);
       continue;
     }
     if (node.type === "ExportAllDeclaration" && node.exportKind !== "type") add("*", "re-export", node);
