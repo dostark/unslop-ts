@@ -10,6 +10,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { runBounded } from "../src/report/bounded_io.ts";
+import { canRun } from "./helpers/permissions.ts";
 import {
   churnWeightOf,
   collectChurn,
@@ -294,7 +295,12 @@ Deno.test("churn-head-probe-causes: only an unborn HEAD is empty, and every othe
   assertEquals([noisy.available, noisy.reason], [false, "git-stderr-too-large"]);
 });
 
-Deno.test("bounded-grandchild-pipe: a child that exits returns its result while a grandchild holds the pipe", async () => {
+const SHELL_RUNNABLE = canRun("sh");
+if (!SHELL_RUNNABLE) console.warn("bounded-grandchild-pipe is ignored: the process may not spawn sh");
+
+Deno.test("bounded-grandchild-pipe: a child that exits returns its result while a grandchild holds the pipe", {
+  ignore: !SHELL_RUNNABLE,
+}, async () => {
   const deadlineMs = 5_000;
   const started = Date.now();
   const result = await runBounded("sh", ["-c", "(sleep 20 &); echo hi"], { cwd: Deno.cwd(), env: {} }, {
