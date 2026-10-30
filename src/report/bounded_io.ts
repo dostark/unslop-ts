@@ -10,6 +10,9 @@
 const READ_CHUNK_BYTES = 64 * 1024;
 const KILL_SIGNAL = "SIGKILL";
 
+/** How long the streams may keep open after the child exits, for example while a grandchild holds a pipe. */
+const STREAM_DRAIN_GRACE_MS = 250;
+
 /** The limits one child process runs under. */
 export interface IChildLimits {
   readonly deadlineMs: number;
@@ -130,11 +133,24 @@ export async function runBounded(
   };
   const timer = setTimeout(() => stop("timeout"), limits.deadlineMs);
   try {
-    const [out, err] = await Promise.all([
+    const drained = Promise.all([
       collectBounded(stdout, limits.maxStdoutBytes, () => stop("stdout-overflow")),
       collectBounded(stderr, limits.maxStderrBytes, () => stop("stderr-overflow")),
     ]);
     const status = await child.status;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+    const settled = await Promise.race([
+      drained.then(() => true),
+      new Promise<boolean>((resolve) => {
+        graceTimer = setTimeout(() => resolve(false), STREAM_DRAIN_GRACE_MS);
+      }),
+    ]);
+    clearTimeout(graceTimer);
+    if (!settled) {
+      stdout.cancel().catch(() => undefined);
+      stderr.cancel().catch(() => undefined);
+    }
+    const [out, err] = await drained;
     if (cause !== null) return { status: cause };
     return { status: "exited", code: status.code, stdout: out, stderr: err };
   } finally {

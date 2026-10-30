@@ -8,7 +8,7 @@
  */
 
 import { join } from "@std/path";
-import { readFileBounded } from "../../report/bounded_io.ts";
+import { BoundedReadError, readFileBounded } from "../../report/bounded_io.ts";
 import { MAX_JSCPD_REPORT_BYTES } from "../../report/constants.ts";
 import {
   buildBaseline,
@@ -229,7 +229,10 @@ async function readReport(outputDir: string, groupName: string): Promise<IRawRep
   let text: string;
   try {
     text = new TextDecoder().decode(await readFileBounded(join(outputDir, JSCPD_REPORT_FILE), MAX_JSCPD_REPORT_BYTES));
-  } catch {
+  } catch (error) {
+    if (error instanceof BoundedReadError) {
+      throw new Error(`The jscpd report of group '${groupName}' exceeds the ${MAX_JSCPD_REPORT_BYTES} byte bound.`);
+    }
     throw new Error(`jscpd wrote no report for group '${groupName}'.`);
   }
   return parseReport(text, groupName);

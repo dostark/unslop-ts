@@ -99,7 +99,18 @@ function snapshotTokenLinesOf(tokenLines: ReadonlyMap<string, ReadonlySet<number
 
 /** Measures the duplication, treating a runner failure or a changed source as an attributed absence. */
 export async function measureDuplication(input: IDuplicationInput): Promise<IDuplicationMeasurement> {
-  const before = await input.snapshotDigest();
+  const sourceChanged: IDuplicationMeasurement = {
+    available: false,
+    reason: "source-changed-during-scan",
+    lines: 0,
+    total_lines: 0,
+  };
+  let before: string;
+  try {
+    before = await input.snapshotDigest();
+  } catch {
+    return sourceChanged;
+  }
   let report;
   try {
     report = await checkDuplicationRepository(
@@ -117,10 +128,13 @@ export async function measureDuplication(input: IDuplicationInput): Promise<IDup
       total_lines: 0,
     };
   }
-  const after = await input.snapshotDigest();
-  if (before !== after) {
-    return { available: false, reason: "source-changed-during-scan", lines: 0, total_lines: 0 };
+  let after: string;
+  try {
+    after = await input.snapshotDigest();
+  } catch {
+    return sourceChanged;
   }
+  if (before !== after) return sourceChanged;
   const clones: IClone[] = [
     ...report.groups.flatMap((group) => group.clones),
     ...(report.cross?.clones ?? []),

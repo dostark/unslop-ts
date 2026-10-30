@@ -10,6 +10,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { canRun } from "./helpers/permissions.ts";
+import { MAX_JSCPD_REPORT_BYTES } from "../src/report/constants.ts";
 import { checkRepository, type TJscpdRunner } from "../src/rules/whole_tree/duplicate_code.ts";
 import type { IDuplicateCodeSettings } from "../src/rules/whole_tree/options.ts";
 import {
@@ -385,5 +386,65 @@ Deno.test("health-runner-stream-bounds: a runner that floods stderr or stalls is
     await assertThrowsAsync(() => runner(["--output", root], root), "deadline");
   } finally {
     await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("duplication-digest-failure: a digest that cannot be read is an unavailable signal and the run completes", async () => {
+  const settings: IDuplicateCodeSettings = {
+    jscpdVersion: "5.4.2",
+    minLines: 5,
+    minTokens: 50,
+    maxGapLines: 0,
+    baseline: null,
+    crossGroups: false,
+    groups: [{ name: "a", paths: ["a.ts"], ignore: [], threshold: 100, minLines: 5, maxGapLines: 0, pattern: null }],
+  };
+  const runner: TJscpdRunner = async (_args, outputDir) => {
+    await Deno.writeTextFile(
+      join(outputDir, "jscpd-report.json"),
+      JSON.stringify({
+        statistics: { total: { percentage: 0, duplicatedLines: 0, sources: 1, lines: 10 } },
+        duplicates: [],
+      }),
+    );
+  };
+  const tokenLines = new Map([["a.ts", new Set([1, 2])]]);
+  for (const failAt of [0, 1]) {
+    let calls = 0;
+    const measured = await measureDuplication({
+      rootPath: Deno.cwd(),
+      settings,
+      runner,
+      tokenLines,
+      snapshotDigest: () => (calls++ === failAt ? Promise.reject(new Error("file vanished")) : Promise.resolve("same")),
+    });
+    assertEquals(measured.available, false, `digest call ${failAt}`);
+    assertEquals(measured.reason, "source-changed-during-scan");
+  }
+});
+
+Deno.test("jscpd-report-bound-cause: an oversized report names the byte bound, not a missing report", async () => {
+  const root = await Deno.makeTempDir({ prefix: "unslop_big_report_" });
+  const tempRoot = await Deno.makeTempDir({ prefix: "unslop_big_report_temp_" });
+  try {
+    const settings: IDuplicateCodeSettings = {
+      jscpdVersion: "5.4.2",
+      minLines: 5,
+      minTokens: 50,
+      maxGapLines: 0,
+      baseline: null,
+      crossGroups: false,
+      groups: [{ name: "a", paths: ["."], ignore: [], threshold: 100, minLines: 5, maxGapLines: 0, pattern: null }],
+    };
+    const runner: TJscpdRunner = async (_args, outputDir) => {
+      const file = await Deno.open(join(outputDir, "jscpd-report.json"), { create: true, write: true });
+      await file.truncate(MAX_JSCPD_REPORT_BYTES + 1);
+      file.close();
+    };
+    await assertThrowsAsync(() => checkRepository(root, settings, runner, { tempRoot }), "byte bound");
+    assertEquals([...Deno.readDirSync(tempRoot)], []);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+    await Deno.remove(tempRoot, { recursive: true });
   }
 });

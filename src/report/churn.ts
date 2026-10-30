@@ -153,10 +153,13 @@ function churnOf(
   return files;
 }
 
+/** The Git message of `rev-parse --verify HEAD` in a repository without a commit. */
+const UNBORN_HEAD_MESSAGE = "Needed a single revision";
+
 /** Why a bounded Git call ended without a successful exit. */
 const GIT_STOP_REASONS = {
   "stdout-overflow": "git-output-too-large",
-  "stderr-overflow": "git-output-too-large",
+  "stderr-overflow": "git-stderr-too-large",
   timeout: "git-command-timeout",
 } as const;
 
@@ -209,6 +212,7 @@ export async function collectChurn(
   const shallow = shallowResult.stdout.trim() === "true";
   const head = await runGit(rootPath, ["rev-parse", "--verify", "HEAD"], probe);
   if (!head.ok) {
+    if (!head.reason.includes(UNBORN_HEAD_MESSAGE)) return { ...unavailable(head.reason), shallow };
     return { available: true, reason: null, shallow, empty: true, files: new Map() };
   }
   const log = await runGit(

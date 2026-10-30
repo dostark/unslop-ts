@@ -9,6 +9,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
+import { runBounded } from "../src/report/bounded_io.ts";
 import {
   churnWeightOf,
   collectChurn,
@@ -212,13 +213,27 @@ case "$*" in
     echo /tmp/fake ;;
   *--show-prefix*) echo ;;
   *--is-shallow-repository*) echo false ;;
-  *--verify*) echo abc ;;
-  *log*) yes x | head -c ${FLOOD_BYTES}; touch "$MARKER" ;;
+  *--verify*)
+    case "$FAKE_MODE" in
+      head-stall) sleep ${STALL_SECONDS} ;;
+      head-corrupt) echo "fatal: loose object is corrupt" >&2; exit 128 ;;
+      head-unborn) echo "fatal: Needed a single revision" >&2; exit 128 ;;
+      log-stderr) echo abc ;;
+      *) echo abc ;;
+    esac ;;
+  *log*)
+    case "$FAKE_MODE" in
+      log-stderr) yes y | head -c ${FLOOD_BYTES} >&2; touch "$MARKER" ;;
+      *) yes x | head -c ${FLOOD_BYTES}; touch "$MARKER" ;;
+    esac ;;
 esac
 `;
 
 /** Runs the real collectChurn in a child with a fake Git first on its PATH. */
-async function churnWithFakeGit(mode: string, deadlineMs: number): Promise<{ reason: string | null; marker: boolean }> {
+async function churnWithFakeGit(
+  mode: string,
+  deadlineMs: number,
+): Promise<{ reason: string | null; available: boolean; empty: boolean; marker: boolean }> {
   const dir = await Deno.makeTempDir({ prefix: "unslop_fake_git_" });
   try {
     const bin = join(dir, "bin");
@@ -231,7 +246,7 @@ async function churnWithFakeGit(mode: string, deadlineMs: number): Promise<{ rea
       `import { collectChurn } from "${CHURN_URL}";\n` +
         "const limits = JSON.parse(Deno.args[0]);\n" +
         "const history = await collectChurn(Deno.args[1], 0, 0, new Set(), limits);\n" +
-        "console.log(JSON.stringify({ reason: history.reason }));\n",
+        "console.log(JSON.stringify({ reason: history.reason, available: history.available, empty: history.empty }));\n",
     );
     const marker = join(dir, "marker");
     const limits = { deadlineMs, maxStdoutBytes: STREAM_LIMIT_BYTES, maxStderrBytes: STREAM_LIMIT_BYTES };
@@ -242,8 +257,12 @@ async function churnWithFakeGit(mode: string, deadlineMs: number): Promise<{ rea
       stderr: "piped",
     }).output();
     assertEquals(output.code, 0, new TextDecoder().decode(output.stderr));
-    const reason = (JSON.parse(new TextDecoder().decode(output.stdout)) as { reason: string | null }).reason;
-    return { reason, marker: await Deno.stat(marker).then(() => true, () => false) };
+    const found = JSON.parse(new TextDecoder().decode(output.stdout)) as {
+      reason: string | null;
+      available: boolean;
+      empty: boolean;
+    };
+    return { ...found, marker: await Deno.stat(marker).then(() => true, () => false) };
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -255,10 +274,35 @@ Deno.test("health-child-stream-bounds: oversized output and stalled Git calls en
   assertEquals(stdout.reason, "history-output-too-large");
   assertEquals(stdout.marker, false);
   const stderr = await churnWithFakeGit("stderr", 30_000);
-  assertStringIncludes(stderr.reason ?? "", "git-output-too-large");
+  assertEquals(stderr.reason, "git-stderr-too-large");
   assertEquals(stderr.marker, false);
   const stalled = await churnWithFakeGit("stall", 1_000);
   assertEquals(stalled.reason, "git-command-timeout");
   assertEquals(stalled.marker, false);
   assert(Date.now() - started < PROMPT_MS * 3, "the bounded calls must end promptly");
+});
+
+Deno.test("churn-head-probe-causes: only an unborn HEAD is empty, and every other HEAD failure keeps its cause", async () => {
+  const unborn = await churnWithFakeGit("head-unborn", 30_000);
+  assertEquals([unborn.available, unborn.empty, unborn.reason], [true, true, null]);
+  const stalled = await churnWithFakeGit("head-stall", 1_000);
+  assertEquals([stalled.available, stalled.empty, stalled.reason], [false, false, "git-command-timeout"]);
+  const corrupt = await churnWithFakeGit("head-corrupt", 30_000);
+  assertEquals([corrupt.available, corrupt.empty], [false, false]);
+  assertStringIncludes(corrupt.reason ?? "", "git-command-failed");
+  const noisy = await churnWithFakeGit("log-stderr", 30_000);
+  assertEquals([noisy.available, noisy.reason], [false, "git-stderr-too-large"]);
+});
+
+Deno.test("bounded-grandchild-pipe: a child that exits returns its result while a grandchild holds the pipe", async () => {
+  const deadlineMs = 5_000;
+  const started = Date.now();
+  const result = await runBounded("sh", ["-c", "(sleep 20 &); echo hi"], { cwd: Deno.cwd(), env: {} }, {
+    deadlineMs,
+    maxStdoutBytes: STREAM_LIMIT_BYTES,
+    maxStderrBytes: STREAM_LIMIT_BYTES,
+  });
+  assertEquals(result.status, "exited");
+  if (result.status === "exited") assertEquals(new TextDecoder().decode(result.stdout), "hi\n");
+  assert(Date.now() - started < deadlineMs / 2, "the exit result must not wait for the deadline");
 });
