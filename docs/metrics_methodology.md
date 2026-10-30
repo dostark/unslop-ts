@@ -91,20 +91,22 @@ the conservative reading of an uncertain binding, and it can lower a cognitive v
 
 ## Lines of code and parameters
 
-`lines` is the number of source lines of one unit, counted from the first to the last line of its range, with the
-unit start normalized as described above. `params` is the number of declared parameters; a destructured pattern
-counts as one parameter.
+`lines` is the number of unique source lines containing code tokens owned by one unit. A nested function owns its
+own tokens; its lines do not also count toward the enclosing function. Blank lines and comment-only lines do not
+count. The unit start is normalized as described above for its reported position. `params` is the number of
+declared parameters; a destructured pattern counts as one parameter. File-level `lines` uses the same code-token
+definition across the whole file, so it can be lower than physical file length.
 
 ## Maintainability index
 
-The engine uses the classic maintainability index (MI) form:
+The health report uses a density-based file score, clamped to the range 0 to 100:
 
-`MI = 171 - 5.2 * ln(HV) - 0.23 * CC - 16.2 * ln(LOC)`
+`MI = clamp(100 - 30 × (CC / LOC) × min(LOC / 50, 1) - 20 × deadExportRatio - min(4 × ln(fanOut + 1), 15))`
 
-`HV` is the Halstead volume, `CC` is the classic cyclomatic count of the file and `LOC` is the file length. The
-engine also reports the scaled `MI` in the 0 to 100 range, which multiplies the raw value by `100 / 171` and
-clamps it to the range. This is an engine-policy decision that follows the common Visual Studio form of the
-metric; the raw value is always reported next to it.
+`CC` sums the measured functions' cyclomatic values, `LOC` counts unique code-token lines in the file,
+`deadExportRatio` is the unused share of value exports, and `fanOut` counts distinct internal targets. An empty
+file has zero density. This is not the classic Halstead-volume maintainability index, and it must not be compared
+as though it were the same metric.
 
 ## CRAP and coverage
 
@@ -163,9 +165,10 @@ target is not in the snapshot, makes the graph incomplete, and the graph signals
 is an export site that no resolved import, re-export chain or public entry reaches. The cycle signal divides the
 cycle count by all measured files, the same population as the vital sign.
 
-The report supports nine signals and marks two as `not_measured`: line coverage when no LCOV file is given and
-duplication when the local duplicate runner is unavailable. Grades are A at 85 or more, B at 70, C at 55 and D
-at 40. A partial report has no grade.
+The report supports nine score signals. It marks unused dependencies and prop drilling `not_measured` because
+health v1 does not implement them. A supported signal, such as duplication, is `unavailable` when its input or
+runner is missing. A missing LCOV file is reported separately as coverage source `none`; CRAP then uses static
+reachability estimates. Grades are A at 85 or more, B at 70, C at 55 and D at 40. A partial report has no grade.
 
 ## Thresholds and gates
 

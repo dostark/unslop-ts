@@ -174,6 +174,30 @@ Deno.test("health-duplication-union: overlapping copies union once and a changed
 const NODE_RUNNABLE = canRun("node");
 if (!NODE_RUNNABLE) console.warn("the jscpd runner tests are ignored: the process may not spawn node");
 
+Deno.test("fix(health-duplication): the pinned Deno npm package supplies the local runner", {
+  ignore: !NODE_RUNNABLE,
+}, async () => {
+  const root = await Deno.makeTempDir({ prefix: "unslop_jscpd_deno_" });
+  try {
+    const packageRoot = join(root, "node_modules/.deno/jscpd@5.4.2/node_modules/jscpd");
+    await Deno.mkdir(packageRoot, { recursive: true });
+    await Deno.writeTextFile(
+      join(packageRoot, "package.json"),
+      JSON.stringify({ name: "jscpd", version: "5.4.2", bin: "run-jscpd.js" }),
+    );
+    const record = join(root, "ran.txt");
+    await Deno.writeTextFile(
+      join(packageRoot, "run-jscpd.js"),
+      `require("node:fs").writeFileSync(${JSON.stringify(record)}, "ran");\n`,
+    );
+    const runner = await localJscpdRunner(root, "5.4.2");
+    await runner(["--version"], root);
+    assertEquals(await Deno.readTextFile(record), "ran");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 Deno.test("health-runner-security: the local bin is version and containment checked, and failures clean up", {
   ignore: !NODE_RUNNABLE,
 }, async () => {

@@ -131,6 +131,8 @@ function classifySpecifier(
   specifier: string,
   fromPath: string,
   known: ReadonlySet<string>,
+  excluded: ReadonlySet<string>,
+  resources: ReadonlySet<string>,
   aliases: Readonly<Record<string, string>>,
   limitations: { external: number; unresolved: number },
 ): string | null {
@@ -140,6 +142,13 @@ function classifySpecifier(
   }
   const target = resolveSpecifier(specifier, fromPath, known, aliases);
   if (target === null) {
+    if (
+      resolveSpecifier(specifier, fromPath, resources, aliases) !== null ||
+      resolveSpecifier(specifier, fromPath, excluded, aliases) !== null
+    ) {
+      limitations.external++;
+      return null;
+    }
     if (specifier.startsWith(".") || aliasEntryOf(specifier, aliases) !== null) {
       limitations.unresolved++;
     } else {
@@ -201,6 +210,8 @@ function dynamicSourceOf(node: ILintNode): { readonly text: string | null } | nu
 export function buildHealthGraph(
   files: ReadonlyMap<string, IParsedHealthFile>,
   aliases: Readonly<Record<string, string>> = {},
+  excluded: ReadonlySet<string> = new Set(),
+  resources: ReadonlySet<string> = new Set(),
 ): IHealthGraph {
   const known = new Set(files.keys());
   const limitations = { external: 0, unresolved: 0, nonliteral_dynamic: 0 };
@@ -208,7 +219,7 @@ export function buildHealthGraph(
   for (const [path, file] of files) {
     const specifiers = specifiersOf(asNode(file.tree.program), limitations);
     for (const { text, kind, form } of specifiers) {
-      const target = classifySpecifier(text, path, known, aliases, limitations);
+      const target = classifySpecifier(text, path, known, excluded, resources, aliases, limitations);
       if (target !== null) edges.push({ from: path, to: target, kind, form });
     }
   }

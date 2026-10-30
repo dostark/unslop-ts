@@ -20,7 +20,7 @@ import { checkManifestRepository } from "../rules/whole_tree/unused_files_manife
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
 import { deadRatioOf, exportPopulationOf, moduleGraphOf } from "./exports.ts";
-import { HEALTH_WALK_SKIP_PATTERNS, MAX_GIT_HISTORY_BYTES } from "./constants.ts";
+import { GIT_LIMITS, HEALTH_WALK_SKIP_PATTERNS, MAX_GIT_HISTORY_BYTES } from "./constants.ts";
 import { type IDuplicationMeasurement, measureDuplication } from "./duplication.ts";
 import { type ILcovCoverage, MAX_LCOV_BYTES, parseLcov } from "./lcov.ts";
 import {
@@ -66,6 +66,9 @@ const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
   ".mjs",
   ".cjs",
 ]);
+
+/** Data-file extensions that imports may name without adding code-graph edges. */
+const RESOURCE_EXTENSIONS: ReadonlySet<string> = new Set([".json", ".jsonc"]);
 
 /** The declared size below which a unit is small. */
 const LOW_LINES = 15;
@@ -208,9 +211,12 @@ function isExcluded(relativePath: string, input: ICollectHealthInput): boolean {
 }
 
 /** The source files of one root, sorted, without excluded paths or directories. */
-async function sourceFiles(input: ICollectHealthInput): Promise<{ files: string[]; excluded: number }> {
+async function sourceFiles(
+  input: ICollectHealthInput,
+): Promise<{ files: string[]; excludedPaths: string[]; resourcePaths: string[] }> {
   const files: string[] = [];
-  let excluded = 0;
+  const excludedPaths: string[] = [];
+  const resourcePaths: string[] = [];
   const visit = async (directory: string, prefix: string): Promise<void> => {
     const entries: Deno.DirEntry[] = [];
     for await (const entry of Deno.readDir(directory)) entries.push(entry);
@@ -224,9 +230,13 @@ async function sourceFiles(input: ICollectHealthInput): Promise<{ files: string[
       if (entry.isSymlink || !entry.isFile) continue;
       const dot = entry.name.lastIndexOf(".");
       const extension = dot === -1 ? "" : entry.name.slice(dot).toLowerCase();
+      if (RESOURCE_EXTENSIONS.has(extension)) {
+        resourcePaths.push(relativePath);
+        continue;
+      }
       if (!SOURCE_EXTENSIONS.has(extension)) continue;
       if (isExcluded(relativePath, input)) {
-        excluded++;
+        excludedPaths.push(relativePath);
         continue;
       }
       files.push(relativePath);
@@ -234,7 +244,7 @@ async function sourceFiles(input: ICollectHealthInput): Promise<{ files: string[
   };
   await visit(input.rootPath, "");
   files.sort((left, right) => left.localeCompare(right));
-  return { files, excluded };
+  return { files, excludedPaths, resourcePaths };
 }
 
 /** The code-token line numbers of one file. */
@@ -489,11 +499,13 @@ interface ISnapshot {
   readonly parsed: Map<string, IParsedHealthFile>;
   readonly errors: IHealthError[];
   readonly excluded: number;
+  readonly excludedPaths: ReadonlySet<string>;
+  readonly resourcePaths: ReadonlySet<string>;
 }
 
 /** Parses every measured file once, attributing each failure. */
 async function parseSnapshot(input: ICollectHealthInput): Promise<ISnapshot> {
-  const { files, excluded } = await sourceFiles(input);
+  const { files, excludedPaths, resourcePaths } = await sourceFiles(input);
   const parsed = new Map<string, IParsedHealthFile>();
   const errors: IHealthError[] = [];
   for (const relativePath of files) {
@@ -506,7 +518,13 @@ async function parseSnapshot(input: ICollectHealthInput): Promise<ISnapshot> {
       errors.push({ path: relativePath, message: error instanceof Error ? error.message : String(error) });
     }
   }
-  return { parsed, errors, excluded };
+  return {
+    parsed,
+    errors,
+    excluded: excludedPaths.length,
+    excludedPaths: new Set(excludedPaths),
+    resourcePaths: new Set(resourcePaths),
+  };
 }
 
 /** Every measured function of one root, with the failures and exclusions attributed. */
@@ -631,7 +649,13 @@ async function hotspotReportOf(
   parsed: ReadonlyMap<string, IParsedHealthFile>,
   facts: ReadonlyMap<string, IFileFacts>,
 ): Promise<{ hotspots: readonly IHotspotScore[]; summary: IHealthHotspotSummary }> {
-  const churn = await collectChurn(input.rootPath, input.sinceEpoch, input.nowEpoch, new Set(parsed.keys()));
+  const churn = await collectChurn(
+    input.rootPath,
+    input.sinceEpoch,
+    input.nowEpoch,
+    new Set(parsed.keys()),
+    GIT_LIMITS,
+  );
   const densities = new Map([...facts].map(([path, fact]) => [
     path,
     fact.lines === 0 ? 0 : fact.cyclomatic / fact.lines,
@@ -705,12 +729,12 @@ async function exportsOf(
 
 /** Collects the report for one descriptor root. */
 export async function collectHealth(input: ICollectHealthInput): Promise<IHealthReport> {
-  const { parsed, errors, excluded } = await parseSnapshot(input);
+  const { parsed, errors, excluded, excludedPaths, resourcePaths } = await parseSnapshot(input);
   assertCoverageManifest(input.coverageManifest, parsed);
   const coverage: ILcovCoverage | null = input.coverageText === null
     ? null
     : parseLcov(input.coverageText, input.rootPath, new Set(parsed.keys()));
-  const graph = buildHealthGraph(parsed, await readImportAliases(input.rootPath));
+  const graph = buildHealthGraph(parsed, await readImportAliases(input.rootPath), excludedPaths, resourcePaths);
   const exports = await exportsOf(parsed, input);
   const reach = reachabilityOf(graph, input.testGlobs);
   const findings: IMeasuredFinding[] = [];

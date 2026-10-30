@@ -235,6 +235,36 @@ const GRAPH_FILES: Readonly<Record<string, string>> = {
   "packages/x/src/unresolved.ts": 'import { x } from "./missing.ts";\nexport const y = x;\n',
 };
 
+Deno.test("fix(health-graph): excluded source and JSON imports do not disable graph scores", async () => {
+  await withHealthProject({
+    "packages/x/src/main.ts": 'import data from "./config.json" with { type: "json" };\n' +
+      'import { value } from "../tests/fixtures/helper.ts";\n' +
+      "export const result = value + data.value;\n",
+    "packages/x/src/config.json": '{"value": 1}\n',
+    "packages/x/tests/fixtures/helper.ts": "export const value = 2;\n",
+  }, async (dir) => {
+    const result = await health(dir, ["--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const report = parseReport(result.stdout);
+    assertEquals(report.summary.graph.unresolved_specifiers, 0);
+    assertEquals(report.summary.graph.complete, true);
+    assertEquals(report.health_score.signals.find((signal) => signal.signal === "cycles")?.status, "measured");
+    assertEquals(report.health_score.signals.find((signal) => signal.signal === "coupling")?.status, "measured");
+  });
+});
+
+Deno.test("fix(health-graph): a missing JSON import still makes the graph incomplete", async () => {
+  await withHealthProject({
+    "packages/x/src/main.ts": 'import data from "./missing.json" with { type: "json" };\nexport const value = data;\n',
+  }, async (dir) => {
+    const result = await health(dir, ["--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const report = parseReport(result.stdout);
+    assertEquals(report.summary.graph.unresolved_specifiers, 1);
+    assertEquals(report.summary.graph.complete, false);
+  });
+});
+
 Deno.test("health-graph-cli: the real command emits file scores and graph limitations", async () => {
   await withHealthProject(GRAPH_FILES, async (dir) => {
     const result = await health(dir, ["--format=json"]);
@@ -535,6 +565,28 @@ const DUPLICATE_RULE: Record<string, unknown> = {
     },
   },
 };
+
+Deno.test("fix(health-text): the report groups evidence and prints measured duplication", async () => {
+  await withHealthProject({ ...MAIN_FILES, ...FAKE_JSCPD }, async (dir) => {
+    const result = await health(dir, ["--format=text", "--top=1"]);
+    assertEquals(result.code, 0, result.stderr);
+    const output = result.stdout;
+    const sections = ["UNSLOP HEALTH", "OVERVIEW", "SCORE SIGNALS", "HOTSPOTS", "FINDINGS", "LIMITATIONS"];
+    let previous = -1;
+    for (const section of sections) {
+      const current = output.indexOf(section);
+      assert(current > previous, `${section} is missing or out of order`);
+      previous = current;
+    }
+    assertStringIncludes(output, "Duplication");
+    assertStringIncludes(output, "0.0%");
+    assertStringIncludes(output, "grade withheld");
+    assertStringIncludes(output, "Variant");
+    assertStringIncludes(output, "external");
+    assertStringIncludes(output, "dynamic");
+    assertStringIncludes(output, "File scores");
+  }, DUPLICATE_RULE);
+});
 
 Deno.test("health-min-score-exit: the gate passes equality only on a complete score", async () => {
   const files: Readonly<Record<string, string>> = {

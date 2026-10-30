@@ -28,6 +28,7 @@ import {
   DEFAULT_MAX_CRAP,
   DEFAULT_MIN_COMMITS,
   DEFAULT_SINCE_DAYS,
+  RUNNER_LIMITS,
 } from "../../report/constants.ts";
 import { BoundedReadError, readFileBounded } from "../../report/bounded_io.ts";
 import { parseSince } from "../../report/churn.ts";
@@ -40,7 +41,7 @@ import {
 import type { TJscpdRunner } from "../../rules/whole_tree/duplicate_code.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
 import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
-import type { IHealthReport } from "../../report/health_model.ts";
+import type { IHealthReport, IHealthScoreSignal } from "../../report/health_model.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { print, printError } from "../output.ts";
 import { loadConfigDescriptor, readAndCompile } from "../project_loader.ts";
@@ -285,61 +286,95 @@ async function canonicalRoot(url: URL): Promise<string> {
   }
 }
 
-/** The text view of one report. */
+/** The report headings use one consistent visual separator in plain terminals and logs. */
+function heading(title: string): string[] {
+  return ["", title, "-".repeat(title.length)];
+}
+
+/** The human name of one score signal. */
+function signalName(name: string): string {
+  return name.split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
+}
+
+/** One observed score signal, or its stated reason for absence. */
+function signalLine(signal: IHealthScoreSignal): string {
+  const label = signalName(signal.signal).padEnd(21);
+  if (signal.status !== "measured") {
+    return `  ${label} ${"—".padEnd(19)} ${signal.status}: ${signal.reason ?? "no reason"}`;
+  }
+  const unit = signal.signal === "cycles" || signal.signal === "unit_size" ? "/1k" : "%";
+  const value = (signal.raw === null ? "—" : `${signal.raw.toFixed(1)}${unit}`).padEnd(7);
+  const population =
+    (signal.numerator === null || signal.denominator === null ? "—" : `${signal.numerator}/${signal.denominator}`)
+      .padEnd(17);
+  return `  ${label} ${value} ${population} -${signal.penalty.toFixed(2)}`;
+}
+
+/** The text view of one report, grouped by summary, score evidence and actionable details. */
 function renderText(report: IHealthReport, top: number): string {
-  const options = report.summary.options;
-  const bands = report.vital_signs.unit_size.bands;
+  const { summary, vital_signs, health_score: score } = report;
+  const options = summary.options;
+  const bands = vital_signs.unit_size.bands;
   const band = (name: "low" | "medium" | "high" | "very_high"): string =>
     `${bands[name].count} (${bands[name].percent.toFixed(1)}%)`;
+  const grade = score.grade === null ? "grade withheld" : `grade ${score.grade}`;
   const lines = [
-    `unslop health (${report.formula_version}, schema ${report.schema_version})`,
-    `files: ${report.summary.analyzed_files} analyzed, ${report.summary.excluded_files} excluded, ` +
-    `${report.summary.failed_files} failed | functions: ${report.summary.functions} | ` +
-    `findings: ${report.summary.findings_population}`,
-    `maxima: cyclomatic ${options.max_cyclomatic}, cognitive ${options.max_cognitive}, lines ${options.max_lines}, ` +
-    `crap ${options.max_crap} (variant ${options.variant}, count-nullish ${options.count_nullish})`,
-    `score: ${report.health_score.value.toFixed(1)} ` +
-    `(${report.health_score.grade ?? "no-grade"}, ${report.health_score.status})`,
-    `hotspots: ${
-      report.hotspot_summary.available
-        ? `${report.hotspot_summary.qualified} qualified of ${report.hotspot_summary.population} file(s), ` +
-          `${report.hotspot_summary.shallow ? "shallow history" : "full history"}`
-        : `unavailable (${report.hotspot_summary.reason ?? "unknown"})`
-    }`,
-    `coverage: ${report.summary.coverage.source} ` +
-    `(${report.summary.coverage.matched_files} matched, ${report.summary.coverage.unmatched_files} unmatched, ` +
-    `revision ${report.summary.coverage.revision})`,
-    `unit size: low ${band("low")}, medium ${band("medium")}, high ${band("high")}, very high ${band("very_high")}`,
-    `graph: ${report.summary.graph.internal_edges} internal edge(s), ` +
-    `${report.summary.graph.runtime_edges} runtime, ${report.summary.graph.external_specifiers} external, ` +
-    `${report.summary.graph.unresolved_specifiers} unresolved, ` +
-    `${report.summary.graph.nonliteral_dynamic_imports} nonliteral dynamic ` +
-    `(${report.summary.graph.complete ? "complete" : "incomplete"})`,
-    `cycles: ${report.vital_signs.cycles.sccs} runtime SCC(s), ${report.vital_signs.cycles.files} ` +
-    `file(s) in cycles (${report.vital_signs.cycles.per_thousand.toFixed(2)} per 1000)`,
-    `coupling: ${report.vital_signs.coupling.high_files} high file(s) of ` +
-    `${report.vital_signs.coupling.code_files} (${report.vital_signs.coupling.percent.toFixed(1)}%)`,
-    `file scores: ${report.summary.file_scores_population} file(s), dead exports ` +
-    `${report.summary.dead_exports.unused}/${report.summary.dead_exports.total}, dead files ` +
-    `${report.summary.dead_files.available ? String(report.summary.dead_files.count) : "unavailable"}`,
+    "UNSLOP HEALTH",
+    "=============",
+    `Score ${score.value.toFixed(1)} / 100  (${score.status}; ${grade})`,
+    `Formula ${report.formula_version} · schema ${report.schema_version} · tool ${report.tool_version}`,
+    ...heading("OVERVIEW"),
+    `  Scope       ${summary.analyzed_files} files analyzed · ${summary.excluded_files} excluded · ` +
+    `${summary.failed_files} failed · ${summary.functions} functions`,
+    `  Findings    ${summary.findings_population} functions above a threshold`,
+    `  Limits      cyclomatic ${options.max_cyclomatic} · cognitive ${options.max_cognitive} · ` +
+    `code lines ${options.max_lines} · CRAP ${options.max_crap}`,
+    `  Variant     ${options.variant} · count-nullish ${options.count_nullish}`,
+    `  Coverage    ${summary.coverage.source} · ${summary.coverage.matched_files} matched · ` +
+    `${summary.coverage.unmatched_files} unmatched · revision ${summary.coverage.revision}`,
+    `  Graph       ${summary.graph.complete ? "complete" : "incomplete"} · ` +
+    `${summary.graph.internal_edges} internal edges · ${summary.graph.external_specifiers} external · ` +
+    `${summary.graph.unresolved_specifiers} unresolved · ` +
+    `${summary.graph.nonliteral_dynamic_imports} nonliteral dynamic`,
+    `  File scores ${summary.file_scores_population} files`,
+    `  Unit size   low ${band("low")} · medium ${band("medium")} · ` +
+    `high ${band("high")} · very high ${band("very_high")}`,
+    `  Structure   ${vital_signs.cycles.sccs} runtime cycles · ${vital_signs.coupling.high_files} ` +
+    `high-coupling files · ${summary.dead_exports.unused}/${summary.dead_exports.total} dead exports · ` +
+    `${summary.dead_files.available ? summary.dead_files.count : "unavailable"} dead files`,
+    ...heading("SCORE SIGNALS"),
+    "  Signal                Observed  Population        Penalty / status",
+    ...score.signals.map(signalLine),
+    ...heading("HOTSPOTS"),
+    `  ${Math.min(top, report.hotspots.length)} shown of ${report.hotspot_summary.qualified} qualified` +
+    `${report.hotspot_summary.shallow ? " · shallow history, advisory only" : ""}`,
   ];
   for (const hotspot of report.hotspots.slice(0, top)) {
     lines.push(
-      `  hotspot ${hotspot.path} — score ${hotspot.score.toFixed(1)}, churn ${hotspot.churn.toFixed(2)}, ` +
-        `density ${hotspot.density.toFixed(2)}, commits ${hotspot.commits}`,
+      `  ${hotspot.score.toFixed(1).padStart(5)}  ${hotspot.path}  ` +
+        `(${hotspot.commits} commits, churn ${hotspot.churn.toFixed(1)}, density ${hotspot.density.toFixed(2)})`,
     );
   }
+  lines.push(
+    ...heading("FINDINGS"),
+    `  ${Math.min(top, report.findings.length)} shown of ${summary.findings_population}`,
+  );
   for (const finding of report.findings.slice(0, top)) {
     lines.push(
-      `  ${finding.path}:${finding.line} ${finding.name} — cyclomatic ${finding.cyclomatic}, ` +
-        `cognitive ${finding.cognitive}, lines ${finding.line_count}, crap ${finding.crap.toFixed(1)} ` +
-        `(${finding.coverage_source}/${finding.coverage_reason}, ${finding.severity})`,
+      `  ${finding.severity.toUpperCase().padEnd(8)} ${finding.path}:${finding.line} ${finding.name}  ` +
+        `CC ${finding.cyclomatic} · Cog ${finding.cognitive} · Lines ${finding.line_count} · ` +
+        `CRAP ${finding.crap.toFixed(1)} (${finding.coverage_source})`,
     );
   }
-  for (const signal of report.health_score.signals) {
+  lines.push(...heading("LIMITATIONS"));
+  lines.push("  Line counts use unique code-token lines; they exclude blank and comment-only lines.");
+  if (summary.coverage.source === "none") lines.push("  CRAP uses estimated coverage; no LCOV input was supplied.");
+  if (report.hotspot_summary.shallow) lines.push("  Git history is shallow; hotspot scores are advisory.");
+  for (const signal of score.signals) {
     if (signal.status === "measured") continue;
-    lines.push(`  signal ${signal.signal}: ${signal.status} (${signal.reason ?? "no reason"})`);
+    lines.push(`  ${signalName(signal.signal)}: ${signal.status} (${signal.reason ?? "no reason"})`);
   }
+  for (const error of report.errors) lines.push(`  ${error.path}: ${error.message}`);
   return lines.join("\n");
 }
 
@@ -379,7 +414,10 @@ async function duplicationSetupOf(
   const parsed = DuplicateCodeSettingsSchema.safeParse(options);
   if (!parsed.success) return { duplication: null, duplicateRunner: null };
   try {
-    return { duplication: parsed.data, duplicateRunner: await localJscpdRunner(rootPath, parsed.data.jscpdVersion) };
+    return {
+      duplication: parsed.data,
+      duplicateRunner: await localJscpdRunner(rootPath, parsed.data.jscpdVersion, RUNNER_LIMITS),
+    };
   } catch {
     return { duplication: parsed.data, duplicateRunner: null };
   }

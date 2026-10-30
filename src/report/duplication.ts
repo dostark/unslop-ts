@@ -149,12 +149,18 @@ export async function measureDuplication(input: IDuplicationInput): Promise<IDup
 
 /** Reads the installed jscpd manifest and returns its validated bin path. */
 async function installedJscpdBin(rootPath: string, requiredVersion: string): Promise<string> {
-  const packageRoot = join(rootPath, "node_modules/jscpd");
+  let packageRoot = join(rootPath, "node_modules/jscpd");
   let text: string;
   try {
     text = await Deno.readTextFile(join(packageRoot, "package.json"));
   } catch {
-    throw new Error("jscpd-not-installed");
+    if (requiredVersion !== JSCPD_REQUIRED_VERSION) throw new Error("jscpd-not-installed");
+    packageRoot = join(rootPath, "node_modules/.deno", `jscpd@${JSCPD_REQUIRED_VERSION}`, "node_modules/jscpd");
+    try {
+      text = await Deno.readTextFile(join(packageRoot, "package.json"));
+    } catch {
+      throw new Error("jscpd-not-installed");
+    }
   }
   const manifest = JSON.parse(text) as { version?: unknown; bin?: unknown };
   if (manifest.version !== requiredVersion) {
