@@ -20,6 +20,7 @@ import {
 } from "../src/report/mod.ts";
 import type { IParsedHealthFile } from "../src/report/parse.ts";
 import { readImportAliases } from "../src/report/aliases.ts";
+import { parseJsonc } from "../src/report/jsonc.ts";
 import { couplingSignalOf, runtimeCyclesOf } from "../src/rules/whole_tree/import_cycles.ts";
 
 /** Writes the files to a temp dir and parses the snapshot the way the CLI does. */
@@ -312,4 +313,63 @@ Deno.test("health-real-config-aliases: exact, longest-prefix, JSONC and workspac
     assertEquals(graph.limitations.unresolved, 1);
     assertEquals(graph.complete, false);
   });
+});
+
+const COMMENTED_MANIFEST = '{\n  // the alias\n  "imports": { "@app/": "./src/" },\n}\n';
+const PLAIN_MANIFEST = JSON.stringify({ imports: { "@app/": "./src/" } });
+const EXPORT_FILES: Readonly<Record<string, string>> = {
+  "main.ts": 'import { used } from "@app/lib.ts";\nexport const main = used;\n',
+  "src/lib.ts": "export const used = 1;\nexport const dead = 2;\n",
+};
+
+/** The dead and total export counts of a project with the given manifest file. */
+async function exportCountsFor(manifestName: string, manifest: string): Promise<{ total: number; unused: number }> {
+  return await withAliasProject({ ...EXPORT_FILES, [manifestName]: manifest }, async (root, snapshot) => {
+    const population = exportPopulationOf(
+      snapshot,
+      await moduleGraphOf(snapshot, { rootPath: root, publicEntries: [] }),
+    );
+    return { total: population.total, unused: population.unused };
+  });
+}
+
+Deno.test("export-graph-jsonc: a commented deno.json and a deno.jsonc give the plain JSON dead-export count", async () => {
+  const plain = await exportCountsFor("deno.json", PLAIN_MANIFEST);
+  assertEquals(plain, { total: 3, unused: 2 });
+  assertEquals(await exportCountsFor("deno.json", COMMENTED_MANIFEST), plain);
+  assertEquals(await exportCountsFor("deno.jsonc", COMMENTED_MANIFEST), plain);
+});
+
+Deno.test("jsonc-string-commas: a string that contains a comma and a bracket survives unchanged", () => {
+  const parsed = parseJsonc('{ "a": "./a,}.ts", /* note */ "b": [1, 2,], "c": "x, ]", }');
+  assertEquals(parsed, { a: "./a,}.ts", b: [1, 2], c: "x, ]" });
+  assertEquals(parseJsonc('{"url": "https://example.com/a//b"}'), { url: "https://example.com/a//b" });
+});
+
+Deno.test("alias-root-confinement: escaping entries add no alias and inherited names resolve as ordinary keys", async () => {
+  const outside = await Deno.makeTempDir({ prefix: "unslop_alias_outside_" });
+  try {
+    await Deno.writeTextFile(join(outside, "deno.json"), JSON.stringify({ imports: { "@o/": "./o/" } }));
+    await withAliasProject({
+      "deno.json": JSON.stringify({
+        workspace: [`../${outside.slice(outside.lastIndexOf("/") + 1)}`, "./member"],
+        imports: { "@esc": "../../escape.ts", "constructor": "./c.ts", "toString": "./t.ts", "@ok": "./ok.ts" },
+      }),
+      "member/deno.json": JSON.stringify({ name: "@scope/member", exports: "./mod.ts" }),
+      "member/mod.ts": "export const m = 1;\n",
+      "c.ts": "export const c = 1;\n",
+      "t.ts": "export const t = 1;\n",
+      "ok.ts": "export const ok = 1;\n",
+    }, async (root) => {
+      const aliases = await readImportAliases(root);
+      assertEquals(Object.hasOwn(aliases, "@esc"), false);
+      assertEquals(Object.keys(aliases).some((key) => key.startsWith("@o/")), false);
+      assertEquals(aliases["@scope/member"], "member/mod.ts");
+      assertEquals(aliases["constructor"], "c.ts");
+      assertEquals(aliases["toString"], "t.ts");
+      assertEquals(aliases["@ok"], "ok.ts");
+    });
+  } finally {
+    await Deno.remove(outside, { recursive: true });
+  }
 });

@@ -8,6 +8,7 @@
  */
 
 import ts from "typescript";
+import { parseJsonc } from "../../report/jsonc.ts";
 import { walk } from "@std/fs";
 import { dirname, relative } from "@std/path";
 import {
@@ -21,7 +22,7 @@ import {
 
 const DEFAULT_EXPORT = "default";
 const KEY_SEPARATOR = "\0";
-const DENO_MANIFEST = "deno.json";
+const DENO_MANIFEST = "deno.jsonc?";
 const PACKAGE_MANIFEST = "package.json";
 
 /** One export site that the report may list: an exported name in a file. */
@@ -84,14 +85,14 @@ function keyOf(repoPath: string, name: string): string {
   return `${repoPath}${KEY_SEPARATOR}${name}`;
 }
 
-/** Reads every deno.json and package.json below the root. */
+/** Reads every deno.json, deno.jsonc and package.json below the root. */
 async function scanManifests(repoRoot: string, skipPatterns: readonly string[]): Promise<IManifestScan> {
   const skip = skipPatterns.map((pattern) => new RegExp(pattern));
   const scan: IManifestScan = { importMap: [], publicEntries: [] };
   const match = [new RegExp(`(^|/)(${DENO_MANIFEST}|${PACKAGE_MANIFEST})$`.replaceAll(".", "\\."))];
   for await (const entry of walk(repoRoot, { includeDirs: false, includeSymlinks: false, skip, match })) {
     try {
-      const json = JSON.parse(await Deno.readTextFile(entry.path));
+      const json = parseJsonc(await Deno.readTextFile(entry.path));
       const dir = dirname(relative(repoRoot, entry.path));
       const isPackageJson = entry.name === PACKAGE_MANIFEST;
       scan.publicEntries.push(...readPublicEntries(dir, json, isPackageJson));
