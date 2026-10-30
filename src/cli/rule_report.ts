@@ -259,16 +259,17 @@ export interface IRuleEvidenceInput {
   readonly cwd: string;
 }
 
-/** The working-directory-relative path of a file the host reported. */
-function relativeFile(file: string, cwd: string): string {
-  const path = file.startsWith("file:") ? fromFileUrl(file) : file;
-  return relative(cwd, path).replaceAll("\\", "/");
+/** The path form the plugin records: relative inside the working directory, absolute elsewhere. */
+function pluginPathOf(file: string, cwd: string): string {
+  const path = (file.startsWith("file:") ? fromFileUrl(file) : file).replaceAll("\\", "/");
+  const prefix = cwd.endsWith("/") ? cwd : `${cwd}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
 }
 
 /**
  * Fails unless the lint plugin itself reported that the rule ran on files. Absent diagnostics prove nothing,
- * so the trace records are the only accepted evidence: a plugin that never loaded or a rule that its selection
- * switched off leaves no terminal record, and a listed lint file without a record was never evaluated.
+ * so the trace records are the only accepted evidence. A plugin that never loaded or a rule that its selection
+ * switched off leaves no terminal record, and every file that the plugin observed needs one for the rule.
  */
 export function assertRuleEvidence(input: IRuleEvidenceInput): void {
   const { records } = parseTraceStderr(input.stderr, input.runId);
@@ -285,10 +286,11 @@ export function assertRuleEvidence(input: IRuleEvidenceInput): void {
     throw new Error(`no file in the requested roots is in the scope of ${input.rule}`);
   }
   const evaluated = new Set(terminal.map((record) => record.file));
-  const missing = input.checkedFiles
+  const observed = records.filter((record) => record.kind === "observed").map((record) => record.file);
+  const listed = input.checkedFiles
     .filter((file) => LINTABLE_EXTENSIONS.some((extension) => file.endsWith(extension)))
-    .map((file) => relativeFile(file, input.cwd))
-    .filter((file) => !evaluated.has(file));
+    .map((file) => pluginPathOf(file, input.cwd));
+  const missing = [...new Set([...observed, ...listed])].filter((file) => !evaluated.has(file));
   if (missing.length > 0) {
     throw new Error(`incomplete coverage: ${missing.slice(0, MAX_MISSING_LISTED).join(", ")}`);
   }

@@ -394,3 +394,45 @@ Deno.test("rule-report-descriptor-root: another cwd still scans with the descrip
     }
   });
 });
+
+Deno.test("rule-report-outside-cwd: a valid scan of a root outside the descriptor root passes", async () => {
+  await withCeilingProject({ plugin: true, source: CLEAN_SOURCE, ceiling: 5 }, async (dir) => {
+    const outside = await Deno.makeTempDir({ prefix: "rule_report_outside_" });
+    try {
+      await Deno.writeTextFile(join(outside, "branching.ts"), BRANCHING_SOURCE);
+      const result = await runDeno([
+        "run",
+        "-A",
+        "--config=deno.json",
+        SCRIPT_URL,
+        `--rule=${CEILING_RULE}`,
+        `--roots=${outside}`,
+        "--descriptor=unslop.project.ts",
+        "--ceilings=rule_ceilings.json",
+        "--json",
+        "--fail",
+      ], dir);
+      assertEquals(result.code, 0, result.stderr);
+      assertEquals(JSON.parse(result.stdout).selected, 1);
+    } finally {
+      await Deno.remove(outside, { recursive: true });
+    }
+  });
+});
+
+/** The evidence check with an explicit working directory. */
+function evidenceIn(cwd: string, lines: readonly string[], checkedFiles: readonly string[] = []): void {
+  assertRuleEvidence({ rule: EVIDENCE_RULE, runId: EVIDENCE_RUN, stderr: lines.join("\n"), checkedFiles, cwd });
+}
+
+Deno.test("rule-report-observed-population: every observed file needs a terminal record for the rule", () => {
+  const observed = (file: string) => traceLine("observed", file);
+  assertThrows(
+    () => evidence([observed("a.ts"), observed("b.ts"), traceLine("checked", "a.ts")]),
+    Error,
+    "incomplete coverage: b.ts",
+  );
+  evidence([observed("a.ts"), observed("b.ts"), traceLine("checked", "a.ts"), traceLine("skipped", "b.ts")]);
+  evidence([traceLine("checked", "a.ts")]);
+  evidenceIn("/project", [traceLine("checked", "/elsewhere/x.ts")], ["file:///elsewhere/x.ts"]);
+});
