@@ -8,7 +8,8 @@ external source of each method and names the engine-policy decision where the en
 A unit is one executable function: a function declaration, a function expression, an arrow function, a class
 method, an object method, a constructor or a getter or setter. The engine finds units with the pinned Babel parser
 and measures each unit over its own range. A nested function is a separate unit, and its decisions never count
-toward its ancestors. A unit start excludes a declared method key, so every host reports the same start.
+toward its ancestors. A unit start excludes a declared method key, so every host reports the same start. A default value in a parameter
+list adds no decision, and the `?.` links that the extended variant counts are the ones in the body.
 
 Cyclomatic contributions carry weight one and no nesting. Cognitive contributions carry a weight and a nesting
 level. Both lists are sorted by line and column.
@@ -72,7 +73,9 @@ The engine follows Campbell's cognitive complexity model (SonarSource 2018). A s
 | `recursion`                                          | `1`           |
 
 An `if` body, a loop body, a `catch` body, a `switch` case body and a ternary branch each raise the nesting by
-one. A logical run is a maximal chain of one operator. `countNullish` controls whether a `??` run counts.
+one. A logical run is a maximal chain of one operator. `countNullish` controls whether a `??` run counts. A call
+to the unit's own name counts as recursion once. A nested function declaration, a class declaration, a variable, a
+parameter or a `catch` binding with the same name shadows the call, so it adds nothing.
 
 ### Differences from the paper, SonarJS and fallow
 
@@ -112,15 +115,24 @@ a unit, the engine uses a fallback: 85 percent for a directly reachable unit, 40
 reachable unit and 0 percent for an unreachable unit. This is an engine-policy decision (Savoia's CRAP model
 does not define unreachable code).
 
-Coverage comes from an LCOV file. Each record is bounded to 1 MiB, each input to 256 MiB and the source file to
-16 MiB. The coverage manifest records the snapshot that produced the numbers, so a run can be audited later.
+Coverage comes from an LCOV file. The parser checks each record against its grammar: `DA` needs a positive line
+and a decimal hit count, `FN`, `FNDA` and `BRDA` follow their field lists, and the count tags are decimal
+integers. A merged hit count must stay finite. A malformed record rejects the whole input, so it never becomes
+measured evidence. Each record is bounded to 1 MiB of UTF-8, each input to 256 MiB and each source file to 16 MiB,
+and a read stops at the bound instead of buffering the file.
+
+The coverage manifest maps source paths to SHA-256 digests. The revision is `verified` only when the manifest names
+every covered source and each digest matches the measured bytes. An empty or partial manifest leaves the revision
+`unverified`. A malformed digest, an unknown path or a changed source is rejected.
 
 ## History and hotspots
 
 Churn comes from the Git history of each file. The engine runs the fixed argument list
 `git log --no-renames --no-merges -z --numstat` and applies a 90-day half-life to weigh recent changes. A hotspot
 is a file whose churn and complexity both place it above the report thresholds. The engine accepts `--since` as
-a day, month or ISO date and `--min-commits` as the history floor.
+a day, month or ISO date and `--min-commits` as the history floor. Every Git call and the local duplicate runner
+run under a deadline and byte limits on stdout and stderr. A child that passes a limit is killed, awaited and
+reported as an unavailable signal with its cause.
 
 ## Project score
 
@@ -137,6 +149,13 @@ The score starts at 100 and subtracts one penalty per signal:
 | Coupling               | 0.5               | 5   |
 | Duplication            | `max(0, pct - 5)` | 10  |
 
+Dependency signals come from the import graph. The graph resolves relative specifiers and the import maps of the
+root and the workspace members, including `deno.jsonc` files and workspace package exports. An exact key matches only
+itself, and the longest directory prefix wins. A key that two configs map to different files, or an alias whose
+target is not in the snapshot, makes the graph incomplete, and the graph signals become unavailable. A dead export
+is an export site that no resolved import, re-export chain or public entry reaches. The cycle signal divides the
+cycle count by all measured files, the same population as the vital sign.
+
 The report supports nine signals and marks two as `not_measured`: line coverage when no LCOV file is given and
 duplication when the local duplicate runner is unavailable. Grades are A at 85 or more, B at 70, C at 55 and D
 at 40. A partial report has no grade.
@@ -145,18 +164,24 @@ at 40. A partial report has no grade.
 
 The rule gate defaults to 15 cyclomatic, 15 cognitive and 60 lines per function. The phase refactoring tranche
 targets 20 cyclomatic and 30 cognitive. The compiled workspace ceilings are measured counts, and the
-`check:complexity` task runs three single-rule invocations against them. A ceiling is lowered only to a measured
+`check:complexity` task runs three single-rule invocations against them from the descriptor root with its own lint
+config. A scan passes only when the lint plugin reports that the rule ran on files: a missing plugin, an inactive
+rule, an empty scope or a listed file without a record fails the invocation. A ceiling is lowered only to a measured
 count and never raised.
 
 ## Calibration record
 
-The frozen calibration (2026-10-29) used the extended variant with `countNullish: true`. The pinned signed
-fallow 3.36.0 (schema 12) run matched 46,107 of 46,108 functions over the 3,195 common files of the two file
-populations (3,216 fallow, 3,201 core): coverage 99.998 percent each, exact cyclomatic 97.82 percent and exact
-cognitive 99.77 percent. One fallow row and one core row stay unmatched in the exactl flow-command test
-(one anonymous method, one column apart). 108 fallow rows sit
-outside the health snapshot because the snapshot does not follow the symlinked portal-fixture files, and 2,626
-core rows sit in files that fallow did not report. Parse failures were zero.
+The frozen calibration (2026-10-30) used the extended variant with `countNullish: true`. It compares the full
+function populations of both tools. The pinned signed fallow 3.36.0 (schema 12) run matched 46,137 of 46,138
+functions on each side: coverage 99.998 percent each, exact cyclomatic 97.78 percent and exact cognitive 99.77
+percent. One fallow row and one core row stay unmatched in the exactl flow-command test (one anonymous method, one
+column apart). Parse failures and ambiguous keys were zero.
+
+Only listed exclusions leave a population, each with a stated reason in `CALIBRATION_EXCLUSIONS`. They removed
+604 fallow rows and 496 core rows of the scenario fixture projects, which the two tools scan differently, 2,587
+core rows of the generated engine bundle, and 22 core rows of evidence probes and generated scenario output. A
+tool-only file that no exclusion names counts against the coverage of the tool that lacks it. A parse failure, an
+ambiguous key or coverage below 99 percent makes the calibration insufficient.
 
 ## Limitations
 

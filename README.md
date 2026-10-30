@@ -437,10 +437,18 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
 - **Permissions:** the command reads the project and the environment, and it runs `git` and `node`. The
   duplication signal needs a local `jscpd` package. Without that package the signal is `not_measured`, and a
   run without `--coverage` leaves coverage `not_measured`.
+- **Values:** a flag value is checked before any measurement. `--count-nullish` is exactly `true` or `false`,
+  the numeric flags are decimal safe integers or finite decimals, and `--since` takes a safe duration or a strict
+  ISO date. A malformed value exits `2` with no report.
 - **Coverage:** `--coverage` takes an LCOV file inside the project root. Without it, CRAP uses the documented
-  reachability fallbacks.
+  reachability fallbacks. A malformed LCOV record rejects the input. The report calls the coverage revision
+  `verified` only when an adjacent `.manifest.json` names every covered file with a matching SHA-256. An empty or
+  partial manifest stays `unverified`, and a mismatched one is rejected.
+- **Graph:** the import graph resolves the import maps of the root and the workspace members, including
+  `deno.jsonc` and workspace package exports. A key that two configs map differently, or an alias whose target is
+  outside the snapshot, marks the graph incomplete, and the graph signals become unavailable.
 - **History:** `--since` accepts a day count, a month count or an ISO date, and `--min-commits` sets the
-  history floor.
+  history floor. Git and the duplicate runner run under a deadline and byte limits.
 - **Score:** the project score starts at 100 and subtracts one capped penalty per signal. Grades are A at 85,
   B at 70, C at 55 and D at 40. A partial report prints no grade, and `--min-score` fails on a partial score.
 

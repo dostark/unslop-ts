@@ -261,19 +261,18 @@ Deno.test("the calibration record names the pinned counts and differences", asyn
   const text = await methodologyText();
   for (
     const fact of [
-      "2026-10-29",
+      "2026-10-30",
       "3.36.0",
       "schema 12",
-      "46,107",
-      "46,108",
-      "3,195",
-      "3,216",
-      "3,201",
+      "46,137",
+      "46,138",
       "99.998",
-      "97.82",
+      "97.78",
       "99.77",
-      "108 fallow rows",
-      "2,626",
+      "604 fallow rows",
+      "496 core rows",
+      "2,587",
+      "CALIBRATION_EXCLUSIONS",
     ]
   ) {
     assert(text.includes(fact), `missing calibration fact: ${fact}`);
