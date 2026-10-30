@@ -378,11 +378,12 @@ Deno.test("default-type-export: a default-exported interface adds no value expor
   await withAliasProject({
     "src/props.ts": "export default interface Props {\n  value: number;\n}\nexport const kept = 1;\n",
     "src/value.ts": "export default 1;\n",
-  }, async (_root, snapshot) => {
+  }, (_root, snapshot) => {
     const props = snapshot.get("src/props.ts");
     const value = snapshot.get("src/value.ts");
     assert(props !== undefined && value !== undefined);
     assertEquals(valueExportSitesOf(props).map((site) => site.name), ["kept"]);
     assertEquals(valueExportSitesOf(value).map((site) => site.name), ["default"]);
+    return Promise.resolve();
   });
 });

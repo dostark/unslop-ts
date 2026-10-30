@@ -605,7 +605,16 @@ Deno.test("the_readme_documents_every_health_flag", async () => {
   ) {
     assertStringIncludes(section, flag);
   }
-  for (const claim of ["exactly `true` or `false`", "`unverified`", "SHA-256", "deno.jsonc", "byte limits"]) {
+  for (
+    const claim of [
+      "exactly `true` or `false`",
+      "`unverified`",
+      "SHA-256",
+      "deno.jsonc",
+      "byte limits",
+      "leaves the project root",
+    ]
+  ) {
     assertStringIncludes(section, claim);
   }
   assertStringIncludes(section, "unslop-health-v1");

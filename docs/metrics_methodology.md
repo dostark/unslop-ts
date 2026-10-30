@@ -135,7 +135,10 @@ Churn comes from the Git history of each file. The engine runs the fixed argumen
 is a file whose churn and complexity both place it above the report thresholds. The engine accepts `--since` as
 a day, month or ISO date and `--min-commits` as the history floor. Every Git call and the local duplicate runner
 run under a deadline and byte limits on stdout and stderr. A child that passes a limit is killed, awaited and
-reported as an unavailable signal with its cause.
+reported as an unavailable signal with its cause. A child that exits returns its result at once: streams that a
+grandchild keeps open are cancelled after a short grace. Only an unborn HEAD makes the history empty, and any other
+failure of the HEAD probe makes the hotspot signal unavailable. A snapshot digest that cannot be read leaves the
+duplication signal unavailable with the reason `source-changed-during-scan`.
 
 ## Project score
 
@@ -154,7 +157,8 @@ The score starts at 100 and subtracts one penalty per signal:
 
 Dependency signals come from the import graph. The graph resolves relative specifiers and the import maps of the
 root and the workspace members, including `deno.jsonc` files and workspace package exports. An exact key matches only
-itself, and the longest directory prefix wins. A key that two configs map to different files, or an alias whose
+itself, and the longest directory prefix wins. A workspace entry or an import target that leaves the project root is
+ignored. A key that two configs map to different files, or an alias whose
 target is not in the snapshot, makes the graph incomplete, and the graph signals become unavailable. A dead export
 is an export site that no resolved import, re-export chain or public entry reaches. The cycle signal divides the
 cycle count by all measured files, the same population as the vital sign.
@@ -169,7 +173,8 @@ The rule gate defaults to 15 cyclomatic, 15 cognitive and 60 lines per function.
 targets 20 cyclomatic and 30 cognitive. The compiled workspace ceilings are measured counts, and the
 `check:complexity` task runs three single-rule invocations against them from the descriptor root with its own lint
 config. A scan passes only when the lint plugin reports that the rule ran on files: a missing plugin, an inactive
-rule, an empty scope or a listed file without a record fails the invocation. A ceiling is lowered only to a measured
+rule or an empty scope fails the invocation, and so does every file that the plugin observed without a terminal
+record for the rule. Listed lint files are compared in the path form that the plugin records. A ceiling is lowered only to a measured
 count and never raised.
 
 ## Calibration record

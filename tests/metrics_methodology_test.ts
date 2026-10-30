@@ -284,3 +284,18 @@ Deno.test("methodology-shadow-example: the shadowing limit is stated as function
   assert(text.includes("recursion-shadow"), "the shadow example is present");
   assert(text.includes("function-wide"), "the shadow check is described as function-wide");
 });
+
+Deno.test("postreview-methodology-examples: the gate, graph and history contracts are stated as built", async () => {
+  const text = await methodologyText();
+  for (
+    const claim of [
+      "every file that the plugin observed",
+      "leaves the project root",
+      "unborn HEAD",
+      "short grace",
+      "source-changed-during-scan",
+    ]
+  ) {
+    assert(text.includes(claim), `missing contract statement: ${claim}`);
+  }
+});
