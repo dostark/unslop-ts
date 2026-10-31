@@ -6,6 +6,7 @@
  * @related-files [src/cli/commands/health.ts, src/report/health.ts, src/report/health_model.ts]
  */
 
+import { fixtureGit as gitIn } from "./helpers/git_fixture.ts";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { crapOf, DIRECT_COVERAGE_PERCENT } from "../src/report/crap.ts";
@@ -357,25 +358,6 @@ Deno.test("health-real-lcov: real Deno coverage changes the CRAP value and the s
 });
 
 /** Runs Git inside one fixture with an isolated configuration. */
-async function gitIn(cwd: string, args: readonly string[], env: Record<string, string> = {}): Promise<void> {
-  const output = await new Deno.Command("git", {
-    args: [...args],
-    cwd,
-    env: {
-      LD_LIBRARY_PATH: "",
-      GIT_CONFIG_GLOBAL: "/dev/null",
-      GIT_CONFIG_NOSYSTEM: "1",
-      GIT_AUTHOR_NAME: "Test",
-      GIT_AUTHOR_EMAIL: "test@example.com",
-      GIT_COMMITTER_NAME: "Test",
-      GIT_COMMITTER_EMAIL: "test@example.com",
-      ...env,
-    },
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  if (!output.success) throw new Error(`git ${args.join(" ")}: ${new TextDecoder().decode(output.stderr)}`);
-}
 
 Deno.test("health-hotspot-cli: the real --since and --min-commits flags change CLI hotspots", async () => {
   await withHealthProject(MAIN_FILES, async (dir) => {

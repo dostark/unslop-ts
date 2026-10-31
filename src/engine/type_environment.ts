@@ -147,3 +147,12 @@ export function createTypeEnvironment(program: ILintNode): ITypeEnvironment {
 
   return { aliases, resolve, unionMembers };
 }
+
+/** The text of an ESTree or Babel string literal, or null for other values. */
+export function stringLiteralValue(value: unknown): string | null {
+  if (!isNodeLike(value)) return null;
+  const node = asNode(value);
+  return (node.type === "StringLiteral" || node.type === "Literal") && typeof node.value === "string"
+    ? node.value
+    : null;
+}

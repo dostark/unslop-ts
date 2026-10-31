@@ -7,7 +7,7 @@
  * @related-files [src/report/parse.ts, src/report/health.ts, src/engine/posix_path.ts]
  */
 
-import { asNode, type ILintNode, isNodeLike } from "../engine/type_environment.ts";
+import { asNode, type ILintNode, isNodeLike, stringLiteralValue } from "../engine/type_environment.ts";
 import { dirname, normalize } from "../engine/posix_path.ts";
 import { forEachChildNode } from "../metrics/estree.ts";
 import { AMBIGUOUS_ALIAS } from "./aliases.ts";
@@ -57,14 +57,6 @@ const EXTENSIONS: readonly string[] = [".ts", ".tsx", ".mts", ".cts", ".js", ".j
 
 /** The file names a directory specifier resolves to. */
 const INDEX_FILES: readonly string[] = EXTENSIONS.map((extension) => `index${extension}`);
-
-/** The string value of a literal node, or null. */
-function literalText(value: unknown): string | null {
-  if (!isNodeLike(value)) return null;
-  const node = asNode(value);
-  if ((node.type === "StringLiteral" || node.type === "Literal") && typeof node.value === "string") return node.value;
-  return null;
-}
 
 /** True when the import or export is declared as type-only. */
 function isTypeOnly(node: ILintNode, specifierCount: number): boolean {
@@ -169,7 +161,7 @@ function specifiersOf(program: ILintNode, limitations: { nonliteral_dynamic: num
     if (!isNodeLike(statement)) continue;
     const node = asNode(statement);
     if (node.type === "ImportDeclaration") {
-      const text = literalText(node.source);
+      const text = stringLiteralValue(node.source);
       if (text === null) continue;
       const specifiers = Array.isArray(node.specifiers) ? node.specifiers : [];
       const sideEffect = specifiers.length === 0;
@@ -181,7 +173,7 @@ function specifiersOf(program: ILintNode, limitations: { nonliteral_dynamic: num
       continue;
     }
     if (node.type === "ExportNamedDeclaration" || node.type === "ExportAllDeclaration") {
-      const text = literalText(node.source);
+      const text = stringLiteralValue(node.source);
       if (text === null) continue;
       found.push({ text, kind: isTypeOnly(node, 1) ? "type" : "runtime", form: "re-export" });
     }
@@ -201,12 +193,12 @@ function specifiersOf(program: ILintNode, limitations: { nonliteral_dynamic: num
 /** The source of one dynamic import node, or null when the node is not a dynamic import. */
 function dynamicSourceOf(node: ILintNode): { readonly text: string | null } | null {
   if (node.type === "ImportExpression") {
-    return { text: literalText(node.source) };
+    return { text: stringLiteralValue(node.source) };
   }
   if (node.type !== "CallExpression" || !isNodeLike(node.callee)) return null;
   if (asNode(node.callee).type !== "Import") return null;
   const args = Array.isArray(node.arguments) ? node.arguments : [];
-  return { text: literalText(args[0]) };
+  return { text: stringLiteralValue(args[0]) };
 }
 
 /** Builds the structural and runtime projections of one parsed snapshot. */

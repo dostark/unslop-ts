@@ -7,10 +7,10 @@
  * @related-files [src/metrics/types.ts, src/metrics/context.ts, src/rules/max_cyclomatic_complexity.ts]
  */
 
-import { asNode, type ILintNode, isNodeLike, NODE_IDENTIFIER } from "../engine/type_environment.ts";
+import { asNode, type ILintNode, isNodeLike, NODE_IDENTIFIER, stringLiteralValue } from "../engine/type_environment.ts";
 import type { IRuleNode } from "../rules/types.ts";
 import { cognitiveContributions } from "./cognitive.ts";
-import { forEachChildNode, FUNCTION_KINDS, isFunctionUnitNode, rangeOf } from "./estree.ts";
+import { forEachChildNode, FUNCTION_KINDS, functionBody, isFunctionUnitNode, rangeOf } from "./estree.ts";
 import type {
   IFunctionMetrics,
   IFunctionUnit,
@@ -64,10 +64,7 @@ function identifierName(value: unknown): string | null {
 function keyName(value: unknown): string | null {
   const declared = identifierName(value);
   if (declared !== null) return declared;
-  if (!isNodeLike(value)) return null;
-  const node = asNode(value);
-  if ((node.type === "StringLiteral" || node.type === "Literal") && typeof node.value === "string") return node.value;
-  return null;
+  return stringLiteralValue(value);
 }
 
 /** The declared name with its accessor prefix, so a getter and a setter stay distinct. */
@@ -270,9 +267,9 @@ function cyclomaticContributions(
   options: IMetricOptions,
   context: IMeasurementContext,
 ): IMetricContribution[] {
+  const body = functionBody(asNode(unit.node));
+  if (body === null) return [];
   const fn = asNode(unit.node);
-  const body = fn.body;
-  if (!isNodeLike(body)) return [];
   const contributions: IMetricContribution[] = [];
   const visit = (node: ILintNode, parent: ILintNode | null): void => {
     if (node !== fn && FUNCTION_KINDS.has(node.type)) return;

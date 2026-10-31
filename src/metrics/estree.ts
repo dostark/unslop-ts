@@ -58,3 +58,8 @@ export function rangeOf(node: ILintNode): readonly [number, number] {
 export function isFunctionUnitNode(node: ILintNode): boolean {
   return FUNCTION_KINDS.has(node.type) && isNodeLike(node.body);
 }
+
+/** The function body node, or null when the host supplies no executable body. */
+export function functionBody(node: ILintNode): ILintNode | null {
+  return isNodeLike(node.body) ? asNode(node.body) : null;
+}

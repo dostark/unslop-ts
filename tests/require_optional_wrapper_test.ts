@@ -9,37 +9,18 @@
 import { assertEquals } from "@std/assert";
 import type { JsonValue } from "../mod.ts";
 import { runPlugin } from "../deno.ts";
-import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
-
-const TEST_SCOPES = {
-  test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
-  fixture: ["tests/scenario_framework/fixtures/**", "**/tests/fixtures/**"],
-};
+import {
+  createTestPlugin,
+  loadTestCatalog,
+  singleRuleCatalog,
+  STANDARD_TEST_SCOPES as TEST_SCOPES,
+} from "./helpers/registry.ts";
 
 const PROD = "packages/x/src/a.ts";
 
-function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, JsonValue> {
-  return {
-    version: "1",
-    scopes: TEST_SCOPES,
-    tagVocabulary: {
-      "type-safety": { description: "Rules that keep type evidence." },
-      deslop: { description: "Rule idea from deslop or anti-slop." },
-    },
-    rules: {
-      "demo/require-optional-wrapper": {
-        engine: "plugin",
-        severity: "error",
-        scope: "all",
-        tags: ["type-safety", "deslop"],
-        options,
-      },
-    },
-  };
-}
-
 function reports(source: string, options: Record<string, JsonValue> = {}): boolean {
-  const plugin = createTestPlugin(loadTestCatalog(buildCatalog(options)));
+  const catalog = singleRuleCatalog("require-optional-wrapper", options, TEST_SCOPES, "type-safety", "all");
+  const plugin = createTestPlugin(loadTestCatalog(catalog));
   return runPlugin(plugin, PROD, source).length > 0;
 }
 

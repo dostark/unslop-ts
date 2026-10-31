@@ -7,6 +7,7 @@
  * @related-files [tests/hosts/deno.ts]
  */
 
+import { testPluginSource } from "./helpers/registry.ts";
 import { assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { enginePins } from "./helpers/demo_project.ts";
@@ -39,19 +40,9 @@ Deno.test("the Deno runner matches a direct deno lint run", async () => {
   try {
     await Deno.mkdir(join(dir, "packages/x/src"), { recursive: true });
     await Deno.writeTextFile(join(dir, CASE.filename), CASE.code);
-    const mod = new URL("../mod.ts", import.meta.url).href;
-    const denoHost = new URL("../deno.ts", import.meta.url).href;
     await Deno.writeTextFile(
       join(dir, "plugin.ts"),
-      [
-        `import { DENO_RULE_PACK, parseCatalog, TYPESCRIPT_RULE_PACK } from ${JSON.stringify(mod)};`,
-        `import { createRuleRegistry } from ${JSON.stringify(mod)};`,
-        `import { createDenoPlugin } from ${JSON.stringify(denoHost)};`,
-        `const registry = createRuleRegistry("demo", [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK]);`,
-        `const catalog = parseCatalog(${JSON.stringify(CATALOG)}, { scriptRuleSchemas: null, registry });`,
-        `export default createDenoPlugin("demo", catalog, { rulePacks: [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK] });`,
-        "",
-      ].join("\n"),
+      testPluginSource(CATALOG),
     );
     await Deno.writeTextFile(
       join(dir, "deno.json"),

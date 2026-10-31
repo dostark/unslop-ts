@@ -7,6 +7,7 @@
  * @related-files [src/report/churn.ts, src/report/health.ts]
  */
 
+import { fixtureGit as git } from "./helpers/git_fixture.ts";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { runBounded } from "../src/report/bounded_io.ts";
@@ -24,28 +25,6 @@ const NOW = 1_800_000_000;
 const DAY = 86400;
 
 /** Runs Git in one directory with an isolated configuration. */
-async function git(cwd: string, args: readonly string[], env: Record<string, string> = {}): Promise<string> {
-  const output = await new Deno.Command("git", {
-    args: [...args],
-    cwd,
-    env: {
-      LD_LIBRARY_PATH: "",
-      GIT_CONFIG_GLOBAL: "/dev/null",
-      GIT_CONFIG_NOSYSTEM: "1",
-      GIT_AUTHOR_NAME: "Test",
-      GIT_AUTHOR_EMAIL: "test@example.com",
-      GIT_COMMITTER_NAME: "Test",
-      GIT_COMMITTER_EMAIL: "test@example.com",
-      ...env,
-    },
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  if (!output.success) {
-    throw new Error(`git ${args.join(" ")} failed: ${new TextDecoder().decode(output.stderr)}`);
-  }
-  return new TextDecoder().decode(output.stdout);
-}
 
 /** Commits every change with one fixed committer date. */
 async function commit(cwd: string, message: string, epoch: number): Promise<void> {

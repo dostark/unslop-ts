@@ -18,6 +18,7 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
  */
 
+import { flagValue } from "./flags.ts";
 import { fromFileUrl, relative } from "@std/path";
 import { CliError } from "./error.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
@@ -93,11 +94,6 @@ function parseTop(value: string | undefined): number {
   const top = Number(value);
   if (!Number.isInteger(top) || top < 1) return exitWithUsage("--top must be a positive integer.");
   return top;
-}
-
-function flagValue(args: readonly string[], name: string): string | undefined {
-  const prefix = `--${name}=`;
-  return args.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
 }
 
 async function runConstantRestatement(settings: IConstantRestatementSettings): Promise<void> {

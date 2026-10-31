@@ -7,13 +7,11 @@
  * @related-files [src/rules/mod.ts, src/metrics/function_metrics.ts, tests/max_cyclomatic_complexity_test.ts]
  */
 
-import { programOf } from "../engine/type_environment.ts";
 import type { JsonValue } from "../engine/catalog.ts";
 import { DEFAULT_MAX_CYCLOMATIC, DEFAULT_METRIC_VARIANT } from "../metrics/constants.ts";
-import { createMeasurementContext } from "../metrics/context.ts";
-import { functionUnits, measureFunction } from "../metrics/function_metrics.ts";
-import type { IFunctionUnit, IMetricOptions, MetricVariant } from "../metrics/types.ts";
-import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
+import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
+import type { IPluginRuleContext, IRuleContext, LintVisitor } from "./types.ts";
+import { functionMetricLimit } from "./function_metric_limit.ts";
 
 /** The counting variant a catalog pins, or the engine default. */
 function variantOf(options: Record<string, JsonValue>): MetricVariant {
@@ -27,24 +25,5 @@ export function createMaxCyclomaticComplexity(context: IRuleContext, ctx: IPlugi
     variant: variantOf(ctx.options),
     countNullish: ctx.options.countNullish !== false,
   };
-  const measurement = createMeasurementContext(context.sourceCode, context.filename);
-  const units = new Map<IRuleNode, IFunctionUnit>(
-    functionUnits(programOf(context.sourceCode), measurement).map((unit) => [unit.node, unit]),
-  );
-  const check = (rawNode: IRuleNode): void => {
-    const unit = units.get(rawNode);
-    if (unit === undefined) return;
-    const metrics = measureFunction(unit, options, measurement);
-    if (metrics.cyclomatic <= max) return;
-    context.report({
-      node: rawNode,
-      message: `Function ${metrics.name} has cyclomatic complexity ${metrics.cyclomatic} (limit ${max}).`,
-      hint: "Split the function into smaller, named helpers.",
-    });
-  };
-  return {
-    FunctionDeclaration: check,
-    FunctionExpression: check,
-    ArrowFunctionExpression: check,
-  };
+  return functionMetricLimit(context, options, max, "cyclomatic");
 }

@@ -7,6 +7,7 @@
  * @related-files [src/metrics/types.ts, src/metrics/function_metrics.ts]
  */
 
+import { lineAt, lineStarts } from "../engine/module_layout.ts";
 import { parse, type ParseResult, type ParserPlugin } from "@babel/parser";
 import type { IMeasurementContext, IMeasurementSource, IMetricPosition, IMetricToken } from "./types.ts";
 
@@ -34,7 +35,6 @@ const SYNTAX_PLUGINS: readonly ParserPlugin[] = [
 const END_OF_FILE_LABEL = "eof";
 const JSX_TEXT_LABEL = "jsxText";
 const QUESTION_DOT_LABEL = "?.";
-const NEWLINE = 0x0a;
 const SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([".cjs", ".cts"]);
 
 /** The lowercase extension of a filename, or the empty string. */
@@ -104,37 +104,22 @@ function collectTokens(tree: ParseResult, text: string): ICollectedTokens {
   return { tokens, optionalChainOffsets };
 }
 
-/** The UTF-16 offset at which each physical line starts, so offsets map to one-based positions. */
-function lineStartsOf(text: string): number[] {
-  const starts = [0];
-  for (let index = 0; index < text.length; index++) {
-    if (text.charCodeAt(index) === NEWLINE) starts.push(index + 1);
-  }
-  return starts;
-}
-
 /** The one-based line and column of an offset, found by binary search over the line starts. */
 function positionOf(starts: readonly number[], offset: number): IMetricPosition {
-  let low = 0;
-  let high = starts.length - 1;
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if (starts[middle] <= offset) low = middle;
-    else high = middle - 1;
-  }
-  return { line: low + 1, column: offset - starts[low] + 1 };
+  const line = lineAt(starts, offset);
+  return { line, column: offset - starts[line - 1] + 1 };
 }
 
 /** Builds the tokens and position lookup of an already parsed source text. */
 export function measurementContextOf(tree: ParseResult, text: string): IMeasurementContext {
   const collected = collectTokens(tree, text);
-  const lineStarts = lineStartsOf(text);
+  const starts = lineStarts(text);
   return {
     syntaxTree: tree,
     tokens: collected.tokens,
     optionalChainOffsets: collected.optionalChainOffsets,
     positionAt(offset: number): IMetricPosition {
-      return positionOf(lineStarts, offset);
+      return positionOf(starts, offset);
     },
   };
 }

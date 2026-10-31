@@ -10,33 +10,17 @@ import { assert, assertEquals } from "@std/assert";
 import type { JsonValue } from "../mod.ts";
 import { runPlugin } from "../deno.ts";
 import { CLASSIC_OPTIONS, measureAll, positionOf } from "./helpers/measurement.ts";
-import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
-
-const TEST_SCOPES = {
-  test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
-  fixture: ["tests/scenario_framework/fixtures/**", "**/tests/fixtures/**"],
-};
+import {
+  createTestPlugin,
+  loadTestCatalog,
+  singleRuleCatalog,
+  STANDARD_TEST_SCOPES as TEST_SCOPES,
+} from "./helpers/registry.ts";
 
 const PROD = "packages/x/src/a.ts";
 
 function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, JsonValue> {
-  return {
-    version: "1",
-    scopes: TEST_SCOPES,
-    tagVocabulary: {
-      complexity: { description: "Function size limits." },
-      deslop: { description: "Rule idea from deslop or anti-slop." },
-    },
-    rules: {
-      "demo/max-cyclomatic-complexity": {
-        engine: "plugin",
-        severity: "error",
-        scope: "prod",
-        tags: ["complexity", "deslop"],
-        options,
-      },
-    },
-  };
+  return singleRuleCatalog("max-cyclomatic-complexity", options, TEST_SCOPES, "complexity", "prod");
 }
 
 function messages(source: string, options: Record<string, JsonValue> = {}): string[] {

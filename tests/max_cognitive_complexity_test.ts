@@ -11,7 +11,7 @@ import type { JsonValue } from "../mod.ts";
 import { runPlugin } from "../deno.ts";
 import type { IMetricOptions } from "../src/metrics/types.ts";
 import { measureAll } from "./helpers/measurement.ts";
-import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
+import { createTestPlugin, loadTestCatalog, singleRuleCatalog } from "./helpers/registry.ts";
 
 const TEST_SCOPES = {
   test: ["**/tests/**", "**/*_test.ts", "**/*.test.ts"],
@@ -22,23 +22,7 @@ const COUNTING: IMetricOptions = { variant: "extended", countNullish: true };
 const NO_NULLISH: IMetricOptions = { variant: "extended", countNullish: false };
 
 function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, JsonValue> {
-  return {
-    version: "1",
-    scopes: TEST_SCOPES,
-    tagVocabulary: {
-      complexity: { description: "Function size limits." },
-      deslop: { description: "Rule idea from deslop or anti-slop." },
-    },
-    rules: {
-      "demo/max-cognitive-complexity": {
-        engine: "plugin",
-        severity: "error",
-        scope: "prod",
-        tags: ["complexity", "deslop"],
-        options,
-      },
-    },
-  };
+  return singleRuleCatalog("max-cognitive-complexity", options, TEST_SCOPES, "complexity", "prod");
 }
 
 function messages(source: string, options: Record<string, JsonValue> = {}): string[] {

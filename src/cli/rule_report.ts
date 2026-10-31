@@ -12,6 +12,7 @@
  *   deno run -A src/cli/rule_report.ts --rule=<id> --descriptor=<entry> --ceilings=<file> [--json] [--fail]
  */
 
+import { flagValue } from "./flags.ts";
 import { fromFileUrl, join, relative, resolve } from "@std/path";
 import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 import { parseTraceStderr, traceEnvName } from "../engine/trace.ts";
@@ -328,10 +329,6 @@ async function runDenoLint(
 }
 
 /** Reads one `--name=value` flag. */
-function flagValue(args: readonly string[], name: string): string | undefined {
-  const prefix = `--${name}=`;
-  return args.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
-}
 
 /** One ceiling evaluation beside the ranked report. */
 interface ICeilingReport {

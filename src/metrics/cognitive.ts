@@ -8,7 +8,7 @@
  */
 
 import { asNode, type ILintNode, isNodeLike, NODE_IDENTIFIER } from "../engine/type_environment.ts";
-import { forEachChildNode, FUNCTION_KINDS, rangeOf } from "./estree.ts";
+import { forEachChildNode, FUNCTION_KINDS, functionBody, rangeOf } from "./estree.ts";
 import type {
   IFunctionUnit,
   IMeasurementContext,
@@ -172,10 +172,10 @@ export function cognitiveContributions(
   options: IMetricOptions,
   context: IMeasurementContext,
 ): IMetricContribution[] {
-  const fn = asNode(unit.node);
-  const body = fn.body;
-  if (!isNodeLike(body)) return [];
+  const body = functionBody(asNode(unit.node));
+  if (body === null) return [];
   const contributions: IMetricContribution[] = [];
+  const fn = asNode(unit.node);
   const structural = (node: ILintNode, kind: MetricContributionKind, nesting: number): void => {
     contributions.push(cognitiveContribution(rangeOf(node)[0], kind, 1 + nesting, nesting, context));
   };

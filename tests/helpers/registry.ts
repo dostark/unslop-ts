@@ -34,3 +34,50 @@ export function loadTestCatalog(input: JsonValue): ICatalog {
 export function createTestPlugin(catalog: ICatalog): Deno.lint.Plugin {
   return createDenoPlugin(TEST_PLUGIN_NAME, catalog, { rulePacks: TEST_RULE_PACKS });
 }
+
+/** Builds a one-rule catalog while preserving each fixture's scopes and tags. */
+export function singleRuleCatalog(
+  key: string,
+  options: Record<string, JsonValue>,
+  scopes: Record<string, JsonValue>,
+  category: string,
+  scope: string,
+): Record<string, JsonValue> {
+  return {
+    version: "1",
+    scopes,
+    tagVocabulary: {
+      [category]: { description: "The tested rule category." },
+      deslop: { description: "Rule idea from deslop or anti-slop." },
+    },
+    rules: {
+      [`${TEST_PLUGIN_NAME}/${key}`]: {
+        engine: "plugin",
+        severity: "error",
+        scope,
+        tags: [category, "deslop"],
+        options,
+      },
+    },
+  };
+}
+
+export const STANDARD_TEST_SCOPES = {
+  test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
+  fixture: ["tests/scenario_framework/fixtures/**", "**/tests/fixtures/**"],
+};
+
+/** The standalone plugin fixture used by both direct and hosted lint tests. */
+export function testPluginSource(catalog: JsonValue): string {
+  const mod = new URL("../../mod.ts", import.meta.url).href;
+  const denoHost = new URL("../../deno.ts", import.meta.url).href;
+  return [
+    `import { DENO_RULE_PACK, parseCatalog, TYPESCRIPT_RULE_PACK } from ${JSON.stringify(mod)};`,
+    `import { createRuleRegistry } from ${JSON.stringify(mod)};`,
+    `import { createDenoPlugin } from ${JSON.stringify(denoHost)};`,
+    `const registry = createRuleRegistry("demo", [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK]);`,
+    `const catalog = parseCatalog(${JSON.stringify(catalog)}, { scriptRuleSchemas: null, registry });`,
+    `export default createDenoPlugin("demo", catalog, { rulePacks: [TYPESCRIPT_RULE_PACK, DENO_RULE_PACK] });`,
+    "",
+  ].join("\n");
+}
