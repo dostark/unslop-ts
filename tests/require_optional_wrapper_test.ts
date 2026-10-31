@@ -8,20 +8,10 @@
 
 import { assertEquals } from "@std/assert";
 import type { JsonValue } from "../mod.ts";
-import { runPlugin } from "../deno.ts";
-import {
-  createTestPlugin,
-  loadTestCatalog,
-  singleRuleCatalog,
-  STANDARD_TEST_SCOPES as TEST_SCOPES,
-} from "./helpers/registry.ts";
-
-const PROD = "packages/x/src/a.ts";
+import { findingsOf, runAt } from "./helpers/rule_runner.ts";
 
 function reports(source: string, options: Record<string, JsonValue> = {}): boolean {
-  const catalog = singleRuleCatalog("require-optional-wrapper", options, TEST_SCOPES, "type-safety", "all");
-  const plugin = createTestPlugin(loadTestCatalog(catalog));
-  return runPlugin(plugin, PROD, source).length > 0;
+  return findingsOf("require-optional-wrapper", runAt(source, "packages/x/src/a.ts", options)).length > 0;
 }
 
 Deno.test("require-optional-wrapper reports a bare ? parameter", () => {
