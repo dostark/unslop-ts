@@ -134,6 +134,39 @@ Deno.test("no-typeof-escape accepts a precise cast", () => {
   expectRule("demo/no-typeof-escape", "let x = y as string;", false);
 });
 
+const TEST_FILE = "packages/x/tests/a_test.ts";
+const FETCH_CAST = "let x = y as typeof globalThis.fetch;";
+
+Deno.test("no-typeof-escape allows the configured target in a test file, with the default option", () => {
+  expectRule("demo/no-typeof-escape", FETCH_CAST, false, TEST_FILE);
+});
+
+Deno.test("no-typeof-escape allows the configured target in a test file, with an explicit option", () => {
+  const overrides = { "demo/no-typeof-escape": { options: { allowedTypeofTargets: ["globalThis.fetch"] } } };
+  expectRule("demo/no-typeof-escape", FETCH_CAST, false, TEST_FILE, overrides);
+});
+
+Deno.test("no-typeof-escape allows the configured target in the angle-bracket form and with extra spacing", () => {
+  for (const source of ["let x = <typeof globalThis.fetch> y;", "let x = y as typeof   globalThis.fetch;"]) {
+    expectRule("demo/no-typeof-escape", source, false, TEST_FILE);
+  }
+});
+
+Deno.test("no-typeof-escape keeps reporting the configured target in a production file", () => {
+  expectRule("demo/no-typeof-escape", FETCH_CAST, true);
+});
+
+Deno.test("no-typeof-escape keeps reporting other targets in a test file", () => {
+  for (const source of ["let x = y as typeof Date.now;", "let x = y as typeof globalThis.fetchAll;"]) {
+    expectRule("demo/no-typeof-escape", source, true, TEST_FILE);
+  }
+});
+
+Deno.test("no-typeof-escape reports the configured target when the option lists none", () => {
+  const overrides = { "demo/no-typeof-escape": { options: { allowedTypeofTargets: [] } } };
+  expectRule("demo/no-typeof-escape", FETCH_CAST, true, TEST_FILE, overrides);
+});
+
 Deno.test("no-pass-through-type-alias reports an alias that only renames another alias", () => {
   expectRule("demo/no-pass-through-type-alias", "type B = string;\ntype A = B;", true);
   expectRule("demo/no-pass-through-type-alias", "type A = string;", false);

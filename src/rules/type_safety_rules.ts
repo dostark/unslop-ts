@@ -153,9 +153,12 @@ export function createNoUnsafeDictionary(context: IRuleContext, ctx: IPluginRule
     },
   };
 }
-/** The source text a `TSTypeQuery` names, for the allowed-target check. */
+/** The source text a `TSTypeQuery` names, without its `typeof` keyword, for the allowed-target check. */
 function queryText(node: ILintNode, text: string): string {
-  const range = node.range;
+  const target = node.exprName;
+  const range = target !== null && typeof target === "object" && !Array.isArray(target)
+    ? asNode(target).range
+    : undefined;
   return range ? text.slice(range[0], range[1]) : "";
 }
 
