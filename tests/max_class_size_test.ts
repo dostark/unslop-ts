@@ -73,3 +73,26 @@ Deno.test("max-class-size raises the score as the method count grows", () => {
   const largeScore = Number(large[0].message.match(/score (\d+)/)?.[1]);
   assertEquals(largeScore > smallScore, true);
 });
+
+Deno.test("class-legacy-message: the legacy score is unchanged and the message carries WMC, TCC and LCOM4", () => {
+  const found = findings(classSource(5), { minClassLines: 1, threshold: 1 });
+  assertEquals(found.length, 1);
+  assertEquals(
+    /^Class Big score \d+ \(limit 1; 5 methods, \d+ lines; WMC 5, TCC 0\.00, LCOM4 5\)\.$/.test(found[0].message),
+    true,
+  );
+  const single = findings("class One {\n  only(): number {\n    return 1;\n  }\n}\n", {
+    minClassLines: 1,
+    threshold: 0,
+  });
+  assertEquals(single[0].message.includes("TCC n/a"), true);
+});
+
+Deno.test("class-legacy-message: the wmcVariant option changes the WMC in the message", () => {
+  const source =
+    "class Reader {\n  read(box?: { value: number }): number | undefined {\n    return box?.value;\n  }\n}\n";
+  const classic = findings(source, { minClassLines: 1, threshold: 0 });
+  const extended = findings(source, { minClassLines: 1, threshold: 0, wmcVariant: "extended" });
+  assertEquals(classic[0].message.includes("WMC 1,"), true);
+  assertEquals(extended[0].message.includes("WMC 2,"), true);
+});

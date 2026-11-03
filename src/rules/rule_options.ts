@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { compilesAsRegex, RegexFlagsSchema, RegexSourceSchema } from "../engine/regex_option.ts";
 import {
+  DEFAULT_CLASS_WMC_VARIANT,
   DEFAULT_COUNT_NULLISH,
   DEFAULT_MAX_COGNITIVE,
   DEFAULT_MAX_CYCLOMATIC,
@@ -86,6 +87,7 @@ const MaxFunctionLinesOptions = z.object({
 const MaxClassSizeOptions = z.object({
   minClassLines: z.number().int().positive().default(200),
   threshold: z.number().nonnegative().default(60),
+  wmcVariant: MetricVariantSchema.default(DEFAULT_CLASS_WMC_VARIANT),
 }).strict();
 
 const RequireOptionalWrapperOptions = z.object({

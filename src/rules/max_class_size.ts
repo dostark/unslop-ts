@@ -9,6 +9,10 @@
  */
 
 import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/type_environment.ts";
+import { measureClass } from "../metrics/class_metrics.ts";
+import { DEFAULT_CLASS_WMC_VARIANT, DEFAULT_COUNT_NULLISH } from "../metrics/constants.ts";
+import { createMeasurementContext } from "../metrics/context.ts";
+import type { IClassMetrics, IMeasurementContext, IMetricOptions } from "../metrics/types.ts";
 import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
 
 /** Class-size indicators, matching the check_god_objects.ts metrics. */
@@ -116,11 +120,26 @@ function classNameOf(classNode: ILintNode): string {
   return "(anonymous)";
 }
 
+/** The shared metric options that weighted methods per class reads from the rule options. */
+function wmcOptionsOf(ctx: IPluginRuleContext): IMetricOptions {
+  return {
+    variant: ctx.options.wmcVariant === "extended" ? "extended" : DEFAULT_CLASS_WMC_VARIANT,
+    countNullish: DEFAULT_COUNT_NULLISH,
+  };
+}
+
+/** The cohesion text of a message: two decimals, or n/a when the class has fewer than two visible methods. */
+function tccText(metrics: IClassMetrics): string {
+  return metrics.tcc === null ? "n/a" : metrics.tcc.toFixed(2);
+}
+
 export function createMaxClassSize(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const minClassLines = typeof ctx.options.minClassLines === "number" ? ctx.options.minClassLines : 200;
   const threshold = typeof ctx.options.threshold === "number" ? ctx.options.threshold : 60;
   const importCount = countImports(programOf(context.sourceCode));
   const text = context.sourceCode.getText();
+  const wmcOptions = wmcOptionsOf(ctx);
+  let measurement: IMeasurementContext | undefined;
 
   const check = (rawNode: IRuleNode): void => {
     const node = asNode(rawNode);
@@ -128,11 +147,15 @@ export function createMaxClassSize(context: IRuleContext, ctx: IPluginRuleContex
     if (indicators === null) return;
     const score = classSizeScore(indicators, minClassLines);
     if (score < threshold) return;
+    measurement ??= createMeasurementContext(context.sourceCode, context.filename);
+    const metrics = measureClass(node, wmcOptions, measurement);
     context.report({
       node: rawNode,
-      message: `Class ${
-        classNameOf(node)
-      } score ${score} (limit ${threshold}; ${indicators.methodCount} methods, ${indicators.lineCount} lines).`,
+      message:
+        `Class ${
+          classNameOf(node)
+        } score ${score} (limit ${threshold}; ${indicators.methodCount} methods, ${indicators.lineCount} lines; ` +
+        `WMC ${metrics.wmc}, TCC ${tccText(metrics)}, LCOM4 ${metrics.lcom4}).`,
       hint: "Split the class into smaller, focused units.",
     });
   };

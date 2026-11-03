@@ -322,7 +322,7 @@
         ],
         "line": 1,
         "column": 8,
-        "message": "Class A score 3 (limit 1; 2 methods, 1 lines)."
+        "message": "Class A score 3 (limit 1; 2 methods, 1 lines; WMC 2, TCC 0.00, LCOM4 2)."
       }
     ]
   },

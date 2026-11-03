@@ -28,7 +28,7 @@ export interface IMeasuredSource {
 }
 
 /** Captures the Deno host AST of one source unit, the tree every Deno rule receives. */
-function denoProgram(source: string, filename = FIXTURE_PATH): IRuleNode {
+export function denoProgram(source: string, filename = FIXTURE_PATH): IRuleNode {
   let captured: IRuleNode | undefined;
   const plugin: Deno.lint.Plugin = {
     name: "capture",

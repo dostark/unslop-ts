@@ -102,3 +102,27 @@ export interface IFunctionMetrics extends IMetricPosition {
   readonly params: number;
   readonly contributions: readonly IMetricContribution[];
 }
+
+/** How a class metric obtained its foreign-data and coupling values. */
+export type ClassMetricPrecision = "syntactic" | "typed";
+
+/** The design metrics of one class. Report-only fields are null or zero in the per-file rule. */
+export interface IClassMetrics {
+  readonly name: string;
+  readonly line: number;
+  readonly nom: number;
+  readonly wmc: number;
+  readonly loc: number;
+  readonly noa: number;
+  readonly tcc: number | null;
+  readonly lcom4: number;
+  readonly atfd: number;
+  readonly cbo: number;
+  readonly rfc: number | null;
+  readonly dit: number | null;
+  readonly noc: number | null;
+  readonly woc: number | null;
+  readonly noap: number;
+  readonly noam: number;
+  readonly precision: ClassMetricPrecision;
+}

@@ -24,5 +24,8 @@ export const METRIC_VARIANTS = ["classic", "extended"] as const;
 /** The variant the engine counts when a catalog does not pin one. */
 export const DEFAULT_METRIC_VARIANT: MetricVariant = "extended";
 
+/** The variant that weighted methods per class counts. The God Class limits come from classic McCabe counts. */
+export const DEFAULT_CLASS_WMC_VARIANT: MetricVariant = "classic";
+
 /** True when the cognitive metric counts nullish-coalescing runs by default. */
 export const DEFAULT_COUNT_NULLISH = true;
