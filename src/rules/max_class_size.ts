@@ -10,7 +10,13 @@
 
 import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/type_environment.ts";
 import { measureClass } from "../metrics/class_metrics.ts";
-import { DEFAULT_CLASS_WMC_VARIANT, DEFAULT_COUNT_NULLISH } from "../metrics/constants.ts";
+import {
+  DEFAULT_CLASS_WMC_VARIANT,
+  DEFAULT_COUNT_NULLISH,
+  DEFAULT_GOD_CLASS_ATFD_FEW,
+  DEFAULT_GOD_CLASS_TCC_LIMIT,
+  DEFAULT_GOD_CLASS_WMC_VERY_HIGH,
+} from "../metrics/constants.ts";
 import { createMeasurementContext } from "../metrics/context.ts";
 import type { IClassMetrics, IMeasurementContext, IMetricOptions } from "../metrics/types.ts";
 import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
@@ -133,7 +139,49 @@ function tccText(metrics: IClassMetrics): string {
   return metrics.tcc === null ? "n/a" : metrics.tcc.toFixed(2);
 }
 
-export function createMaxClassSize(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
+/** The three limits of the God Class strategy. */
+interface IGodClassLimits {
+  readonly wmcVeryHigh: number;
+  readonly tccLimit: number;
+  readonly atfdFew: number;
+}
+
+function godClassLimitsOf(ctx: IPluginRuleContext): IGodClassLimits {
+  const { wmcVeryHigh, tccLimit, atfdFew } = ctx.options;
+  return {
+    wmcVeryHigh: typeof wmcVeryHigh === "number" ? wmcVeryHigh : DEFAULT_GOD_CLASS_WMC_VERY_HIGH,
+    tccLimit: typeof tccLimit === "number" ? tccLimit : DEFAULT_GOD_CLASS_TCC_LIMIT,
+    atfdFew: typeof atfdFew === "number" ? atfdFew : DEFAULT_GOD_CLASS_ATFD_FEW,
+  };
+}
+
+/** True when the class is complex, incoherent and reaches into the data of other classes. A null TCC never qualifies. */
+function isGodClass(metrics: IClassMetrics, limits: IGodClassLimits): boolean {
+  if (metrics.tcc === null) return false;
+  return metrics.wmc >= limits.wmcVeryHigh && metrics.tcc < limits.tccLimit && metrics.atfd > limits.atfdFew;
+}
+
+/** The God Class strategy of Lanza and Marinescu: WMC, TCC and ATFD decide, and the size score does not. */
+function createGodClass(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
+  const limits = godClassLimitsOf(ctx);
+  const wmcOptions = wmcOptionsOf(ctx);
+  let measurement: IMeasurementContext | undefined;
+  const check = (rawNode: IRuleNode): void => {
+    measurement ??= createMeasurementContext(context.sourceCode, context.filename);
+    const metrics = measureClass(asNode(rawNode), wmcOptions, measurement);
+    if (!isGodClass(metrics, limits)) return;
+    context.report({
+      node: rawNode,
+      message: `Class ${metrics.name} is a god class (WMC ${metrics.wmc} >= ${limits.wmcVeryHigh}, ` +
+        `TCC ${tccText(metrics)} < ${limits.tccLimit.toFixed(2)}, ATFD ${metrics.atfd} > ${limits.atfdFew}).`,
+      hint: "Split the class so that each part owns one responsibility and its own data.",
+    });
+  };
+  return { ClassDeclaration: check };
+}
+
+/** The legacy strategy: the weighted size score and its minimum line count. */
+function createLegacyScore(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
   const minClassLines = typeof ctx.options.minClassLines === "number" ? ctx.options.minClassLines : 200;
   const threshold = typeof ctx.options.threshold === "number" ? ctx.options.threshold : 60;
   const importCount = countImports(programOf(context.sourceCode));
@@ -161,4 +209,8 @@ export function createMaxClassSize(context: IRuleContext, ctx: IPluginRuleContex
   };
 
   return { ClassDeclaration: check };
+}
+
+export function createMaxClassSize(context: IRuleContext, ctx: IPluginRuleContext): LintVisitor {
+  return ctx.options.strategy === "legacy-score" ? createLegacyScore(context, ctx) : createGodClass(context, ctx);
 }

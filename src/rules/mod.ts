@@ -264,11 +264,12 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
     "max-class-size": {
       overlaps: [{ ecosystem: "eslint", rule: "max-classes-per-file", kind: "related" }],
       meta: {
-        description: "A class whose size score reaches the threshold.",
+        description: "A god class: complex, incoherent and reaching into other classes' data, or a legacy size score.",
         category: "complexity",
         docs: "#complexity-rules",
         preset: "strict",
-        limits: "The score is per class; a class under the minimum line count is skipped before scoring.",
+        limits:
+          "The metrics are per class and per file. ATFD counts reads through identifier or this.field receivers and CBO counts imported or declared types, both as syntactic approximations. The legacy score skips a class under the minimum line count.",
       },
       requiresTestGlobs: false,
       create: createMaxClassSize,

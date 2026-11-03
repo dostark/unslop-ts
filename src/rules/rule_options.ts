@@ -10,8 +10,13 @@
 import { z } from "zod";
 import { compilesAsRegex, RegexFlagsSchema, RegexSourceSchema } from "../engine/regex_option.ts";
 import {
+  CLASS_SIZE_STRATEGIES,
+  DEFAULT_CLASS_SIZE_STRATEGY,
   DEFAULT_CLASS_WMC_VARIANT,
   DEFAULT_COUNT_NULLISH,
+  DEFAULT_GOD_CLASS_ATFD_FEW,
+  DEFAULT_GOD_CLASS_TCC_LIMIT,
+  DEFAULT_GOD_CLASS_WMC_VERY_HIGH,
   DEFAULT_MAX_COGNITIVE,
   DEFAULT_MAX_CYCLOMATIC,
   DEFAULT_MAX_FUNCTION_LINES,
@@ -84,7 +89,13 @@ const MaxFunctionLinesOptions = z.object({
   max: z.number().int().positive().default(DEFAULT_MAX_FUNCTION_LINES),
 }).strict();
 
+const ClassSizeStrategySchema = z.enum(CLASS_SIZE_STRATEGIES);
+
 const MaxClassSizeOptions = z.object({
+  strategy: ClassSizeStrategySchema.default(DEFAULT_CLASS_SIZE_STRATEGY),
+  wmcVeryHigh: z.number().int().positive().default(DEFAULT_GOD_CLASS_WMC_VERY_HIGH),
+  tccLimit: z.number().min(0).max(1).default(DEFAULT_GOD_CLASS_TCC_LIMIT),
+  atfdFew: z.number().int().nonnegative().default(DEFAULT_GOD_CLASS_ATFD_FEW),
   minClassLines: z.number().int().positive().default(200),
   threshold: z.number().nonnegative().default(60),
   wmcVariant: MetricVariantSchema.default(DEFAULT_CLASS_WMC_VARIANT),

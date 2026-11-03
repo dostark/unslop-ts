@@ -316,6 +316,7 @@
         "code": "export class A { m() { return 1; } n() { return 2; } }\n",
         "options": [
           {
+            "strategy": "legacy-score",
             "minClassLines": 1,
             "threshold": 1
           }
