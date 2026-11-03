@@ -9,6 +9,7 @@
 
 import { asNode, type ILintNode, isNodeLike, stringLiteralValue } from "../engine/type_environment.ts";
 import type { IRuleNode } from "../rules/types.ts";
+import { measureCoupling } from "./class_coupling.ts";
 import { forEachChildNode, rangeOf } from "./estree.ts";
 import { functionUnits, measureFunction } from "./function_metrics.ts";
 import type { IClassMetrics, IMeasurementContext, IMetricOptions } from "./types.ts";
@@ -228,6 +229,7 @@ export function measureClass(
   const attributes = attributeNames(members);
   const methods = methodRecords(members, attributes);
   const range = rangeOf(classNode);
+  const coupling = measureCoupling(classNode, context);
   return {
     name: classNameOf(classNode),
     line: context.positionAt(range[0]).line,
@@ -237,8 +239,8 @@ export function measureClass(
     noa: attributes.size,
     tcc: tightClassCohesion(methods),
     lcom4: connectedComponents(methods),
-    atfd: 0,
-    cbo: 0,
+    atfd: coupling.atfd,
+    cbo: coupling.cbo,
     rfc: null,
     dit: null,
     noc: null,

@@ -11,6 +11,7 @@ import ts from "typescript";
 import { hasPragma, isExported } from "./declaration_markers.ts";
 import { createDefinitionReach, definitionKey, type IDefinitionReach, type IFileBindings } from "./definition_reach.ts";
 import { type AccessTargets, type IReceiverContext, type ITypeDef, recordTypedAccesses } from "./class_receivers.ts";
+import { resolveHeritage } from "../../metrics/heritage.ts";
 import type { IModuleGraph } from "./unused_exports_resolved.ts";
 
 const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-class-member\b/;
@@ -335,11 +336,7 @@ function unusedOf(
 /** The types that a class or interface extends or implements, as the walked files declare them. */
 function parentsFor(context: IClassContext, def: ITypeDef): ITypeDef[] {
   const bindings = bindingsFor(context, def.repoPath);
-  const parents: ITypeDef[] = [];
-  for (const name of heritageNames(def.node)) {
-    if (name !== null) parents.push(...bindings.names.get(name) ?? []);
-  }
-  return parents;
+  return resolveHeritage(heritageNames(def.node), (name) => bindings.names.get(name) ?? []);
 }
 
 /** The lookups that receiver typing needs, with the family of a type memoized. */

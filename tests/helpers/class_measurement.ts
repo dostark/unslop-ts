@@ -23,6 +23,11 @@ function classNodesUnder(root: ILintNode, found: ILintNode[]): ILintNode[] {
   return found;
 }
 
+/** Every class node of a source unit on the Deno host AST. */
+export function classNodesOf(source: string, filename = FIXTURE_PATH): readonly ILintNode[] {
+  return classNodesUnder(asNode(denoProgram(source, filename)), []);
+}
+
 /** Measures every class of a source unit on the Deno host AST. */
 export function measureClasses(
   source: string,
@@ -30,6 +35,5 @@ export function measureClasses(
   filename = FIXTURE_PATH,
 ): readonly IClassMetrics[] {
   const context = createMeasurementContext({ text: source }, filename);
-  const program = asNode(denoProgram(source, filename));
-  return classNodesUnder(program, []).map((node) => measureClass(node, options, context));
+  return classNodesOf(source, filename).map((node) => measureClass(node, options, context));
 }
