@@ -432,7 +432,7 @@ deno run --allow-read --allow-env --allow-run=git,node src/cli/unslop.ts health 
 
 The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, `--max-cyclomatic`,
 `--max-cognitive`, `--max-lines`, `--max-crap`, `--coverage`, `--variant=classic|extended`, `--count-nullish`,
-`--top`, `--sort`, `--since`, `--min-commits` and `--min-score`.
+`--top`, `--sort`, `--since`, `--min-commits`, `--min-score`, `--classes` and `--top-classes`.
 
 - **Permissions:** the command reads the project and the environment, and it runs `git` and `node`. The
   duplication signal needs the configured `jscpd` release in local `node_modules` or the pinned Deno npm
@@ -461,6 +461,17 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
   are `not_measured`, carry no penalty, and do not make the supported-signal score partial. A partial report prints
   no grade. Without `--min-score`, the score is advisory and does not affect the exit code. With `--min-score`,
   a partial score or a score below the threshold exits 1; `--min-score=0` gates completeness only.
+
+- **Class design:** the report adds three top-level keys that the fallow-compatible keys do not read, and the text view prints
+  them after the score under the label `unslop extension`. `class_scores` holds the metrics of every class, `design_findings`
+  holds the God Class, Data Class and Feature Envy matches with the values that made them match, and `class_thresholds` holds
+  the sourced default limits beside the limits that this project's classes derive. `--classes` prints only this section, and
+  `--top-classes` limits the text rows. Each class carries a `precision` label: `typed` for a class that both the Babel tree
+  and the TypeScript compiler tree report, and `syntactic` for the rest. The health score and its formula do not change.
+- **Class-size rule:** the `max-class-size` rule has a `strategy` option. `god-class`, the default, reports a class when WMC,
+  TCC and ATFD all cross their limits. `legacy-score` keeps the earlier weighted size score, and only it reads `minClassLines`
+  and `threshold`. The rule reads one file, so its ATFD and CBO are `syntactic`. The limits and their sources are in
+  [docs/metrics_methodology.md](docs/metrics_methodology.md).
 
 The `./metrics` entry exports the measurement API: `createMeasurementContext`, `functionUnits`,
 `measureFunction`, `METRIC_CONTRIBUTION_KINDS` and the metric types. The `./report` entry exports the report

@@ -380,17 +380,41 @@ Keep functions and classes small enough to read in one pass.
   [Metrics methodology](metrics_methodology.md).
 - **Function size:** a function owns at most 60 code-token lines by default. Comments and blank lines never
   count, and a nested function body belongs to that function, not to its parent.
-- **Class size:** a class of at least 200 lines gets a score from its method count, constructor parameters,
-  length, longest method, imports, and fields. A score of 60 or more is a god object. Split it into focused
-  classes.
+- **Class design:** a class is judged by what it does, not by its length alone. The class metric core measures these
+  values for each class:
+  - **NOM** and **NOA** count the methods (accessors included, the constructor not) and the attributes.
+  - **WMC** sums the classic cyclomatic values of the constructor and the methods.
+  - **TCC** is the share of visible method pairs that read a common attribute, and **LCOM4** is the number of
+    connected groups of methods that share an attribute or call each other through `this`.
+  - **ATFD** counts the distinct attributes of other classes that the class reads. **LAA** is the share of the
+    attributes a method reads that belong to its own class, and **FDP** counts the classes whose attributes the
+    method reads.
+  - **CBO** counts the classes that the class is coupled to, and **RFC** is NOM plus the distinct methods of other
+    types that it calls.
+  - **DIT** is the depth of the `extends` chain, and **NOC** counts the direct subclasses.
+  - **WOC** is the share of public members that are functional methods, **NOAP** counts public attributes and
+    **NOAM** counts public accessor methods.
+- **Class strategies:** the `max-class-size` rule has a `strategy` option. The default, `god-class`, reports a
+  God Class: WMC at least 47, TCC below one third and ATFD above 5. The health report also finds a Data Class (a class
+  that mostly holds public data) and Feature Envy (a method that uses the data of other classes more than its own).
+  The limits are second-hand values from the literature, and the methodology lists each with its sources and the date
+  they were read. `legacy-score` keeps the earlier weighted size score: a class of at least `minClassLines` lines
+  gets a score from its methods, constructor parameters, length, longest method, imports and fields, and a score of
+  `threshold` or more is reported. `minClassLines` and `threshold` apply only to `legacy-score`.
+- **Precision:** the rule reads one file, so its ATFD and CBO are syntactic approximations. The health report
+  types the receivers across files, and its values carry the label `typed`. The two can differ.
+- **Activation:** the generic preset leaves both rules off, so `max-params` and `max-class-size` stay opt-in until a
+  project turns them on. A project decides its own gate. One may fail default lint above 7 parameters, and one may
+  hold god classes under per-package ceilings. The definitions, the limits with their sources, the legacy score and
+  the limits of syntax are in [Metrics methodology](metrics_methodology.md).
 
-| Rule                        | Reports                                                 |
-| --------------------------- | ------------------------------------------------------- |
-| `max-params`                | A function with more parameters than the limit (opt-in) |
-| `max-cyclomatic-complexity` | A function whose complexity exceeds the limit           |
-| `max-cognitive-complexity`  | A function whose cognitive complexity exceeds the limit |
-| `max-function-lines`        | A function with more code-token lines than the limit    |
-| `max-class-size`            | A class whose size score reaches the threshold (opt-in) |
+| Rule                        | Reports                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `max-params`                | A function with more parameters than the limit (opt-in)                                     |
+| `max-cyclomatic-complexity` | A function whose complexity exceeds the limit                                               |
+| `max-cognitive-complexity`  | A function whose cognitive complexity exceeds the limit                                     |
+| `max-function-lines`        | A function with more code-token lines than the limit                                        |
+| `max-class-size`            | A god class, or with `legacy-score` a class whose size score reaches the threshold (opt-in) |
 
 ## Optional Parameters {#optional-parameters}
 
