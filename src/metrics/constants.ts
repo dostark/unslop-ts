@@ -33,14 +33,5 @@ export const CLASS_SIZE_STRATEGIES = ["god-class", "legacy-score"] as const;
 /** The strategy that the class-size rule applies when a catalog does not pin one. */
 export const DEFAULT_CLASS_SIZE_STRATEGY: (typeof CLASS_SIZE_STRATEGIES)[number] = "god-class";
 
-/** The God Class limit of weighted methods per class. */
-export const DEFAULT_GOD_CLASS_WMC_VERY_HIGH = 47;
-
-/** The God Class limit of tight class cohesion: a class below it is incoherent. */
-export const DEFAULT_GOD_CLASS_TCC_LIMIT = 1 / 3;
-
-/** The God Class limit of access to foreign data: a class above it reaches into other classes. */
-export const DEFAULT_GOD_CLASS_ATFD_FEW = 5;
-
 /** True when the cognitive metric counts nullish-coalescing runs by default. */
 export const DEFAULT_COUNT_NULLISH = true;

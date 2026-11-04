@@ -106,7 +106,7 @@ export interface IFunctionMetrics extends IMetricPosition {
 /** How a class metric obtained its foreign-data and coupling values. */
 export type ClassMetricPrecision = "syntactic" | "typed";
 
-/** The design metrics of one class. Report-only fields are null or zero in the per-file rule. */
+/** The design metrics of one class. RFC, DIT and NOC are null until the class pass types them. */
 export interface IClassMetrics {
   readonly name: string;
   readonly line: number;

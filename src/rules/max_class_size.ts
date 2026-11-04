@@ -10,13 +10,8 @@
 
 import { asNode, type ILintNode, isNodeLike, programOf, walk } from "../engine/type_environment.ts";
 import { measureClass } from "../metrics/class_metrics.ts";
-import {
-  DEFAULT_CLASS_WMC_VARIANT,
-  DEFAULT_COUNT_NULLISH,
-  DEFAULT_GOD_CLASS_ATFD_FEW,
-  DEFAULT_GOD_CLASS_TCC_LIMIT,
-  DEFAULT_GOD_CLASS_WMC_VERY_HIGH,
-} from "../metrics/constants.ts";
+import { CLASS_THRESHOLDS } from "../metrics/class_thresholds.ts";
+import { DEFAULT_CLASS_WMC_VARIANT, DEFAULT_COUNT_NULLISH } from "../metrics/constants.ts";
 import { createMeasurementContext } from "../metrics/context.ts";
 import type { IClassMetrics, IMeasurementContext, IMetricOptions } from "../metrics/types.ts";
 import type { IPluginRuleContext, IRuleContext, IRuleNode, LintVisitor } from "./types.ts";
@@ -149,9 +144,9 @@ interface IGodClassLimits {
 function godClassLimitsOf(ctx: IPluginRuleContext): IGodClassLimits {
   const { wmcVeryHigh, tccLimit, atfdFew } = ctx.options;
   return {
-    wmcVeryHigh: typeof wmcVeryHigh === "number" ? wmcVeryHigh : DEFAULT_GOD_CLASS_WMC_VERY_HIGH,
-    tccLimit: typeof tccLimit === "number" ? tccLimit : DEFAULT_GOD_CLASS_TCC_LIMIT,
-    atfdFew: typeof atfdFew === "number" ? atfdFew : DEFAULT_GOD_CLASS_ATFD_FEW,
+    wmcVeryHigh: typeof wmcVeryHigh === "number" ? wmcVeryHigh : CLASS_THRESHOLDS.wmcVeryHigh.value,
+    tccLimit: typeof tccLimit === "number" ? tccLimit : CLASS_THRESHOLDS.tccLimit.value,
+    atfdFew: typeof atfdFew === "number" ? atfdFew : CLASS_THRESHOLDS.atfdFew.value,
   };
 }
 

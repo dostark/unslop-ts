@@ -14,15 +14,13 @@ import {
   DEFAULT_CLASS_SIZE_STRATEGY,
   DEFAULT_CLASS_WMC_VARIANT,
   DEFAULT_COUNT_NULLISH,
-  DEFAULT_GOD_CLASS_ATFD_FEW,
-  DEFAULT_GOD_CLASS_TCC_LIMIT,
-  DEFAULT_GOD_CLASS_WMC_VERY_HIGH,
   DEFAULT_MAX_COGNITIVE,
   DEFAULT_MAX_CYCLOMATIC,
   DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_METRIC_VARIANT,
   METRIC_VARIANTS,
 } from "../metrics/constants.ts";
+import { CLASS_THRESHOLDS } from "../metrics/class_thresholds.ts";
 import { DEFAULT_REASON_SEPARATOR } from "./deno/ignore_directive.ts";
 import { DEFAULT_FORBIDDEN_IGNORES } from "./deno/no_forbidden_lint_ignore.ts";
 import { DEFAULT_DENO_SHEBANG } from "./deno/require_deno_shebang.ts";
@@ -93,9 +91,9 @@ const ClassSizeStrategySchema = z.enum(CLASS_SIZE_STRATEGIES);
 
 const MaxClassSizeOptions = z.object({
   strategy: ClassSizeStrategySchema.default(DEFAULT_CLASS_SIZE_STRATEGY),
-  wmcVeryHigh: z.number().int().positive().default(DEFAULT_GOD_CLASS_WMC_VERY_HIGH),
-  tccLimit: z.number().min(0).max(1).default(DEFAULT_GOD_CLASS_TCC_LIMIT),
-  atfdFew: z.number().int().nonnegative().default(DEFAULT_GOD_CLASS_ATFD_FEW),
+  wmcVeryHigh: z.number().int().positive().default(CLASS_THRESHOLDS.wmcVeryHigh.value),
+  tccLimit: z.number().min(0).max(1).default(CLASS_THRESHOLDS.tccLimit.value),
+  atfdFew: z.number().int().nonnegative().default(CLASS_THRESHOLDS.atfdFew.value),
   minClassLines: z.number().int().positive().default(200),
   threshold: z.number().nonnegative().default(60),
   wmcVariant: MetricVariantSchema.default(DEFAULT_CLASS_WMC_VARIANT),

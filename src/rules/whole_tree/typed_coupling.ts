@@ -14,29 +14,38 @@ import {
   type IClassAccess,
   type IReceiverContext,
   type ITypeDef,
+  methodMemberOwner,
   recordClassAccesses,
   typeReferenceDefs,
 } from "./class_receivers.ts";
 import type { ITypeContext } from "./class_context.ts";
 
-/** The typed foreign-data and coupling counts of one class. */
+/** The typed foreign-data, coupling and call counts of one class. */
 export interface ITypedCoupling {
   readonly atfd: number;
   readonly cbo: number;
+  /** The distinct methods of other types that the class calls. RFC adds the methods of the class itself. */
+  readonly calledMethods: number;
 }
 
 /** What one class has been seen to use so far. */
 interface IUsage {
   readonly foreignData: Set<string>;
+  readonly calledMethods: Set<string>;
   readonly coupled: Set<ITypeDef>;
 }
 
 const MEMBER_SEPARATOR = "\0";
 
+/** The key of a member: the type that declares it and its name. */
+function memberKey(owner: ITypeDef, name: string): string {
+  return [owner.repoPath, owner.name, name].join(MEMBER_SEPARATOR);
+}
+
 function usageOf(into: Map<ITypeDef, IUsage>, def: ITypeDef): IUsage {
   const known = into.get(def);
   if (known) return known;
-  const created = { foreignData: new Set<string>(), coupled: new Set<ITypeDef>() };
+  const created = { foreignData: new Set<string>(), calledMethods: new Set<string>(), coupled: new Set<ITypeDef>() };
   into.set(def, created);
   return created;
 }
@@ -64,11 +73,28 @@ function recordForeignData(
   }
 }
 
+/** Adds the methods of other types that a call reaches, leaving out the class family itself. */
+function recordCalledMethods(
+  receivers: IReceiverContext,
+  access: IClassAccess,
+  targets: readonly ITypeDef[],
+  usage: IUsage,
+): void {
+  if (access.role !== "call") return;
+  const family = receivers.familyOf(access.enclosing);
+  for (const target of targets) {
+    if (family.has(target)) continue;
+    const owner = methodMemberOwner(receivers, target, access.name);
+    if (owner) usage.calledMethods.add(memberKey(owner, access.name));
+  }
+}
+
 function recordAccess(receivers: IReceiverContext, access: IClassAccess, into: Map<ITypeDef, IUsage>): void {
   if (access.targets === null) return;
   const usage = usageOf(into, access.enclosing);
   for (const target of access.targets) usage.coupled.add(target);
   recordForeignData(receivers, access, access.targets, usage);
+  recordCalledMethods(receivers, access, access.targets, usage);
 }
 
 /** Adds the types that the declaration of a class names: type references, `new` expressions and its heritage. */
@@ -100,7 +126,7 @@ export function typedCouplingOf(
     const usage = usageOf(usages, def);
     recordDeclared(receivers, def, usage);
     usage.coupled.delete(def);
-    result.set(def, { atfd: usage.foreignData.size, cbo: usage.coupled.size });
+    result.set(def, { atfd: usage.foreignData.size, cbo: usage.coupled.size, calledMethods: usage.calledMethods.size });
   }
   return result;
 }

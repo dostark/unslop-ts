@@ -32,6 +32,8 @@ const CLASS_KINDS: ReadonlySet<string> = new Set(["ClassDeclaration", "ClassExpr
 const PRIVATE_NAME_KINDS: ReadonlySet<string> = new Set(["PrivateIdentifier", "PrivateName"]);
 const MEMBER_ACCESS_KINDS: ReadonlySet<string> = new Set(["MemberExpression", "OptionalMemberExpression"]);
 const CONSTRUCTOR_KIND = "constructor";
+const ACCESSOR_KINDS: ReadonlySet<string> = new Set(["get", "set"]);
+const HIDDEN_ACCESSIBILITY: ReadonlySet<string> = new Set(["private", "protected"]);
 const PARAMETER_PROPERTY = "TSParameterProperty";
 const PRIVATE_ACCESSIBILITY = "private";
 const PRIVATE_PREFIX = "#";
@@ -100,6 +102,35 @@ function attributeNames(members: readonly ILintNode[]): Set<string> {
     }
   }
   return names;
+}
+
+/** The public surface of a class: its functional methods, accessor methods and attributes. */
+interface IPublicSurface {
+  readonly woc: number | null;
+  readonly noap: number;
+  readonly noam: number;
+}
+
+/** True for a member that is not private, protected or a `#` name. */
+function isPublicMember(member: ILintNode): boolean {
+  if (typeof member.accessibility === "string" && HIDDEN_ACCESSIBILITY.has(member.accessibility)) return false;
+  return !(isNodeLike(member.key) && PRIVATE_NAME_KINDS.has(asNode(member.key).type));
+}
+
+/** Weight of class and the public attribute and accessor counts. A parameter property is skipped: the Deno AST omits its accessibility. */
+function publicSurface(members: readonly ILintNode[]): IPublicSurface {
+  let functional = 0;
+  let accessors = 0;
+  let attributes = 0;
+  for (const member of members) {
+    if (isConstructor(member)) continue;
+    if (METHOD_KINDS.has(member.type) && isPublicMember(member)) {
+      if (typeof member.kind === "string" && ACCESSOR_KINDS.has(member.kind)) accessors++;
+      else functional++;
+    } else if (PROPERTY_KINDS.has(member.type) && isPublicMember(member)) attributes++;
+  }
+  const total = functional + accessors + attributes;
+  return { woc: total === 0 ? null : functional / total, noap: attributes, noam: accessors };
 }
 
 /** The member name that `this.name` reads, or null when the node is not such a read. */
@@ -230,6 +261,7 @@ export function measureClass(
   const methods = methodRecords(members, attributes);
   const range = rangeOf(classNode);
   const coupling = measureCoupling(classNode, context);
+  const surface = publicSurface(members);
   return {
     name: classNameOf(classNode),
     line: context.positionAt(range[0]).line,
@@ -244,9 +276,9 @@ export function measureClass(
     rfc: null,
     dit: null,
     noc: null,
-    woc: null,
-    noap: 0,
-    noam: 0,
+    woc: surface.woc,
+    noap: surface.noap,
+    noam: surface.noam,
     precision: "syntactic",
   };
 }

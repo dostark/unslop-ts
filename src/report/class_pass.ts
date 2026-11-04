@@ -13,6 +13,7 @@ import { measureClass } from "../metrics/class_metrics.ts";
 import { forEachChildNode, rangeOf } from "../metrics/estree.ts";
 import type { IClassMetrics, IMetricOptions } from "../metrics/types.ts";
 import { createReceiverContext, createTypeContext } from "../rules/whole_tree/class_context.ts";
+import { hierarchyOf, type IHierarchy } from "../rules/whole_tree/class_hierarchy.ts";
 import type { ITypeDef } from "../rules/whole_tree/class_receivers.ts";
 import { type ITypedCoupling, typedCouplingOf } from "../rules/whole_tree/typed_coupling.ts";
 import type { IModuleGraph } from "../rules/whole_tree/unused_exports_resolved.ts";
@@ -126,20 +127,40 @@ function typedClassesOf(defs: Iterable<ITypeDef>): ITypedClass[] {
   return classes;
 }
 
+/** The typed values of one joined class. */
+interface ITypedClassValues {
+  readonly coupling: ITypedCoupling | undefined;
+  readonly hierarchy: IHierarchy | undefined;
+}
+
+/** The metrics with the typed ATFD and CBO, RFC, DIT and NOC. A class without typed values keeps its syntactic ones. */
+function withTypedValues(metrics: IClassMetrics, typed: ITypedClassValues | undefined): IClassMetrics {
+  if (typed?.coupling === undefined || typed.hierarchy === undefined) return metrics;
+  return {
+    ...metrics,
+    atfd: typed.coupling.atfd,
+    cbo: typed.coupling.cbo,
+    rfc: metrics.nom + typed.coupling.calledMethods,
+    dit: typed.hierarchy.dit,
+    noc: typed.hierarchy.noc,
+    precision: "typed",
+  };
+}
+
 /** Measures the classes of the snapshot and gives each joined class its typed ATFD and CBO. */
 export function classPassOf(input: IClassPassInput): IClassPassResult {
   const context = createTypeContext(input.graph, typeScriptSourcesOf(input.files));
   const coupling = typedCouplingOf(context, createReceiverContext(context));
+  const hierarchy = hierarchyOf(context);
   const measured = [...input.files.values()].flatMap((file) => babelClassesOf(file, input.options));
   const { pairs, unjoined } = joinClasses(measured, typedClassesOf(context.defs.values()));
-  const typedBy = new Map<IBabelClass, ITypedCoupling | undefined>(
-    pairs.map((pair) => [pair.babel, coupling.get(pair.typed.def)]),
+  const typedBy = new Map<IBabelClass, ITypedClassValues | undefined>(
+    pairs.map((
+      pair,
+    ) => [pair.babel, { coupling: coupling.get(pair.typed.def), hierarchy: hierarchy.get(pair.typed.def) }]),
   );
   const classes = measured.map((entry) => {
-    const typed = typedBy.get(entry);
-    const metrics: IClassMetrics = typed
-      ? { ...entry.metrics, atfd: typed.atfd, cbo: typed.cbo, precision: "typed" }
-      : entry.metrics;
+    const metrics = withTypedValues(entry.metrics, typedBy.get(entry));
     return { path: entry.path, name: entry.name, nameOffset: entry.nameOffset, metrics };
   });
   return { classes, unjoined };

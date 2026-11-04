@@ -127,3 +127,86 @@ Deno.test("class-join: the same name at another offset is another class", () => 
   assertEquals(joined.pairs.length, 0);
   assertEquals(joined.unjoined.map((entry) => entry.reportedBy).sort(), ["babel", "typescript"]);
 });
+
+const RFC_FILES: Readonly<Record<string, string>> = {
+  "other.ts": "export class Other {\n  a(): void {}\n  b(): void {}\n  c(): void {}\n}\n",
+  "caller.ts": [
+    'import { Other } from "./other.ts";',
+    "export class Caller {",
+    "  first(o: Other): void {",
+    "    o.a();",
+    "    o.b();",
+    "  }",
+    "  second(o: Other): void {",
+    "    o.a();",
+    "  }",
+    "  third(): number {",
+    "    return 1;",
+    "  }",
+    "}",
+    "",
+  ].join("\n"),
+};
+
+Deno.test("rfc: a class with three methods that calls two distinct methods of another class has RFC 5", async () => {
+  const result = await passOver(RFC_FILES);
+  assertEquals(classNamed(result, "Caller").rfc, 5);
+  assertEquals(classNamed(result, "Other").rfc, 3);
+});
+
+const CHAIN_FILES: Readonly<Record<string, string>> = {
+  "chain.ts": [
+    "export class A {}",
+    "export class B extends A {}",
+    "export class C extends B {}",
+    "export class D extends Missing {}",
+    "",
+  ].join("\n"),
+};
+
+Deno.test("dit-noc: a chain A <- B <- C gives DIT 0, 1, 2 and NOC 1, 1, 0, and an unresolved base gives DIT 1", async () => {
+  const result = await passOver(CHAIN_FILES);
+  const shape = ["A", "B", "C", "D"].map((name) => [name, classNamed(result, name).dit, classNamed(result, name).noc]);
+  assertEquals(shape, [["A", 0, 1], ["B", 1, 1], ["C", 2, 0], ["D", 1, 0]]);
+});
+
+const SURFACE_SOURCE = [
+  "export class Surface {",
+  "  public field = 1;",
+  "  private hidden = 2;",
+  "  #secret = 3;",
+  "  get value(): number {",
+  "    return this.field;",
+  "  }",
+  "  run(): number {",
+  "    return this.hidden;",
+  "  }",
+  "  stop(): number {",
+  "    return this.#secret;",
+  "  }",
+  "  private quiet(): void {}",
+  "}",
+  "export class Pair {",
+  "  constructor(public left: number, private right: number) {}",
+  "  get sum(): number {",
+  "    return this.left + this.right;",
+  "  }",
+  "  set sum(value: number) {",
+  "    this.left = value;",
+  "  }",
+  "}",
+  "export class Closed {",
+  "  private only(): void {}",
+  "}",
+  "",
+].join("\n");
+
+Deno.test("woc-noap-noam: two public functional methods, one getter and one public field give WOC 2/4", async () => {
+  const result = await passOver({ "surface.ts": SURFACE_SOURCE });
+  const surface = classNamed(result, "Surface");
+  assertEquals([surface.woc, surface.noap, surface.noam], [0.5, 1, 1]);
+  const pair = classNamed(result, "Pair");
+  // A constructor parameter property is not a counted public attribute.
+  assertEquals([pair.woc, pair.noap, pair.noam], [0, 0, 2]);
+  assertEquals(classNamed(result, "Closed").woc, null);
+});

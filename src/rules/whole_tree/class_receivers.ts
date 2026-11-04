@@ -454,6 +454,12 @@ export function dataMemberOwner(context: IReceiverContext, def: ITypeDef, name: 
   return site && !isMethodMember(site.member) ? site.owner : null;
 }
 
+/** The type that declares a method named `name` for `def`, own or inherited. Null for a field, an accessor or no member. */
+export function methodMemberOwner(context: IReceiverContext, def: ITypeDef, name: string): ITypeDef | null {
+  const site = findMember(context, def, name, new Set());
+  return site && isMethodMember(site.member) ? site.owner : null;
+}
+
 /** The classes and interfaces that a type reference names. */
 export function typeReferenceDefs(
   context: IReceiverContext,
