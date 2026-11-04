@@ -222,10 +222,11 @@ function numberOption(options: Record<string, JsonValue> | null, name: string, f
   return typeof value === "number" ? value : fallback;
 }
 
-/** The module size limits of the catalog, or null when the catalog does not enable the module size rule. */
+/** The module size limits of the catalog, or null when it neither enables the module size rule nor configures its options. */
 function fileLinesOf(compiled: ICompiledConfig, pluginName: string): IFileLineLimits | null {
   const rule = compiled.rules[`${pluginName}/max-file-lines`];
-  if (rule === undefined || rule.effectiveLevel === "off") return null;
+  const optionsConfigured = rule?.sources.fields.options?.startsWith("config:") ?? false;
+  if (rule === undefined || (rule.effectiveLevel === "off" && !optionsConfigured)) return null;
   const options = optionsOf(compiled, pluginName, "max-file-lines");
   const hard = numberOption(options, "max", DEFAULT_MAX_FILE_LINES);
   return { soft: numberOption(options, "softMax", hard), hard };

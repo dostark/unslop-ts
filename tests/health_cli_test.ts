@@ -796,3 +796,13 @@ Deno.test("health-large-files: a project that does not configure the rule gets n
     assertEquals(json.large_files, []);
   });
 });
+
+Deno.test("health-large-files: an opt-in rule with configured options still gives the list", async () => {
+  const rule = {
+    "demo/max-file-lines": { level: "off", options: { max: 10, softMax: 4 }, optIn: true, reason: "Manual." },
+  };
+  await withHealthProject({ "packages/x/src/large.ts": fileOf(12) }, async (dir) => {
+    const json = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(json.large_files.some((entry) => entry.path === "packages/x/src/large.ts"), true);
+  }, rule);
+});
