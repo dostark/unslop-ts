@@ -16,6 +16,8 @@ export interface IFileLineLimits {
   /** The advisory limit. It equals the hard limit when the project sets no soft limit. */
   readonly soft: number;
   readonly hard: number;
+  /** True for a repository path that the rule would lint: its scope, include and exclude globs all allow it. */
+  readonly appliesTo: (repoPath: string) => boolean;
 }
 
 /** The files above a limit, largest first. Null limits mean the project does not use the rule. */
@@ -26,6 +28,7 @@ export function largeFilesOf(
   if (limits === null) return [];
   const large: IHealthLargeFile[] = [];
   for (const [path, file] of files) {
+    if (!limits.appliesTo(path)) continue;
     const lines = physicalLinesOf(file.text);
     if (lines > limits.hard) large.push({ path, lines, limit: "hard" });
     else if (lines > limits.soft) large.push({ path, lines, limit: "soft" });

@@ -12,7 +12,8 @@
 
 import { fromFileUrl, join, toFileUrl } from "@std/path";
 import type { ICompiledConfig } from "../../config/descriptor.ts";
-import type { JsonValue } from "../../engine/catalog.ts";
+import { classifyPath, type IResolvedRuleSettings, type JsonValue } from "../../engine/catalog.ts";
+import { skipReasonOf } from "../../engine/rule_gate.ts";
 import {
   DEFAULT_COUNT_NULLISH,
   DEFAULT_MAX_COGNITIVE,
@@ -229,7 +230,17 @@ function fileLinesOf(compiled: ICompiledConfig, pluginName: string): IFileLineLi
   if (rule === undefined || (rule.effectiveLevel === "off" && !optionsConfigured)) return null;
   const options = optionsOf(compiled, pluginName, "max-file-lines");
   const hard = numberOption(options, "max", DEFAULT_MAX_FILE_LINES);
-  return { soft: numberOption(options, "softMax", hard), hard };
+  const entry = compiled.catalog.rules[`${pluginName}/max-file-lines`];
+  const settings: IResolvedRuleSettings = {
+    severity: entry.severity,
+    scope: entry.scope,
+    include: entry.include,
+    exclude: entry.exclude,
+    options: {},
+  };
+  const appliesTo = (repoPath: string): boolean =>
+    skipReasonOf(repoPath, classifyPath(repoPath, compiled.catalog.scopes), settings) === null;
+  return { soft: numberOption(options, "softMax", hard), hard, appliesTo };
 }
 
 /** The resolved settings, with CLI overrides above the compiled catalog and the engine defaults. */

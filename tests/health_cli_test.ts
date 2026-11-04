@@ -806,3 +806,25 @@ Deno.test("health-large-files: an opt-in rule with configured options still give
     assertEquals(json.large_files.some((entry) => entry.path === "packages/x/src/large.ts"), true);
   }, rule);
 });
+
+Deno.test("health-large-files: the list follows the include globs and the scope of the rule", async () => {
+  const rule = {
+    "demo/max-file-lines": {
+      level: "off",
+      options: { max: 10, softMax: 4 },
+      optIn: true,
+      reason: "Manual.",
+      scope: "prod",
+      include: ["packages/x/src/**"],
+    },
+  };
+  const files = {
+    "packages/x/src/large.ts": fileOf(12),
+    "packages/x/tests/big_test.ts": fileOf(12),
+    "packages/y/src/large.ts": fileOf(12),
+  };
+  await withHealthProject(files, async (dir) => {
+    const json = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(json.large_files.map((entry) => entry.path), ["packages/x/src/large.ts"]);
+  }, rule);
+});

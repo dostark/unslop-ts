@@ -469,8 +469,9 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
   `--top-classes` limits the text rows. Each class carries a `precision` label: `typed` for a class that both the Babel tree
   and the TypeScript compiler tree report, and `syntactic` for the rest. The health score and its formula do not change.
 - **Large files:** when the catalog enables the `max-file-lines` rule, the report adds `large_files`, the files above the
-  soft limit `softMax` or the hard limit `max`, largest first, each with its `limit` level. The text view prints them as advice.
-  The lint rule reports only the hard limit and counts physical lines.
+  soft limit `softMax` or the hard limit `max`, largest first, each with its `limit` level. Only the files that the rule
+  would lint appear, by its scope, `include` and `exclude`. The text view prints them as advice. The lint rule reports only
+  the hard limit and counts physical lines.
 - **Class-size rule:** the `max-class-size` rule has a `strategy` option. `god-class`, the default, reports a class when WMC,
   TCC and ATFD all cross their limits. `legacy-score` keeps the earlier weighted size score, and only it reads `minClassLines`
   and `threshold`. The rule reads one file, so its ATFD and CBO are `syntactic`. The limits and their sources are in
