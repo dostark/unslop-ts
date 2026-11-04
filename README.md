@@ -468,6 +468,9 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
   the sourced default limits beside the limits that this project's classes derive. `--classes` prints only this section, and
   `--top-classes` limits the text rows. Each class carries a `precision` label: `typed` for a class that both the Babel tree
   and the TypeScript compiler tree report, and `syntactic` for the rest. The health score and its formula do not change.
+- **Large files:** when the catalog enables the `max-file-lines` rule, the report adds `large_files`, the files above the
+  soft limit `softMax` or the hard limit `max`, largest first, each with its `limit` level. The text view prints them as advice.
+  The lint rule reports only the hard limit and counts physical lines.
 - **Class-size rule:** the `max-class-size` rule has a `strategy` option. `god-class`, the default, reports a class when WMC,
   TCC and ATFD all cross their limits. `legacy-score` keeps the earlier weighted size score, and only it reads `minClassLines`
   and `threshold`. The rule reads one file, so its ATFD and CBO are `syntactic`. The limits and their sources are in
@@ -1018,6 +1021,7 @@ This table is generated from `IPluginRule.overlaps` by `scripts/generate_overlap
 | `unslop/max-cyclomatic-complexity`  | eslint            | `complexity`                    | related   | Both may run; the unslop rule is narrower and states the reason.               |
 | `unslop/max-cognitive-complexity`   | eslint            | `sonarjs/cognitive-complexity`  | related   | Both may run; the unslop rule is narrower and states the reason.               |
 | `unslop/max-function-lines`         | eslint            | `max-lines-per-function`        | related   | Both may run; the unslop rule is narrower and states the reason.               |
+| `unslop/max-file-lines`             | eslint            | `max-lines`                     | related   | Both may run; the unslop rule is narrower and states the reason.               |
 | `unslop/max-class-size`             | eslint            | `max-classes-per-file`          | related   | Both may run; the unslop rule is narrower and states the reason.               |
 | `unslop/ts-suppression-pragmas`     | typescript-eslint | `ban-ts-comment`                | related   | Both may run; the unslop rule is narrower and states the reason.               |
 | `unslop/max-params`                 | eslint            | `max-params`                    | related   | Both may run; the unslop rule is narrower and states the reason.               |

@@ -311,6 +311,7 @@ Deno.test("health-cycle-score-population: one two-file cycle among 100 files sco
       nowEpoch: 0,
       duplication: null,
       duplicateRunner: null,
+      fileLines: null,
       publicEntries: [],
     });
     const signal = report.health_score.signals.find((entry) => entry.signal === "cycles");

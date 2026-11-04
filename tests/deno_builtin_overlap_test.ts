@@ -154,6 +154,12 @@ const CASES: readonly IOverlapCase[] = [
     expectedBuiltins: {},
   },
   {
+    rule: "max-file-lines",
+    name: "a file of two lines",
+    source: "export const value = 1;\nexport const other = 2;\n",
+    expectedBuiltins: {},
+  },
+  {
     rule: "max-class-size",
     name: "a class with methods",
     source: "export class Big {\n  one(): number {\n    return 1;\n  }\n  two(): number {\n    return 2;\n  }\n}\n",

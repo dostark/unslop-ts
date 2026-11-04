@@ -765,3 +765,34 @@ Deno.test("health-soft-lines: without softMax the hard limit is the advisory lim
     assertEquals(report.summary.options.max_lines, 100);
   }, hard);
 });
+
+function fileOf(lineCount: number): string {
+  return Array.from({ length: lineCount }, (_, index) => `export const v${index} = ${index};`).join("\n") + "\n";
+}
+
+Deno.test("health-large-files: files above the soft and hard limits are listed with their level", async () => {
+  const rule = { "demo/max-file-lines": { level: "error", options: { max: 10, softMax: 4 } } };
+  const files = {
+    "packages/x/src/small.ts": fileOf(2),
+    "packages/x/src/medium.ts": fileOf(6),
+    "packages/x/src/large.ts": fileOf(12),
+  };
+  await withHealthProject(files, async (dir) => {
+    const json = parseReport((await health(dir, ["--format=json"])).stdout);
+    const own = json.large_files.filter((entry) => entry.path.startsWith("packages/x/"));
+    assertEquals(own.map((entry) => [entry.path, entry.lines, entry.limit]), [
+      ["packages/x/src/large.ts", 12, "hard"],
+      ["packages/x/src/medium.ts", 6, "soft"],
+    ]);
+    const text = (await health(dir, [])).stdout;
+    assertStringIncludes(text, "LARGE FILES");
+    assertStringIncludes(text, "packages/x/src/large.ts");
+  }, rule);
+});
+
+Deno.test("health-large-files: a project that does not configure the rule gets no list", async () => {
+  await withHealthProject({ "packages/x/src/large.ts": fileOf(1500) }, async (dir) => {
+    const json = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(json.large_files, []);
+  });
+});

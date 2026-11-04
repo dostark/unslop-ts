@@ -307,6 +307,25 @@
     ]
   },
   {
+    "rule": "max-file-lines",
+    "valid": [
+      "export const value = 1;\n"
+    ],
+    "invalid": [
+      {
+        "code": "export const a = 1;\nexport const b = 2;\nexport const c = 3;\n",
+        "options": [
+          {
+            "max": 2
+          }
+        ],
+        "line": 1,
+        "column": 1,
+        "message": "File has 3 lines (limit 2)."
+      }
+    ]
+  },
+  {
     "rule": "max-class-size",
     "valid": [
       "export const value = 1;\n"

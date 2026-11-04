@@ -30,10 +30,10 @@ import { TEST_REGISTRY } from "./helpers/registry.ts";
 const DOCS_BASE = "https://example.test/guide/";
 const NOT_ENABLED = "Not enabled by the configuration.";
 const PLUGIN_PREFIX = "demo/";
-const BOTH_PACK_COUNTS = { recommended: 15, strict: 36 };
-const TYPESCRIPT_PACK_COUNTS = { recommended: 13, strict: 34 };
-const PLUGIN_RULE_COUNT = 43;
-const DESCRIPTOR_RULE_COUNT = 51;
+const BOTH_PACK_COUNTS = { recommended: 15, strict: 37 };
+const TYPESCRIPT_PACK_COUNTS = { recommended: 13, strict: 35 };
+const PLUGIN_RULE_COUNT = 44;
+const DESCRIPTOR_RULE_COUNT = 52;
 const OPTIONAL_PARAMS_OPTIONS = {
   wrapperType: "Opt",
   wrapperImport: "@demo/types",

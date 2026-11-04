@@ -75,7 +75,9 @@ function agentContextSection(guide: string): string {
 Deno.test("docs-agent-context: the style guide explains why module decomposition beats function splitting for agents", async () => {
   const section = agentContextSection(await read("docs/style_guide.md"));
   assertMatch(section, /\bagent/i, "the section is missing or does not mention agents");
-  for (const claim of ["tokens", "whole file", "module", "round trip", "nesting", "softMax", "hard limit", "soft limit"]) {
+  for (
+    const claim of ["tokens", "whole file", "module", "round trip", "nesting", "softMax", "hard limit", "soft limit"]
+  ) {
     assertStringIncludes(section, claim);
   }
   assertMatch(section, /splitting a function[^.]*(more|larger|longer)/i);
@@ -90,3 +92,14 @@ Deno.test("docs-agent-context: the function size rule and the methodology descri
   assertStringIncludes(methodology, "softMax");
 });
 
+Deno.test("docs-agent-context: the guide names the module size rule with its soft and hard limits", async () => {
+  const guide = await read("docs/style_guide.md");
+  const section = agentContextSection(guide);
+  assertStringIncludes(section, "max-file-lines");
+  assertStringIncludes(section, "800");
+  assertMatch(section, /1,?000/);
+  assertMatch(guide, /\| `max-file-lines`\s+\|/);
+  const readme = await read("README.md");
+  assertStringIncludes(readme, "unslop/max-file-lines");
+  assertStringIncludes(readme, "large_files");
+});

@@ -17,6 +17,7 @@ import {
   DEFAULT_COUNT_NULLISH,
   DEFAULT_MAX_COGNITIVE,
   DEFAULT_MAX_CYCLOMATIC,
+  DEFAULT_MAX_FILE_LINES,
   DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_METRIC_VARIANT,
 } from "../../metrics/constants.ts";
@@ -41,6 +42,7 @@ import {
 } from "../../rules/whole_tree/options.ts";
 import type { TJscpdRunner } from "../../rules/whole_tree/duplicate_code.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
+import type { IFileLineLimits } from "../../report/large_files.ts";
 import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
 import type {
   IHealthBands,
@@ -220,6 +222,15 @@ function numberOption(options: Record<string, JsonValue> | null, name: string, f
   return typeof value === "number" ? value : fallback;
 }
 
+/** The module size limits of the catalog, or null when the catalog does not enable the module size rule. */
+function fileLinesOf(compiled: ICompiledConfig, pluginName: string): IFileLineLimits | null {
+  const rule = compiled.rules[`${pluginName}/max-file-lines`];
+  if (rule === undefined || rule.effectiveLevel === "off") return null;
+  const options = optionsOf(compiled, pluginName, "max-file-lines");
+  const hard = numberOption(options, "max", DEFAULT_MAX_FILE_LINES);
+  return { soft: numberOption(options, "softMax", hard), hard };
+}
+
 /** The resolved settings, with CLI overrides above the compiled catalog and the engine defaults. */
 function settingsOf(compiled: ICompiledConfig, pluginName: string, values: Map<string, string>): IHealthSettings {
   const cyclomatic = optionsOf(compiled, pluginName, "max-cyclomatic-complexity");
@@ -337,6 +348,19 @@ function valueText(value: number | null, digits: number): string {
   return value === null ? "n/a" : value.toFixed(digits);
 }
 
+/** The files above the module size limits, shown as advice and not as a gate. */
+function largeFileLines(report: IHealthReport, top: number): string[] {
+  if (report.large_files.length === 0) return [];
+  const lines = [
+    ...heading("LARGE FILES · advisory"),
+    `  ${Math.min(top, report.large_files.length)} shown of ${report.large_files.length}`,
+  ];
+  for (const file of report.large_files.slice(0, top)) {
+    lines.push(`  ${String(file.lines).padStart(5)}  ${file.path}  (${file.limit} limit)`);
+  }
+  return lines;
+}
+
 /** The class design section, labeled as an unslop extension of the fallow-compatible report. */
 function classSectionLines(report: IHealthReport, topClasses: number): string[] {
   const { class_scores: scores, design_findings: findings, class_thresholds: thresholds } = report;
@@ -414,6 +438,7 @@ function renderText(report: IHealthReport, top: number, minScore: number | null,
     "  Signal                Observed  Population        Penalty / status",
     ...score.signals.map(signalLine),
     ...classSectionLines(report, topClasses),
+    ...largeFileLines(report, top),
     ...heading("HOTSPOTS"),
     `  ${Math.min(top, report.hotspots.length)} shown of ${report.hotspot_summary.qualified} qualified` +
     `${report.hotspot_summary.shallow ? " · shallow history, advisory only" : ""}`,
@@ -589,6 +614,7 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     nowEpoch: Math.floor(now.getTime() / 1000),
     duplication,
     duplicateRunner,
+    fileLines: fileLinesOf(compiled, descriptor.pluginName),
   });
 
   renderReport(report, format, { top, topClasses, classesOnly, minScore });

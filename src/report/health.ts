@@ -20,6 +20,7 @@ import { checkManifestRepository } from "../rules/whole_tree/unused_files_manife
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
 import { classSectionOf } from "./class_section.ts";
+import { type IFileLineLimits, largeFilesOf } from "./large_files.ts";
 import { deadRatioOf, exportPopulationOf, moduleGraphOf } from "./exports.ts";
 import { GIT_LIMITS, HEALTH_WALK_SKIP_PATTERNS, MAX_GIT_HISTORY_BYTES } from "./constants.ts";
 import { type IDuplicationMeasurement, measureDuplication } from "./duplication.ts";
@@ -126,6 +127,8 @@ export interface ICollectHealthInput {
   readonly duplication: IDuplicateCodeSettings | null;
   /** The validated local jscpd runner, or null when it is unavailable. */
   readonly duplicateRunner: TJscpdRunner | null;
+  /** The module size limits, or null when the catalog has no module size rule. */
+  readonly fileLines: IFileLineLimits | null;
 }
 
 /** The measured values a finding reports. */
@@ -835,5 +838,6 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
       history_bytes: MAX_GIT_HISTORY_BYTES,
     },
     ...classSectionOf(parsed, moduleGraph, input.settings.countNullish),
+    large_files: largeFilesOf(parsed, input.fileLines),
   };
 }

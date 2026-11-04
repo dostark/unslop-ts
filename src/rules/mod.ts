@@ -28,6 +28,7 @@ import {
 import { createMaxCyclomaticComplexity } from "./max_cyclomatic_complexity.ts";
 import { createMaxCognitiveComplexity } from "./max_cognitive_complexity.ts";
 import { createMaxFunctionLines } from "./max_function_lines.ts";
+import { createMaxFileLines } from "./max_file_lines.ts";
 import { createMaxClassSize } from "./max_class_size.ts";
 import { createRequireOptionalWrapper } from "./require_optional_wrapper.ts";
 import {
@@ -260,6 +261,19 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
       },
       requiresTestGlobs: false,
       create: createMaxFunctionLines,
+    },
+    "max-file-lines": {
+      overlaps: [{ ecosystem: "eslint", rule: "max-lines", kind: "related" }],
+      meta: {
+        description: "A file with more physical lines than the limit.",
+        category: "complexity",
+        docs: "#agent-context",
+        preset: "strict",
+        limits:
+          "Lines are physical lines, so comments and blank lines count. The optional softMax is read by the health report only.",
+      },
+      requiresTestGlobs: false,
+      create: createMaxFileLines,
     },
     "max-class-size": {
       overlaps: [{ ecosystem: "eslint", rule: "max-classes-per-file", kind: "related" }],

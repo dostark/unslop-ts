@@ -16,6 +16,7 @@ import {
   DEFAULT_COUNT_NULLISH,
   DEFAULT_MAX_COGNITIVE,
   DEFAULT_MAX_CYCLOMATIC,
+  DEFAULT_MAX_FILE_LINES,
   DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_METRIC_VARIANT,
   METRIC_VARIANTS,
@@ -88,6 +89,14 @@ const MaxFunctionLinesOptions = z.object({
   /** An advisory limit below `max`. The lint rule ignores it, and the health report flags functions above it. */
   softMax: z.number().int().positive().optional(),
 }).strict();
+
+const MaxFileLinesOptions = z.object({
+  max: z.number().int().positive().default(DEFAULT_MAX_FILE_LINES),
+  /** An advisory limit below `max`. The lint rule ignores it, and the health report flags files above it. */
+  softMax: z.number().int().positive().optional(),
+}).strict().refine((options) => options.softMax === undefined || options.softMax <= options.max, {
+  message: "softMax must not be above max",
+});
 
 const ClassSizeStrategySchema = z.enum(CLASS_SIZE_STRATEGIES);
 
@@ -253,6 +262,7 @@ export const TYPESCRIPT_OPTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   "max-cyclomatic-complexity": MaxCyclomaticComplexityOptions,
   "max-cognitive-complexity": MaxCognitiveComplexityOptions,
   "max-function-lines": MaxFunctionLinesOptions,
+  "max-file-lines": MaxFileLinesOptions,
   "max-class-size": MaxClassSizeOptions,
   "require-optional-wrapper": RequireOptionalWrapperOptions,
   "import-inside-statement": ImportCallOptions,

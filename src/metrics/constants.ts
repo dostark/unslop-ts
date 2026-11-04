@@ -18,6 +18,9 @@ export const DEFAULT_MAX_COGNITIVE = 15;
 /** The gate limit of the function-size metric, matching the SIG very-high band. */
 export const DEFAULT_MAX_FUNCTION_LINES = 60;
 
+/** The hard limit of physical lines in one module, above which a file is hard for a reader to load. */
+export const DEFAULT_MAX_FILE_LINES = 1000;
+
 /** The cyclomatic variants the engine accepts. */
 export const METRIC_VARIANTS = ["classic", "extended"] as const;
 

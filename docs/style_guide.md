@@ -418,6 +418,7 @@ Keep functions and classes small enough to read in one pass.
 | `max-cyclomatic-complexity` | A function whose complexity exceeds the limit                                               |
 | `max-cognitive-complexity`  | A function whose cognitive complexity exceeds the limit                                     |
 | `max-function-lines`        | A function with more code-token lines than the limit                                        |
+| `max-file-lines`            | A file with more physical lines than the limit (opt-in)                                     |
 | `max-class-size`            | A god class, or with `legacy-score` a class whose size score reaches the threshold (opt-in) |
 
 ## Module Size and Agent Context {#agent-context}
@@ -446,6 +447,12 @@ long, with a narrow exported interface. An agent that works on one concern then 
 interfaces of its neighbors, and the rest of the original file stays out of its context. The god class strategy
 and the health hotspots find the candidates: a large, incoherent class that changes often gains the most.
 Removing duplicated code and dead code also shortens what every reader has to load.
+
+**The module size rule.** `max-file-lines` counts physical lines, because a reader loads comments and blank lines
+too. Its hard limit `max` defaults to 1,000 lines, and the lint rule reports a file above it once, at its first line. The
+optional soft limit `softMax`, 800 lines in a project that follows the advice here, is read only by `unslop health`, which
+lists the files above it as advice. The rule is opt-in, because a project with large files adopts it through per-package
+ceilings, like the other size rules.
 
 **How the limits follow from this.**
 

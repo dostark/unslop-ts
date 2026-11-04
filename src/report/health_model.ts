@@ -282,6 +282,16 @@ export interface IHealthClassThresholds {
   };
 }
 
+/** The limit that a large file passes: the advisory soft limit or the hard limit. */
+export type FileLimitLevel = "soft" | "hard";
+
+/** One file above the module size limits. */
+export interface IHealthLargeFile {
+  readonly path: string;
+  readonly lines: number;
+  readonly limit: FileLimitLevel;
+}
+
 /** The complete health report this checkpoint writes. */
 export interface IHealthReport {
   readonly schema_version: typeof HEALTH_SCHEMA_VERSION;
@@ -300,6 +310,8 @@ export interface IHealthReport {
   readonly class_scores: readonly IHealthClassScore[];
   readonly design_findings: readonly IHealthDesignFinding[];
   readonly class_thresholds: IHealthClassThresholds;
+  /** The files above the module size limits, an advisory list that the fallow-compatible keys do not read. */
+  readonly large_files: readonly IHealthLargeFile[];
 }
 
 const finite = z.number().refine(Number.isFinite, "must be finite");
@@ -578,6 +590,12 @@ const HealthClassThresholdsSchema: z.ZodType<IHealthClassThresholds, IHealthClas
   }).strict(),
 }).strict();
 
+const HealthLargeFileSchema: z.ZodType<IHealthLargeFile, IHealthLargeFile> = z.object({
+  path: z.string().min(1),
+  lines: oneBased,
+  limit: z.enum(["soft", "hard"]),
+}).strict();
+
 /** The complete health report this checkpoint writes. */
 export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.object({
   schema_version: z.literal(HEALTH_SCHEMA_VERSION),
@@ -595,4 +613,5 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   class_scores: z.array(HealthClassScoreSchema),
   design_findings: z.array(HealthDesignFindingSchema),
   class_thresholds: HealthClassThresholdsSchema,
+  large_files: z.array(HealthLargeFileSchema),
 }).strict();
