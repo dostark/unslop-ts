@@ -25,6 +25,7 @@ import {
   DEFAULT_HEALTH_FORMAT,
   DEFAULT_HEALTH_SORT,
   DEFAULT_HEALTH_TOP,
+  DEFAULT_HEALTH_TOP_CLASSES,
   DEFAULT_MAX_CRAP,
   DEFAULT_MIN_COMMITS,
   DEFAULT_SINCE_DAYS,
@@ -41,7 +42,12 @@ import {
 import type { TJscpdRunner } from "../../rules/whole_tree/duplicate_code.ts";
 import { collectHealth, type HealthSortKey, type IHealthSettings } from "../../report/health.ts";
 import { LcovError, MAX_LCOV_BYTES } from "../../report/lcov.ts";
-import type { IHealthReport, IHealthScoreSignal } from "../../report/health_model.ts";
+import type {
+  IHealthBands,
+  IHealthDesignFinding,
+  IHealthReport,
+  IHealthScoreSignal,
+} from "../../report/health_model.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { print, printError } from "../output.ts";
 import { loadConfigDescriptor, readAndCompile } from "../project_loader.ts";
@@ -60,11 +66,16 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   "variant",
   "count-nullish",
   "top",
+  "top-classes",
+  "classes",
   "sort",
   "since",
   "min-commits",
   "min-score",
 ]);
+
+/** The flags that need no value. A bare flag reads as true. */
+const BARE_FLAGS: ReadonlySet<string> = new Set(["classes"]);
 
 /** The formats the command writes. */
 const FORMATS: ReadonlySet<string> = new Set(["text", "json"]);
@@ -77,7 +88,10 @@ const VARIANTS: ReadonlySet<string> = new Set(["classic", "extended"]);
 
 /** The usage text of one flag failure. */
 function usage(message: string): CliError {
-  return new CliError(USAGE_EXIT, `${message}\nUsage: unslop health [--format=text|json] [--descriptor=<entry>]`);
+  return new CliError(
+    USAGE_EXIT,
+    `${message}\nUsage: unslop health [--format=text|json] [--descriptor=<entry>] [--classes] [--top-classes=<n>]`,
+  );
 }
 
 /** The flag values of the command, with strict duplicate, name and value checks. */
@@ -86,9 +100,9 @@ function flagValues(args: readonly string[]): Map<string, string> {
   for (const arg of args) {
     if (!arg.startsWith("--")) throw usage(`health takes no positional argument: '${arg}'`);
     const equals = arg.indexOf("=");
-    if (equals === -1) throw usage(`'${arg}' needs a value`);
-    const name = arg.slice(2, equals);
-    const value = arg.slice(equals + 1);
+    if (equals === -1 && !BARE_FLAGS.has(arg.slice(2))) throw usage(`'${arg}' needs a value`);
+    const name = equals === -1 ? arg.slice(2) : arg.slice(2, equals);
+    const value = equals === -1 ? "true" : arg.slice(equals + 1);
     if (!VALUE_FLAGS.has(name)) throw usage(`unknown health flag '--${name}'`);
     if (values.has(name)) throw usage(`--${name} is given more than once`);
     if (value.length === 0) throw usage(`--${name} needs a non-empty value`);
@@ -310,8 +324,55 @@ function signalLine(signal: IHealthScoreSignal): string {
   return `  ${label} ${value} ${population} -${signal.penalty.toFixed(2)}`;
 }
 
+/** One line of the derived bands of a metric. */
+function bandsLine(label: string, bands: IHealthBands): string {
+  return `    ${label.padEnd(4)} mean ${bands.mean.toFixed(1)} · sd ${bands.sd.toFixed(1)} · low ${
+    bands.low.toFixed(1)
+  } · ` +
+    `high ${bands.high.toFixed(1)} · very high ${bands.very_high.toFixed(1)}`;
+}
+
+/** The text of one value that may be absent. */
+function valueText(value: number | null, digits: number): string {
+  return value === null ? "n/a" : value.toFixed(digits);
+}
+
+/** The class design section, labeled as an unslop extension of the fallow-compatible report. */
+function classSectionLines(report: IHealthReport, topClasses: number): string[] {
+  const { class_scores: scores, design_findings: findings, class_thresholds: thresholds } = report;
+  const defaults = thresholds.defaults;
+  const count = (strategy: IHealthDesignFinding["strategy"]): number =>
+    findings.filter((finding) => finding.strategy === strategy).length;
+  const lines = [
+    ...heading("CLASS DESIGN · unslop extension"),
+    `  ${scores.length} classes · ${count("god-class")} god classes · ${count("data-class")} data classes · ` +
+    `${count("feature-envy")} envious methods`,
+    `  Defaults (second-hand) WMC >= ${defaults.wmcVeryHigh.value} · TCC < ${defaults.tccLimit.value.toFixed(2)} · ` +
+    `ATFD > ${defaults.atfdFew.value} · WOC < ${defaults.wocLimit.value.toFixed(2)} · LAA < ${
+      defaults.laaLimit.value.toFixed(2)
+    }`,
+    `  Derived from ${thresholds.derived.population} classes with a method:`,
+  ];
+  for (const [name, bands] of Object.entries(thresholds.derived.metrics)) {
+    lines.push(bandsLine(name.toUpperCase(), bands));
+  }
+  lines.push(`  ${Math.min(topClasses, scores.length)} shown of ${scores.length} classes, by WMC`);
+  for (const score of scores.slice(0, topClasses)) {
+    lines.push(
+      `  ${String(score.wmc).padStart(4)}  ${score.path}:${score.line} ${score.name}  NOM ${score.nom} · ` +
+        `TCC ${valueText(score.tcc, 2)} · ATFD ${score.atfd} · CBO ${score.cbo} · RFC ${score.rfc ?? "n/a"} · ` +
+        `DIT ${score.dit ?? "n/a"} · WOC ${valueText(score.woc, 2)} (${score.precision})`,
+    );
+  }
+  for (const finding of findings.slice(0, topClasses)) {
+    const target = finding.method_name === null ? finding.class_name : `${finding.class_name}.${finding.method_name}`;
+    lines.push(`  ${finding.strategy.padEnd(12)} ${finding.path}:${finding.line} ${target}`);
+  }
+  return lines;
+}
+
 /** The text view of one report, grouped by summary, score evidence and actionable details. */
-function renderText(report: IHealthReport, top: number, minScore: number | null): string {
+function renderText(report: IHealthReport, top: number, minScore: number | null, topClasses: number): string {
   const { summary, vital_signs, health_score: score } = report;
   const options = summary.options;
   const bands = vital_signs.unit_size.bands;
@@ -352,6 +413,7 @@ function renderText(report: IHealthReport, top: number, minScore: number | null)
     "  9 supported score signals; unused dependencies and prop drilling are informational and outside the formula.",
     "  Signal                Observed  Population        Penalty / status",
     ...score.signals.map(signalLine),
+    ...classSectionLines(report, topClasses),
     ...heading("HOTSPOTS"),
     `  ${Math.min(top, report.hotspots.length)} shown of ${report.hotspot_summary.qualified} qualified` +
     `${report.hotspot_summary.shallow ? " · shallow history, advisory only" : ""}`,
@@ -383,6 +445,12 @@ function renderText(report: IHealthReport, top: number, minScore: number | null)
   }
   for (const error of report.errors) lines.push(`  ${error.path}: ${error.message}`);
   return lines.join("\n");
+}
+
+/** The text of the class design view alone. */
+function renderClassesText(report: IHealthReport, topClasses: number): string {
+  const title = `UNSLOP HEALTH · classes · formula ${report.formula_version} · tool ${report.tool_version}`;
+  return [title, ...classSectionLines(report, topClasses)].join("\n");
 }
 
 /** The output format, validated against the accepted set. */
@@ -438,13 +506,33 @@ function publicEntriesOf(compiled: ICompiledConfig): readonly string[] {
   return parsed.success ? parsed.data.publicEntries ?? [] : [];
 }
 
+/** What the command prints: how many rows of each list, and whether only the class section. */
+interface IRenderChoice {
+  readonly top: number;
+  readonly topClasses: number;
+  readonly classesOnly: boolean;
+  readonly minScore: number | null;
+}
+
+/** The JSON of the class design view alone. */
+function classesJson(report: IHealthReport): unknown {
+  const { schema_version, formula_version, tool_version, class_scores, design_findings, class_thresholds } = report;
+  return { schema_version, formula_version, tool_version, class_scores, design_findings, class_thresholds };
+}
+
 /** Prints the report in the requested format. */
-function renderReport(report: IHealthReport, format: string, top: number, minScore: number | null): void {
+function renderReport(report: IHealthReport, format: string, choice: IRenderChoice): void {
   if (format === "json") {
-    print(`${JSON.stringify({ ...report, findings: report.findings.slice(0, top) }, null, 2)}\n`);
+    const shown = choice.classesOnly
+      ? classesJson(report)
+      : { ...report, findings: report.findings.slice(0, choice.top) };
+    print(`${JSON.stringify(shown, null, 2)}\n`);
     return;
   }
-  print(`${renderText(report, top, minScore)}\n`);
+  const text = choice.classesOnly
+    ? renderClassesText(report, choice.topClasses)
+    : renderText(report, choice.top, choice.minScore, choice.topClasses);
+  print(`${text}\n`);
 }
 
 /** Applies the requested score gate and returns its exit code. */
@@ -467,6 +555,10 @@ export async function runHealth(args: readonly string[]): Promise<number> {
   const format = formatOf(values);
   const sort = sortOf(values);
   const top = values.has("top") ? positiveInteger("top", values.get("top") ?? "") : DEFAULT_HEALTH_TOP;
+  const topClasses = values.has("top-classes")
+    ? positiveInteger("top-classes", values.get("top-classes") ?? "")
+    : DEFAULT_HEALTH_TOP_CLASSES;
+  const classesOnly = booleanFlag("classes", values.get("classes") ?? "false");
   const minScore = values.has("min-score") ? scoreThreshold("min-score", values.get("min-score") ?? "") : null;
   const now = new Date();
   const { sinceEpoch, minCommits } = historyWindowOf(values, now);
@@ -499,7 +591,7 @@ export async function runHealth(args: readonly string[]): Promise<number> {
     duplicateRunner,
   });
 
-  renderReport(report, format, top, minScore);
+  renderReport(report, format, { top, topClasses, classesOnly, minScore });
   const gate = gateOf(report, minScore);
   if (gate !== 0) return gate;
   for (const error of report.errors) printError(`${error.path}: ${error.message}\n`);

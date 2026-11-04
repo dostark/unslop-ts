@@ -8,7 +8,7 @@
  */
 
 /** One default threshold, the sources that quote it and the date that those sources were read. */
-interface IClassThreshold {
+export interface IClassThreshold {
   readonly value: number;
   readonly sources: readonly string[];
   /** The ISO date on which the sources were retrieved. */
@@ -35,8 +35,20 @@ function secondHand(value: number, sources: readonly string[]): IClassThreshold 
   return { value, sources, retrieved: SOURCES_RETRIEVED, label: SECOND_HAND_LABEL };
 }
 
+/** The name of one recorded default threshold. */
+export type ClassThresholdName =
+  | "wmcVeryHigh"
+  | "tccLimit"
+  | "atfdFew"
+  | "wmcHigh"
+  | "dataClassFew"
+  | "dataClassMany"
+  | "wocLimit"
+  | "laaLimit"
+  | "fdpFew";
+
 /** The defaults of the God Class, Data Class and Feature Envy strategies of Lanza and Marinescu. */
-export const CLASS_THRESHOLDS = {
+export const CLASS_THRESHOLDS: Readonly<Record<ClassThresholdName, IClassThreshold>> = {
   wmcVeryHigh: secondHand(47, [GOD_CLASS_IMPLEMENTATION, GOD_CLASS_SLIDES, DATA_CLASS_ARTICLE]),
   tccLimit: secondHand(1 / 3, [GOD_CLASS_IMPLEMENTATION, GOD_CLASS_SLIDES]),
   atfdFew: secondHand(5, [GOD_CLASS_IMPLEMENTATION, GOD_CLASS_SLIDES, FEATURE_ENVY_ARTICLE]),
@@ -46,4 +58,4 @@ export const CLASS_THRESHOLDS = {
   wocLimit: secondHand(1 / 3, [DATA_CLASS_ARTICLE]),
   laaLimit: secondHand(1 / 3, [FEATURE_ENVY_ARTICLE, GOD_CLASS_SLIDES]),
   fdpFew: secondHand(5, [FEATURE_ENVY_ARTICLE, GOD_CLASS_SLIDES]),
-} as const;
+};

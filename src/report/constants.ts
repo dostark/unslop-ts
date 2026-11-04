@@ -12,6 +12,9 @@ import type { IChildLimits } from "./bounded_io.ts";
 /** The number of findings the text and JSON views display by default. */
 export const DEFAULT_HEALTH_TOP = 20;
 
+/** The classes the text view lists in its class design section. */
+export const DEFAULT_HEALTH_TOP_CLASSES = 10;
+
 /** The sort key the report applies by default. */
 export const DEFAULT_HEALTH_SORT = "cyclomatic";
 

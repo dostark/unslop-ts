@@ -7,7 +7,7 @@
  */
 
 import { fixtureGit as gitIn } from "./helpers/git_fixture.ts";
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertNotMatch, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { crapOf, DIRECT_COVERAGE_PERCENT } from "../src/report/crap.ts";
 import { HealthReportSchema, type IHealthReport } from "../src/report/mod.ts";
@@ -675,4 +675,71 @@ Deno.test("the_readme_documents_every_health_flag", async () => {
   assertStringIncludes(section, "jscpd");
   assertStringIncludes(section, "./metrics");
   assertStringIncludes(section, "./report");
+});
+
+const CLASS_FILES: Readonly<Record<string, string>> = {
+  "packages/x/src/shape.ts": [
+    "export class Shape {",
+    "  width = 1;",
+    "  height = 2;",
+    "  area(): number {",
+    "    return this.width * this.height;",
+    "  }",
+    "}",
+    "",
+  ].join("\n"),
+  "packages/x/src/user.ts": [
+    'import { Shape } from "./shape.ts";',
+    "export class User {",
+    "  size(shape: Shape): number {",
+    "    return shape.area();",
+    "  }",
+    "}",
+    "",
+  ].join("\n"),
+};
+
+Deno.test("health-class-scores: a fixture repository gives one entry per class with typed values and the thresholds", async () => {
+  await withHealthProject(CLASS_FILES, async (dir) => {
+    const result = await health(dir, ["--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const report = parseReport(result.stdout);
+    assertEquals(report.class_scores.map((entry) => entry.name), ["Shape", "User"]);
+    const shape = report.class_scores[0];
+    assertEquals([shape.path, shape.nom, shape.noap, shape.precision], ["packages/x/src/shape.ts", 1, 2, "typed"]);
+    assertEquals(report.class_scores[1].rfc, 2);
+    assertEquals(report.design_findings, []);
+    assertEquals(report.class_thresholds.defaults.wmcVeryHigh.value, 47);
+    assertEquals(report.class_thresholds.derived.population, 2);
+  });
+});
+
+Deno.test("health-score-unchanged: the class section does not move the score, the version or the existing keys", async () => {
+  const asFunction = { "packages/x/src/shape.ts": "export function area(): number {\n  return 1 * 2;\n}\n" };
+  const asClass = { "packages/x/src/shape.ts": "export class Area {\n  area(): number {\n    return 1 * 2;\n  }\n}\n" };
+  const scoreOf = async (files: Readonly<Record<string, string>>): Promise<IHealthReport> =>
+    await withHealthProject(files, async (dir) => parseReport((await health(dir, ["--format=json"])).stdout));
+  const plain = await scoreOf(asFunction);
+  const classy = await scoreOf(asClass);
+  assertEquals(plain.class_scores.length, 0);
+  assertEquals(classy.class_scores.length, 1);
+  assertEquals(classy.health_score, plain.health_score);
+  assertEquals(classy.schema_version, plain.schema_version);
+  assertEquals(classy.formula_version, "unslop-health-v2");
+});
+
+Deno.test("health-classes-flag: --classes prints only the class section and --top-classes limits its rows", async () => {
+  await withHealthProject(CLASS_FILES, async (dir) => {
+    const only = await health(dir, ["--classes"]);
+    assertEquals(only.code, 0, only.stderr);
+    assertStringIncludes(only.stdout, "CLASS DESIGN");
+    assertStringIncludes(only.stdout, "unslop extension");
+    assertNotMatch(only.stdout, /SCORE SIGNALS|FINDINGS/);
+    const full = await health(dir, []);
+    assertStringIncludes(full.stdout, "SCORE SIGNALS");
+    assertStringIncludes(full.stdout, "CLASS DESIGN");
+    const limited = await health(dir, ["--classes", "--top-classes=1"]);
+    const rows = limited.stdout.split("\n").filter((line) => /^\s+\d+ .*packages\/x\/src\//.test(line));
+    assertEquals(rows.length, 1);
+  });
 });

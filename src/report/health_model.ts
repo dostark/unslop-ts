@@ -8,7 +8,11 @@
  */
 
 import { z } from "zod";
+import type { ClassThresholdName } from "../metrics/class_thresholds.ts";
+import type { DerivedMetric } from "./class_statistics.ts";
+import type { DesignMetricName, DesignStrategy } from "./design_strategies.ts";
 import {
+  type ClassMetricPrecision,
   METRIC_CONTRIBUTION_KINDS,
   type MetricContributionKind,
   type MetricName,
@@ -219,6 +223,65 @@ export interface IHealthLimits {
   readonly history_bytes: number;
 }
 
+/** The design metrics of one class, with its place and the precision of its coupling values. */
+export interface IHealthClassScore {
+  readonly path: string;
+  readonly name: string;
+  readonly line: number;
+  readonly nom: number;
+  readonly wmc: number;
+  readonly loc: number;
+  readonly noa: number;
+  readonly tcc: number | null;
+  readonly lcom4: number;
+  readonly atfd: number;
+  readonly cbo: number;
+  readonly rfc: number | null;
+  readonly dit: number | null;
+  readonly noc: number | null;
+  readonly woc: number | null;
+  readonly noap: number;
+  readonly noam: number;
+  readonly precision: ClassMetricPrecision;
+}
+
+/** One detection strategy match with the metric values that made it match. */
+export interface IHealthDesignFinding {
+  readonly strategy: DesignStrategy;
+  readonly path: string;
+  readonly class_name: string;
+  readonly method_name: string | null;
+  readonly line: number;
+  readonly metrics: Readonly<Record<DesignMetricName, number | null>>;
+}
+
+/** One default threshold with the sources that quote it. */
+export interface IHealthThreshold {
+  readonly value: number;
+  readonly sources: readonly string[];
+  readonly retrieved: string;
+  readonly label: string;
+}
+
+/** The mean, standard deviation and four bands of one metric. */
+export interface IHealthBands {
+  readonly mean: number;
+  readonly sd: number;
+  readonly low: number;
+  readonly average: number;
+  readonly high: number;
+  readonly very_high: number;
+}
+
+/** The default thresholds and the bands that this project's classes derive. */
+export interface IHealthClassThresholds {
+  readonly defaults: Readonly<Record<ClassThresholdName, IHealthThreshold>>;
+  readonly derived: {
+    readonly population: number;
+    readonly metrics: Readonly<Partial<Record<DerivedMetric, IHealthBands>>>;
+  };
+}
+
 /** The complete health report this checkpoint writes. */
 export interface IHealthReport {
   readonly schema_version: typeof HEALTH_SCHEMA_VERSION;
@@ -233,6 +296,10 @@ export interface IHealthReport {
   readonly vital_signs: IHealthVitalSigns;
   readonly errors: readonly IHealthError[];
   readonly limits: IHealthLimits;
+  /** The class design section, an unslop extension that the fallow-compatible keys do not read. */
+  readonly class_scores: readonly IHealthClassScore[];
+  readonly design_findings: readonly IHealthDesignFinding[];
+  readonly class_thresholds: IHealthClassThresholds;
 }
 
 const finite = z.number().refine(Number.isFinite, "must be finite");
@@ -424,6 +491,93 @@ export const HealthLimitsSchema: z.ZodType<IHealthLimits, IHealthLimits> = z.obj
   history_bytes: oneBased,
 }).strict();
 
+const nullableNumber = finite.nullable();
+
+/** The design metrics of one class. */
+const HealthClassScoreSchema: z.ZodType<IHealthClassScore, IHealthClassScore> = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1),
+  line: oneBased,
+  nom: nonNegativeInteger,
+  wmc: nonNegativeInteger,
+  loc: nonNegativeInteger,
+  noa: nonNegativeInteger,
+  tcc: nullableNumber,
+  lcom4: nonNegativeInteger,
+  atfd: nonNegativeInteger,
+  cbo: nonNegativeInteger,
+  rfc: nullableNumber,
+  dit: nullableNumber,
+  noc: nullableNumber,
+  woc: nullableNumber,
+  noap: nonNegativeInteger,
+  noam: nonNegativeInteger,
+  precision: z.enum(["syntactic", "typed"]),
+}).strict();
+
+/** One detection strategy match. */
+const HealthDesignFindingSchema: z.ZodType<IHealthDesignFinding, IHealthDesignFinding> = z.object({
+  strategy: z.enum(["god-class", "data-class", "feature-envy"]),
+  path: z.string().min(1),
+  class_name: z.string().min(1),
+  method_name: z.string().min(1).nullable(),
+  line: oneBased,
+  metrics: z.object({
+    wmc: nullableNumber,
+    tcc: nullableNumber,
+    atfd: nullableNumber,
+    woc: nullableNumber,
+    laa: nullableNumber,
+    fdp: nullableNumber,
+    noap: nullableNumber,
+    noam: nullableNumber,
+  }).strict(),
+}).strict();
+
+const thresholdSchema: z.ZodType<IHealthThreshold, IHealthThreshold> = z.object({
+  value: finite,
+  sources: z.array(z.string().url()).min(1),
+  retrieved: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  label: z.string().min(1),
+}).strict();
+
+const bandsSchema: z.ZodType<IHealthBands, IHealthBands> = z.object({
+  mean: finite,
+  sd: finite,
+  low: finite,
+  average: finite,
+  high: finite,
+  very_high: finite,
+}).strict();
+
+/** The default thresholds and the derived bands. */
+const HealthClassThresholdsSchema: z.ZodType<IHealthClassThresholds, IHealthClassThresholds> = z.object({
+  defaults: z.object({
+    wmcVeryHigh: thresholdSchema,
+    tccLimit: thresholdSchema,
+    atfdFew: thresholdSchema,
+    wmcHigh: thresholdSchema,
+    dataClassFew: thresholdSchema,
+    dataClassMany: thresholdSchema,
+    wocLimit: thresholdSchema,
+    laaLimit: thresholdSchema,
+    fdpFew: thresholdSchema,
+  }).strict(),
+  derived: z.object({
+    population: nonNegativeInteger,
+    metrics: z.object({
+      nom: bandsSchema.optional(),
+      loc: bandsSchema.optional(),
+      wmc: bandsSchema.optional(),
+      atfd: bandsSchema.optional(),
+      cbo: bandsSchema.optional(),
+      rfc: bandsSchema.optional(),
+      noap: bandsSchema.optional(),
+      noam: bandsSchema.optional(),
+    }).strict(),
+  }).strict(),
+}).strict();
+
 /** The complete health report this checkpoint writes. */
 export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.object({
   schema_version: z.literal(HEALTH_SCHEMA_VERSION),
@@ -438,4 +592,7 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   vital_signs: HealthVitalSignsSchema,
   errors: z.array(HealthErrorSchema),
   limits: HealthLimitsSchema,
+  class_scores: z.array(HealthClassScoreSchema),
+  design_findings: z.array(HealthDesignFindingSchema),
+  class_thresholds: HealthClassThresholdsSchema,
 }).strict();

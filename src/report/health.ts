@@ -19,6 +19,7 @@ import { couplingSignalOf, runtimeCyclesOf } from "../rules/whole_tree/import_cy
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
+import { classSectionOf } from "./class_section.ts";
 import { deadRatioOf, exportPopulationOf, moduleGraphOf } from "./exports.ts";
 import { GIT_LIMITS, HEALTH_WALK_SKIP_PATTERNS, MAX_GIT_HISTORY_BYTES } from "./constants.ts";
 import { type IDuplicationMeasurement, measureDuplication } from "./duplication.ts";
@@ -741,13 +742,15 @@ export function coverageRevisionOf(
   return "verified";
 }
 
-/** The raw export population of the snapshot, resolved against the project import graph. */
+/** The raw export population of the snapshot and the project import graph that resolved it. */
 async function exportsOf(
   parsed: ReadonlyMap<string, IParsedHealthFile>,
   input: ICollectHealthInput,
-): Promise<ReturnType<typeof exportPopulationOf>> {
-  const graph = await moduleGraphOf(parsed, { rootPath: input.rootPath, publicEntries: input.publicEntries });
-  return exportPopulationOf(parsed, graph);
+): Promise<
+  { population: ReturnType<typeof exportPopulationOf>; moduleGraph: Awaited<ReturnType<typeof moduleGraphOf>> }
+> {
+  const moduleGraph = await moduleGraphOf(parsed, { rootPath: input.rootPath, publicEntries: input.publicEntries });
+  return { population: exportPopulationOf(parsed, moduleGraph), moduleGraph };
 }
 
 /** Collects the report for one descriptor root. */
@@ -758,7 +761,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
     ? null
     : parseLcov(input.coverageText, input.rootPath, new Set(parsed.keys()));
   const graph = buildHealthGraph(parsed, await readImportAliases(input.rootPath), excludedPaths, resourcePaths);
-  const exports = await exportsOf(parsed, input);
+  const { population: exports, moduleGraph } = await exportsOf(parsed, input);
   const reach = reachabilityOf(graph, input.testGlobs);
   const findings: IMeasuredFinding[] = [];
   const bands: Record<UnitSizeBand, number> = { low: 0, medium: 0, high: 0, very_high: 0 };
@@ -831,5 +834,6 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
       coverage_bytes: MAX_LCOV_BYTES,
       history_bytes: MAX_GIT_HISTORY_BYTES,
     },
+    ...classSectionOf(parsed, moduleGraph, input.settings.countNullish),
   };
 }
