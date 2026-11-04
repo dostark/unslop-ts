@@ -8,40 +8,7 @@
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import type { JsonValue } from "../mod.ts";
-import { runPlugin } from "../deno.ts";
-import { createTestPlugin, loadTestCatalog } from "./helpers/registry.ts";
-
-const RULE_ID = "demo/max-class-size";
-const PROD = "packages/x/src/a.ts";
-
-function buildCatalog(options: Record<string, JsonValue> = {}): Record<string, JsonValue> {
-  return {
-    version: "1",
-    scopes: {
-      test: ["**/tests/**", "**/*_test.ts", "**/*_test.tsx", "**/*.test.ts"],
-      fixture: ["tests/scenario_framework/fixtures/**", "**/tests/fixtures/**"],
-    },
-    tagVocabulary: {
-      complexity: { description: "Rules on code complexity." },
-      "module-structure": { description: "Rules on module and type structure." },
-    },
-    rules: {
-      [RULE_ID]: {
-        engine: "plugin",
-        severity: "error",
-        scope: "all",
-        tags: ["complexity", "module-structure"],
-        options,
-      },
-    },
-  };
-}
-
-/** Runs the rule with the options as given, so the default strategy applies. */
-function godFindings(source: string, options: Record<string, JsonValue> = {}) {
-  const plugin = createTestPlugin(loadTestCatalog(buildCatalog(options)));
-  return runPlugin(plugin, PROD, source);
-}
+import { GOD, godClassSource, godFindings } from "./helpers/god_class_fixture.ts";
 
 /** Runs the rule under the legacy score unless a test names another strategy. */
 function findings(source: string, options: Record<string, JsonValue> = {}) {
@@ -102,38 +69,6 @@ Deno.test("class-legacy-message: the wmcVariant option changes the WMC in the me
   assertStringIncludes(classic[0].message, "WMC 1,");
   assertStringIncludes(extended[0].message, "WMC 2,");
 });
-
-interface IGodSpec {
-  readonly methods: number;
-  readonly branches: number;
-  readonly foreignReads: number;
-  readonly cohesion: "grouped" | "shared";
-}
-
-/** A class whose WMC, TCC and ATFD follow the spec: grouped gives TCC 0.2 for ten methods, shared gives 1. */
-function godClassSource(spec: IGodSpec): string {
-  const attributeOf = (index: number): string => {
-    if (spec.cohesion === "shared") return "shared";
-    if (index < 4) return "groupA";
-    return index < 7 ? "groupB" : `solo${index}`;
-  };
-  const names = new Set(Array.from({ length: spec.methods }, (_, index) => attributeOf(index)));
-  const lines = ["class Hub {", ...[...names].map((name) => `  private ${name} = 0;`)];
-  for (let index = 0; index < spec.methods; index++) {
-    const branches = Array.from({ length: spec.branches }, (_, step) => `    if (n > ${step}) n++;`);
-    const foreign = index < spec.foreignReads ? [`    n += other.field${index};`] : [];
-    lines.push(
-      `  run${index}(other: Other): number {`,
-      `    let n = this.${attributeOf(index)};`,
-      ...branches,
-      ...foreign,
-    );
-    lines.push("    return n;", "  }");
-  }
-  return `${lines.join("\n")}\n}\n`;
-}
-
-const GOD: IGodSpec = { methods: 10, branches: 4, foreignReads: 6, cohesion: "grouped" };
 
 Deno.test("god-class-all-three: a class with WMC 50, TCC 0.2 and ATFD 6 is reported with the three values", () => {
   const found = godFindings(godClassSource(GOD));

@@ -15,7 +15,7 @@ import type { IClassMetrics, IMetricOptions } from "../metrics/types.ts";
 import { createReceiverContext, createTypeContext } from "../rules/whole_tree/class_context.ts";
 import { hierarchyOf, type IHierarchy } from "../rules/whole_tree/class_hierarchy.ts";
 import type { ITypeDef } from "../rules/whole_tree/class_receivers.ts";
-import { type ITypedCoupling, typedCouplingOf } from "../rules/whole_tree/typed_coupling.ts";
+import { type IMethodCoupling, type ITypedCoupling, typedCouplingOf } from "../rules/whole_tree/typed_coupling.ts";
 import type { IModuleGraph } from "../rules/whole_tree/unused_exports_resolved.ts";
 import { typeScriptSourcesOf } from "./exports.ts";
 import type { IParsedHealthFile } from "./parse.ts";
@@ -38,6 +38,8 @@ export interface IUnjoinedClass extends IClassSite {
 /** One measured class with the place where it is declared. */
 export interface IPassClass extends IClassSite {
   readonly metrics: IClassMetrics;
+  /** The typed foreign-data counts per member. Empty for a class that only the Babel tree reports. */
+  readonly methods: readonly IMethodCoupling[];
 }
 
 /** The inputs of the class pass. */
@@ -102,7 +104,8 @@ function nameOffsetOf(node: ILintNode): number {
   return rangeOf(id && typeof id === "object" ? asNode(id) : node)[0];
 }
 
-interface IBabelClass extends IPassClass {
+/** A class that the Babel tree measured, before any typed value is attached. */
+interface IBabelClass extends IClassSite {
   readonly metrics: IClassMetrics;
 }
 
@@ -160,8 +163,15 @@ export function classPassOf(input: IClassPassInput): IClassPassResult {
     ) => [pair.babel, { coupling: coupling.get(pair.typed.def), hierarchy: hierarchy.get(pair.typed.def) }]),
   );
   const classes = measured.map((entry) => {
-    const metrics = withTypedValues(entry.metrics, typedBy.get(entry));
-    return { path: entry.path, name: entry.name, nameOffset: entry.nameOffset, metrics };
+    const typed = typedBy.get(entry);
+    const metrics = withTypedValues(entry.metrics, typed);
+    return {
+      path: entry.path,
+      name: entry.name,
+      nameOffset: entry.nameOffset,
+      metrics,
+      methods: typed?.coupling?.methods ?? [],
+    };
   });
   return { classes, unjoined };
 }

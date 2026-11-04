@@ -8,36 +8,8 @@
  */
 
 import { assertEquals } from "@std/assert";
-import { join } from "@std/path";
-import { classPassOf, type IClassPassResult, joinClasses } from "../src/report/class_pass.ts";
-import { moduleGraphOf } from "../src/report/exports.ts";
-import { type IParsedHealthFile, parseHealthFile } from "../src/report/parse.ts";
-import { CLASSIC_OPTIONS } from "./helpers/measurement.ts";
-import { withRepo, write } from "./helpers/temp_repo.ts";
-
-const SRC = "packages/p/src";
-
-/** Writes the files into a temporary repository and runs the class pass over them. */
-async function passOver(files: Readonly<Record<string, string>>): Promise<IClassPassResult> {
-  let result: IClassPassResult | undefined;
-  await withRepo(async (root) => {
-    const parsed = new Map<string, IParsedHealthFile>();
-    for (const [name, text] of Object.entries(files)) {
-      const path = `${SRC}/${name}`;
-      await write(root, path, text);
-      parsed.set(path, await parseHealthFile(join(root, path), path));
-    }
-    const graph = await moduleGraphOf(parsed, { rootPath: root, publicEntries: [] });
-    result = classPassOf({ files: parsed, graph, options: CLASSIC_OPTIONS });
-  });
-  return result!;
-}
-
-function classNamed(result: IClassPassResult, name: string) {
-  const found = result.classes.find((entry) => entry.metrics.name === name);
-  if (found === undefined) throw new Error(`The pass reports no class ${name}.`);
-  return found.metrics;
-}
+import { joinClasses } from "../src/report/class_pass.ts";
+import { classNamed, passOver } from "./helpers/class_pass_repo.ts";
 
 const OTHER =
   "export class Other {\n  x = 1;\n  y = 2;\n  get z(): number {\n    return 3;\n  }\n  act(): void {}\n}\n";

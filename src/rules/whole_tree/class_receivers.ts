@@ -38,6 +38,8 @@ export type AccessRole = "read" | "call" | "write";
 /** One typed access inside a class: the class it sits in, the name, and the declared types of its receiver. */
 export interface IClassAccess {
   readonly enclosing: ITypeDef;
+  /** The member of the class that holds the access, or null for a node outside any member. */
+  readonly member: ts.ClassElement | null;
   readonly name: string;
   /** The classes and interfaces that the receiver is declared as, or null when they are not known. */
   readonly targets: readonly ITypeDef[] | null;
@@ -431,6 +433,14 @@ function enclosingDef(context: IReceiverContext, node: ts.Node): ITypeDef | null
   return null;
 }
 
+/** The class member that holds the node: a method, an accessor, a constructor or a property. */
+function enclosingMember(node: ts.Node): ts.ClassElement | null {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isClassElement(current) && ts.isClassDeclaration(current.parent)) return current;
+  }
+  return null;
+}
+
 /** Reports each access that sits in a top-level class with its class, name, receiver types and role. */
 export function recordClassAccesses(
   context: IReceiverContext,
@@ -442,7 +452,9 @@ export function recordClassAccesses(
     const access = accessOf(context, repoPath, node);
     const role = access ? roleOf(node) : null;
     const enclosing = access && role ? enclosingDef(context, node) : null;
-    if (access && role && enclosing) onAccess({ enclosing, name: access.name, targets: access.receiver(), role });
+    if (access && role && enclosing) {
+      onAccess({ enclosing, member: enclosingMember(node), name: access.name, targets: access.receiver(), role });
+    }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
