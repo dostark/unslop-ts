@@ -37,3 +37,14 @@ export function measureClasses(
   const context = createMeasurementContext({ text: source }, filename);
   return classNodesOf(source, filename).map((node) => measureClass(node, options, context));
 }
+
+/** Measures every class of a source unit on the Babel AST that the health report reads. */
+export function measureClassesOnBabel(
+  source: string,
+  options: IMetricOptions = CLASSIC_OPTIONS,
+  filename = FIXTURE_PATH,
+): readonly IClassMetrics[] {
+  const context = createMeasurementContext({ text: source }, filename);
+  const program = asNode(context.syntaxTree.program);
+  return classNodesUnder(program, []).map((node) => measureClass(node, options, context));
+}

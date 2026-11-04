@@ -32,6 +32,18 @@ export interface IReceiverContext {
   readonly familyOf: (def: ITypeDef) => ReadonlySet<ITypeDef>;
 }
 
+/** How an access uses the property: it reads it, calls it, or assigns to it. */
+export type AccessRole = "read" | "call" | "write";
+
+/** One typed access inside a class: the class it sits in, the name, and the declared types of its receiver. */
+export interface IClassAccess {
+  readonly enclosing: ITypeDef;
+  readonly name: string;
+  /** The classes and interfaces that the receiver is declared as, or null when they are not known. */
+  readonly targets: readonly ITypeDef[] | null;
+  readonly role: AccessRole;
+}
+
 /** The types of an expression or a type node, or null when they are not known. */
 type Resolved = ITypeDef[] | null;
 
@@ -399,4 +411,63 @@ export function recordTypedAccesses(
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+}
+
+function roleOf(node: ts.Node): AccessRole | null {
+  if (ts.isIndexedAccessTypeNode(node)) return null;
+  const parent = node.parent;
+  if ((ts.isCallExpression(parent) || ts.isNewExpression(parent)) && parent.expression === node) return "call";
+  const isAssigned = ts.isBinaryExpression(parent) && parent.left === node &&
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+  return isAssigned ? "write" : "read";
+}
+
+/** The class declaration that the node sits in. Null outside a class and inside a class expression. */
+function enclosingDef(context: IReceiverContext, node: ts.Node): ITypeDef | null {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isClassExpression(current)) return null;
+    if (ts.isClassDeclaration(current)) return context.defOfNode.get(current) ?? null;
+  }
+  return null;
+}
+
+/** Reports each access that sits in a top-level class with its class, name, receiver types and role. */
+export function recordClassAccesses(
+  context: IReceiverContext,
+  repoPath: string,
+  sourceFile: ts.SourceFile,
+  onAccess: (access: IClassAccess) => void,
+): void {
+  const visit = (node: ts.Node): void => {
+    const access = accessOf(context, repoPath, node);
+    const role = access ? roleOf(node) : null;
+    const enclosing = access && role ? enclosingDef(context, node) : null;
+    if (access && role && enclosing) onAccess({ enclosing, name: access.name, targets: access.receiver(), role });
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
+/** The type that declares a field or accessor named `name` for `def`, own or inherited. Null for a method or no member. */
+export function dataMemberOwner(context: IReceiverContext, def: ITypeDef, name: string): ITypeDef | null {
+  const site = findMember(context, def, name, new Set());
+  return site && !isMethodMember(site.member) ? site.owner : null;
+}
+
+/** The classes and interfaces that a type reference names. */
+export function typeReferenceDefs(
+  context: IReceiverContext,
+  repoPath: string,
+  reference: ts.TypeReferenceNode,
+): readonly ITypeDef[] {
+  return referencedTypes(context, repoPath, reference) ?? [];
+}
+
+/** The classes and interfaces that an expression evaluates to. */
+export function expressionDefs(
+  context: IReceiverContext,
+  repoPath: string,
+  expression: ts.Expression,
+): readonly ITypeDef[] {
+  return typesOfExpression(context, repoPath, expression) ?? [];
 }

@@ -8,10 +8,15 @@
  */
 
 import ts from "typescript";
-import { hasPragma, isExported } from "./declaration_markers.ts";
-import { createDefinitionReach, definitionKey, type IDefinitionReach, type IFileBindings } from "./definition_reach.ts";
-import { type AccessTargets, type IReceiverContext, type ITypeDef, recordTypedAccesses } from "./class_receivers.ts";
-import { resolveHeritage } from "../../metrics/heritage.ts";
+import { hasPragma } from "./declaration_markers.ts";
+import { type AccessTargets, type ITypeDef, recordTypedAccesses } from "./class_receivers.ts";
+import {
+  bindingsFor,
+  createReceiverContext,
+  createTypeContext,
+  heritageNames,
+  type ITypeContext,
+} from "./class_context.ts";
 import type { IModuleGraph } from "./unused_exports_resolved.ts";
 
 const IGNORE_NEXT_LINE = /unslop-ignore-next-line\s+unused-class-member\b/;
@@ -147,33 +152,6 @@ function candidatesOf(node: ts.ClassDeclaration, sourceFile: ts.SourceFile): ICa
   return candidates;
 }
 
-/** Every class and interface declaration of the walked files. */
-function collectTypes(sourceFiles: ReadonlyMap<string, ts.SourceFile>): Map<string, ITypeDef> {
-  const defs = new Map<string, ITypeDef>();
-  for (const [repoPath, sourceFile] of sourceFiles) {
-    for (const statement of sourceFile.statements) {
-      if (!ts.isClassDeclaration(statement) && !ts.isInterfaceDeclaration(statement)) continue;
-      if (!statement.name) continue;
-      const name = statement.name.text;
-      defs.set(definitionKey(repoPath, name), { repoPath, name, node: statement, exported: isExported(statement) });
-    }
-    markListedExports(repoPath, sourceFile, defs);
-  }
-  return defs;
-}
-
-/** An `export { Name }` list exports a declaration of the same file. */
-function markListedExports(repoPath: string, sourceFile: ts.SourceFile, defs: Map<string, ITypeDef>): void {
-  for (const statement of sourceFile.statements) {
-    if (!ts.isExportDeclaration(statement) || statement.moduleSpecifier || !statement.exportClause) continue;
-    if (!ts.isNamedExports(statement.exportClause)) continue;
-    for (const element of statement.exportClause.elements) {
-      const def = defs.get(definitionKey(repoPath, (element.propertyName ?? element.name).text));
-      if (def && !element.propertyName) def.exported = true;
-    }
-  }
-}
-
 /** The type name that `keyof Type` or `keyof typeof value` exposes with all its members. */
 function keyedNameOf(node: ts.Node): string | null {
   if (!ts.isTypeOperatorNode(node) || node.operator !== ts.SyntaxKind.KeyOfKeyword) return null;
@@ -223,29 +201,8 @@ function readNamesInClass(node: ts.ClassDeclaration): Set<string> {
 }
 
 /** The context that resolves the heritage of a class to the types that it names. */
-interface IClassContext extends IDefinitionReach<ITypeDef> {
-  readonly defs: ReadonlyMap<string, ITypeDef>;
-  readonly sourceFiles: ReadonlyMap<string, ts.SourceFile>;
+interface IClassContext extends ITypeContext {
   readonly memo: Map<ITypeDef, Contract>;
-  readonly bindings: Map<string, IFileBindings<ITypeDef>>;
-}
-
-/** The bindings of the file that declares `def`, built once per file. */
-function bindingsFor(context: IClassContext, repoPath: string): IFileBindings<ITypeDef> {
-  const known = context.bindings.get(repoPath);
-  if (known) return known;
-  const bindings = context.bindingsOf(repoPath, context.sourceFiles.get(repoPath)!);
-  context.bindings.set(repoPath, bindings);
-  return bindings;
-}
-
-/** The heritage type names of a class or interface, as written. Null stands for a base that is not a plain name. */
-function heritageNames(node: ts.ClassDeclaration | ts.InterfaceDeclaration): Array<string | null> {
-  const names: Array<string | null> = [];
-  for (const clause of node.heritageClauses ?? []) {
-    for (const type of clause.types) names.push(ts.isIdentifier(type.expression) ? type.expression.text : null);
-  }
-  return names;
 }
 
 function joinContracts(parts: readonly Contract[]): Contract {
@@ -333,61 +290,13 @@ function unusedOf(
   return unused;
 }
 
-/** The types that a class or interface extends or implements, as the walked files declare them. */
-function parentsFor(context: IClassContext, def: ITypeDef): ITypeDef[] {
-  const bindings = bindingsFor(context, def.repoPath);
-  return resolveHeritage(heritageNames(def.node), (name) => bindings.names.get(name) ?? []);
-}
-
-/** The lookups that receiver typing needs, with the family of a type memoized. */
-function receiverContext(context: IClassContext): IReceiverContext {
-  const defOfNode = new Map<ts.Node, ITypeDef>();
-  for (const def of context.defs.values()) defOfNode.set(def.node, def);
-  const parents = new Map<ITypeDef, ITypeDef[]>();
-  const children = new Map<ITypeDef, ITypeDef[]>();
-  for (const def of context.defs.values()) {
-    const found = parentsFor(context, def);
-    parents.set(def, found);
-    for (const parent of found) children.set(parent, [...children.get(parent) ?? [], def]);
-  }
-  const closure = (start: ITypeDef, edges: ReadonlyMap<ITypeDef, ITypeDef[]>, into: Set<ITypeDef>): void => {
-    for (const next of edges.get(start) ?? []) {
-      if (into.has(next)) continue;
-      into.add(next);
-      closure(next, edges, into);
-    }
-  };
-  const families = new Map<ITypeDef, ReadonlySet<ITypeDef>>();
-  return {
-    bindingsFor: (repoPath) => bindingsFor(context, repoPath),
-    reach: context.reach,
-    defOfNode,
-    parentsOf: (def) => parents.get(def) ?? [],
-    familyOf: (def) => {
-      const known = families.get(def);
-      if (known) return known;
-      const family = new Set<ITypeDef>([def]);
-      closure(def, parents, family);
-      closure(def, children, family);
-      families.set(def, family);
-      return family;
-    },
-  };
-}
-
 /** Lists the class members that nothing reads. */
 export function findUnusedClassMembers(input: IClassMemberInput): IUnusedClassMember[] {
-  const defs = collectTypes(input.sourceFiles);
-  const context: IClassContext = {
-    defs,
-    sourceFiles: input.sourceFiles,
-    memo: new Map(),
-    bindings: new Map(),
-    ...createDefinitionReach(input.graph, defs),
-  };
+  const context: IClassContext = { ...createTypeContext(input.graph, input.sourceFiles), memo: new Map() };
+  const defs = context.defs;
   const accessedBy = new Map<string, AccessTargets>();
   const keyed = new Set<string>();
-  const receivers = receiverContext(context);
+  const receivers = createReceiverContext(context);
   for (const [repoPath, sourceFile] of input.sourceFiles) {
     recordTypedAccesses(receivers, repoPath, sourceFile, accessedBy);
     collectKeyedNames(sourceFile, keyed);

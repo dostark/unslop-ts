@@ -8,7 +8,7 @@
 
 import { assertEquals } from "@std/assert";
 import { CLASSIC_OPTIONS, EXTENDED_OPTIONS } from "./helpers/measurement.ts";
-import { measureClasses } from "./helpers/class_measurement.ts";
+import { measureClasses, measureClassesOnBabel } from "./helpers/class_measurement.ts";
 
 const MEMBERS_SOURCE = "class Account {\n" +
   "  readonly id = 1;\n" +
@@ -111,4 +111,13 @@ Deno.test("class-metrics: the class name, its line and its token lines are repor
   assertEquals(metrics.line, 2);
   assertEquals(metrics.loc, 6);
   assertEquals(metrics.precision, "syntactic");
+});
+
+Deno.test("class-metrics-cross-parser: the fixture classes measure the same on the Deno host and on the Babel AST", () => {
+  const corpus = [MEMBERS_SOURCE, WMC_SOURCE, NESTED_SOURCE, OPTIONAL_SOURCE, TCC_SOURCE];
+  for (const source of corpus) {
+    for (const options of [CLASSIC_OPTIONS, EXTENDED_OPTIONS]) {
+      assertEquals(measureClassesOnBabel(source, options), measureClasses(source, options), source);
+    }
+  }
 });

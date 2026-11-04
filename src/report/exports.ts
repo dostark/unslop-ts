@@ -153,18 +153,23 @@ export interface IModuleGraphInput {
   readonly publicEntries: readonly string[];
 }
 
+/** The TypeScript compiler trees of the snapshot files, the only trees that carry typed receivers. */
+export function typeScriptSourcesOf(files: ReadonlyMap<string, IParsedHealthFile>): Map<string, ts.SourceFile> {
+  const sourceFiles = new Map<string, ts.SourceFile>();
+  for (const [path, file] of files) {
+    sourceFiles.set(path, ts.createSourceFile(path, file.text, ts.ScriptTarget.Latest, true));
+  }
+  return sourceFiles;
+}
+
 /** The resolved import graph of the snapshot, with the manifest and configured public entries. */
 export function moduleGraphOf(
   files: ReadonlyMap<string, IParsedHealthFile>,
   input: IModuleGraphInput,
 ): Promise<IModuleGraph> {
-  const sourceFiles = new Map<string, ts.SourceFile>();
-  for (const [path, file] of files) {
-    sourceFiles.set(path, ts.createSourceFile(path, file.text, ts.ScriptTarget.Latest, true));
-  }
   return buildModuleGraph({
     repoRoot: input.rootPath,
-    sourceFiles,
+    sourceFiles: typeScriptSourcesOf(files),
     walkSkipPatterns: HEALTH_WALK_SKIP_PATTERNS,
     publicEntries: input.publicEntries,
   });

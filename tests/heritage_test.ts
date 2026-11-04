@@ -3,7 +3,7 @@
  * @path tests/heritage_test.ts
  * @description The shared heritage reader: class heritage names on the Deno host AST and the resolution through bindings.
  * @architectural-layer Test
- * @related-files [src/metrics/heritage.ts, src/rules/whole_tree/unused_class_members.ts, tests/helpers/class_measurement.ts]
+ * @related-files [src/metrics/heritage.ts, src/rules/whole_tree/class_context.ts, tests/helpers/class_measurement.ts]
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
@@ -25,8 +25,8 @@ Deno.test("heritage-shared: a name resolves through the lookup and a base that i
   assertEquals(found, ["defB", "defC1", "defC2"]);
 });
 
-Deno.test("heritage-shared: the unused-member check reads its parents through the shared resolution", async () => {
-  const source = await Deno.readTextFile(new URL("../src/rules/whole_tree/unused_class_members.ts", import.meta.url));
+Deno.test("heritage-shared: the receiver context reads its parents through the shared resolution", async () => {
+  const source = await Deno.readTextFile(new URL("../src/rules/whole_tree/class_context.ts", import.meta.url));
   assertStringIncludes(source, 'from "../../metrics/heritage.ts"');
   assertStringIncludes(source, "resolveHeritage(");
 });
