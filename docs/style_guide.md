@@ -379,7 +379,11 @@ Keep functions and classes small enough to read in one pass.
   each function starts at nesting zero. The weight table and the paper, SonarJS and fallow differences are in
   [Metrics methodology](metrics_methodology.md).
 - **Function size:** a function owns at most 60 code-token lines by default. Comments and blank lines never
-  count, and a nested function body belongs to that function, not to its parent.
+  count, and a nested function body belongs to that function, not to its parent. The rule has two limits. `max`
+  is the hard limit, and the lint rule reports a function above it. `softMax` is an optional soft limit below
+  it. The lint rule ignores it, and `unslop health` flags functions above it as advisory findings. A project can
+  set a hard limit of 100 and a soft limit of 80, as the reasoning in
+  [Module Size and Agent Context](#agent-context) explains.
 - **Class design:** a class is judged by what it does, not by its length alone. The class metric core measures these
   values for each class:
   - **NOM** and **NOA** count the methods (accessors included, the constructor not) and the attributes.
@@ -398,9 +402,9 @@ Keep functions and classes small enough to read in one pass.
   God Class: WMC at least 47, TCC below one third and ATFD above 5. The health report also finds a Data Class (a class
   that mostly holds public data) and Feature Envy (a method that uses the data of other classes more than its own).
   The limits are second-hand values from the literature, and the methodology lists each with its sources and the date
-  they were read. `legacy-score` keeps the earlier weighted size score: a class of at least `minClassLines` lines
-  gets a score from its methods, constructor parameters, length, longest method, imports and fields, and a score of
-  `threshold` or more is reported. `minClassLines` and `threshold` apply only to `legacy-score`.
+  they were read. `legacy-score` keeps the earlier weighted size score: a class of at least 200 lines (the default `minClassLines`)
+  gets a score from its methods, constructor parameters, length, longest method, imports and fields, and a score of 60
+  (the default `threshold`) or more is reported. `minClassLines` and `threshold` apply only to `legacy-score`.
 - **Precision:** the rule reads one file, so its ATFD and CBO are syntactic approximations. The health report
   types the receivers across files, and its values carry the label `typed`. The two can differ.
 - **Activation:** the generic preset leaves both rules off, so `max-params` and `max-class-size` stay opt-in until a
@@ -415,6 +419,45 @@ Keep functions and classes small enough to read in one pass.
 | `max-cognitive-complexity`  | A function whose cognitive complexity exceeds the limit                                     |
 | `max-function-lines`        | A function with more code-token lines than the limit                                        |
 | `max-class-size`            | A god class, or with `legacy-score` a class whose size score reaches the threshold (opt-in) |
+
+## Module Size and Agent Context {#agent-context}
+
+A coding agent reads source through a limited context, and every token it reads is a cost. A person pays in
+attention and an agent pays in tokens, so the same advice helps both. This section says which size problems are
+worth fixing and which fixes help.
+
+**What an agent pays for.** A call that reads a whole file costs the length of the whole file. A file of about 1,900
+lines is roughly 19,000 tokens, at the common estimate of four characters per token. An agent that changes one
+concern in such a file loads every other concern with it. Reading part of a file costs less text, but each read is
+a round trip with its own latency and its own request overhead. A function with nested branches is also harder to
+follow than a flat one of the same length.
+
+**What splitting a function inside the same file does.** Splitting a function makes the file longer, not
+shorter. It adds a signature, a comment and often a shared state
+object for each new helper, so the file gets longer. In one measured batch of nine files, splitting nine
+over-limit functions raised the changed lines from 428 deleted to 541 added, and the files grew. To follow one
+flow the reader now opens several functions. A split of this kind pays off only when it removes a real
+decision or a real responsibility. A split that only relocates lines, or that moves an operator into a helper so
+that the score drops, makes the code longer and does not make it easier to read. Splitting a function in the same file
+is therefore the weaker fix.
+
+**What helps most.** Decompose a large class into modules, one responsibility for each file, a few hundred lines
+long, with a narrow exported interface. An agent that works on one concern then reads one small file and the
+interfaces of its neighbors, and the rest of the original file stays out of its context. The god class strategy
+and the health hotspots find the candidates: a large, incoherent class that changes often gains the most.
+Removing duplicated code and dead code also shortens what every reader has to load.
+
+**How the limits follow from this.**
+
+- Judge a function by nesting and cognitive complexity first, and by length second. A flat sequence, a table or a
+  long template of 80 lines reads top to bottom and costs the same tokens as the lines it contains.
+- Keep a hard limit and a soft limit. The hard limit is a gate: the lint rule or a ceiling fails above it. The soft
+  limit is advice: `softMax` makes `unslop health` flag a function as a warning without failing a build. A
+  project that wants fewer false alarms can raise the hard limit to 100 and keep the soft limit at 80.
+- Prefer a ceiling over a zero target for code that exists today. A ceiling stops growth and leaves rarely
+  changed code alone, where a refactor costs a risk and returns little.
+- Refactor where the code changes. The hotspot ranking in the health report combines how often a file changes
+  with how complex it is, and it points at the files where a clearer structure repays the effort.
 
 ## Optional Parameters {#optional-parameters}
 

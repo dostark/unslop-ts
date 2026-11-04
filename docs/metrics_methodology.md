@@ -174,7 +174,9 @@ reachability estimates. Grades are A at 85 or more, B at 70, C at 55 and D at 40
 
 ## Thresholds and gates
 
-The rule gate defaults to 15 cyclomatic, 15 cognitive and 60 lines per function. The phase refactoring tranche
+The rule gate defaults to 15 cyclomatic, 15 cognitive and 60 lines per function. The line rule accepts a second,
+optional limit, `softMax`, that is below `max`. The lint rule ignores `softMax`. The health report uses it, when it is set,
+as the line limit of its findings, so a function between `softMax` and `max` is an advisory finding and fails no gate. The phase refactoring tranche
 targets 20 cyclomatic and 30 cognitive. The compiled workspace ceilings are measured counts, and the
 `check:complexity` task runs three single-rule invocations against them from the descriptor root with its own lint
 config. A scan passes only when the lint plugin reports that the rule ran on files: a missing plugin, an inactive

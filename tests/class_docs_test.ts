@@ -65,3 +65,28 @@ Deno.test("docs-strategies: the README documents the strategy option, the class 
   }
   assertStringIncludes(readme, "docs/metrics_methodology.md");
 });
+
+/** The agent context section of the style guide, from its heading to the next second-level heading. */
+function agentContextSection(guide: string): string {
+  const start = guide.indexOf("## Module Size and Agent Context {#agent-context}");
+  return start < 0 ? "" : guide.slice(start, guide.indexOf("\n## ", start + 1));
+}
+
+Deno.test("docs-agent-context: the style guide explains why module decomposition beats function splitting for agents", async () => {
+  const section = agentContextSection(await read("docs/style_guide.md"));
+  assertMatch(section, /\bagent/i, "the section is missing or does not mention agents");
+  for (const claim of ["tokens", "whole file", "module", "round trip", "nesting", "softMax", "hard limit", "soft limit"]) {
+    assertStringIncludes(section, claim);
+  }
+  assertMatch(section, /splitting a function[^.]*(more|larger|longer)/i);
+  assertMatch(section, /relocat|move[sd]? (the )?(lines|decisions)/i);
+});
+
+Deno.test("docs-agent-context: the function size rule and the methodology describe the soft and hard line limits", async () => {
+  const guide = complexitySection(await read("docs/style_guide.md"));
+  assertStringIncludes(guide, "softMax");
+  assertStringIncludes(guide, "#agent-context");
+  const methodology = await read("docs/metrics_methodology.md");
+  assertStringIncludes(methodology, "softMax");
+});
+

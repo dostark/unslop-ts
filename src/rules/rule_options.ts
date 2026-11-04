@@ -85,6 +85,8 @@ const MaxCognitiveComplexityOptions = z.object({
 
 const MaxFunctionLinesOptions = z.object({
   max: z.number().int().positive().default(DEFAULT_MAX_FUNCTION_LINES),
+  /** An advisory limit below `max`. The lint rule ignores it, and the health report flags functions above it. */
+  softMax: z.number().int().positive().optional(),
 }).strict();
 
 const ClassSizeStrategySchema = z.enum(CLASS_SIZE_STRATEGIES);

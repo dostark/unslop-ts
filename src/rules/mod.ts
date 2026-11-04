@@ -256,7 +256,7 @@ export const TYPESCRIPT_RULE_PACK: IRulePack = {
         docs: "#complexity-rules",
         preset: "recommended",
         limits:
-          "Lines are code-token lines, so comments and blank lines never count, and nested functions are scored alone.",
+          "Lines are code-token lines, so comments and blank lines never count, and nested functions are scored alone. The optional softMax is read by the health report only.",
       },
       requiresTestGlobs: false,
       create: createMaxFunctionLines,

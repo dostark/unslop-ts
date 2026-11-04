@@ -243,7 +243,7 @@ function settingsOf(compiled: ICompiledConfig, pluginName: string, values: Map<s
       : numberOption(cognitive, "max", DEFAULT_MAX_COGNITIVE),
     maxLines: values.has("max-lines")
       ? positiveInteger("max-lines", values.get("max-lines") ?? "")
-      : numberOption(lines, "max", DEFAULT_MAX_FUNCTION_LINES),
+      : numberOption(lines, "softMax", numberOption(lines, "max", DEFAULT_MAX_FUNCTION_LINES)),
     variant: flagVariant as MetricVariant,
     countNullish: flagNullish,
   });

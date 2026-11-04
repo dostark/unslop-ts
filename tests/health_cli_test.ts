@@ -743,3 +743,25 @@ Deno.test("health-classes-flag: --classes prints only the class section and --to
     assertEquals(rows.length, 1);
   });
 });
+
+const FOUR_LINES = "export function four(a: number): number {\n  const b = a + 1;\n  return b;\n}\n";
+
+Deno.test("health-soft-lines: softMax sets the advisory line limit below the hard limit and a flag still wins", async () => {
+  const soft = { "demo/max-function-lines": { level: "error", options: { max: 100, softMax: 3 } } };
+  await withHealthProject({ "packages/x/src/four.ts": FOUR_LINES }, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(report.summary.options.max_lines, 3);
+    assertEquals(report.findings.filter((finding) => finding.name === "four").length, 1);
+    const flagged = parseReport((await health(dir, ["--format=json", "--max-lines=50"])).stdout);
+    assertEquals(flagged.summary.options.max_lines, 50);
+    assertEquals(flagged.findings.filter((finding) => finding.name === "four").length, 0);
+  }, soft);
+});
+
+Deno.test("health-soft-lines: without softMax the hard limit is the advisory limit", async () => {
+  const hard = { "demo/max-function-lines": { level: "error", options: { max: 100 } } };
+  await withHealthProject({ "packages/x/src/four.ts": FOUR_LINES }, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(report.summary.options.max_lines, 100);
+  }, hard);
+});
