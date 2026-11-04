@@ -58,7 +58,7 @@ export interface ILintReport {
 }
 
 const DEFAULTS = { topFiles: 5, topFns: 5 };
-const VALUE_PATTERN = /(?:complexity|score)\s+(\d+)|has\s+(\d+)\s+lines?/;
+const VALUE_PATTERN = /(?:complexity|score|WMC)\s+(\d+)|has\s+(\d+)\s+lines?/;
 const MAX_STDERR = 8 * 1024;
 const LINTABLE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 
@@ -335,6 +335,15 @@ interface ICeilingReport {
   readonly selected: number;
   readonly total: number;
   readonly evaluation: IEvaluation;
+  /** Every selected diagnostic, ranked or not, so a caller can compare runs. */
+  readonly findings: readonly IReportedFinding[];
+}
+
+/** One selected diagnostic with its position and message. */
+interface IReportedFinding {
+  readonly file: string;
+  readonly line: number;
+  readonly message: string;
 }
 
 /** Loads the descriptor, the ceilings and the measured counts for one rule. */
@@ -359,6 +368,14 @@ async function evaluateReportCeilings(
     selected: diagnostics.length,
     total: rankFindings(diagnostics).length,
     evaluation: evaluateCeilings(projectCeilings(ceilings, rule), counts, knownRules, knownPackages),
+    findings: diagnostics.map((diagnostic) => ({
+      file: relative(
+        rootPath,
+        diagnostic.filename?.startsWith("file:") ? fromFileUrl(diagnostic.filename) : diagnostic.filename ?? "",
+      ),
+      line: diagnostic.range?.start?.line ?? 0,
+      message: diagnostic.message ?? "",
+    })),
   };
 }
 
@@ -373,6 +390,7 @@ function renderCeilings(rule: string, report: ICeilingReport, asJson: boolean): 
         selected: report.selected,
         total: report.total,
         ceilings: report.evaluation,
+        findings: report.findings,
       },
       null,
       2,

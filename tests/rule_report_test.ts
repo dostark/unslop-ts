@@ -26,6 +26,11 @@ Deno.test("parseValue reads the complexity value", () => {
   assertEquals(parseValue("Function f has cyclomatic complexity 30 (limit 15)."), 30);
 });
 
+Deno.test("parseValue reads the WMC of a god class message and keeps the legacy score first", () => {
+  assertEquals(parseValue("Class Hub is a god class (WMC 50 >= 47, TCC 0.20 < 0.33, ATFD 6 > 5)."), 50);
+  assertEquals(parseValue("Class C score 72 (limit 60; 5 methods, 300 lines; WMC 8, TCC 0.10, LCOM4 3)."), 72);
+});
+
 Deno.test("parseValue reads the class-size score", () => {
   assertEquals(parseValue("Class C score 72 (limit 60; 5 methods, 300 lines)."), 72);
 });
@@ -372,7 +377,11 @@ Deno.test("rule-report-plugin-absent: a missing plugin fails, while a loaded cle
   await withCeilingProject({ plugin: true, source: BRANCHING_SOURCE, ceiling: 0 }, async (dir) => {
     const loaded = await reportCeilings(dir, "", "deno.json");
     assertEquals(loaded.code, 1, loaded.stderr);
-    assertEquals(JSON.parse(loaded.stdout).ceilings.over[0].count, 1);
+    const report = JSON.parse(loaded.stdout);
+    assertEquals(report.ceilings.over[0].count, 1);
+    assertEquals(report.findings.length, 1);
+    assertStringIncludes(report.findings[0].message, "complexity");
+    assertEquals(typeof report.findings[0].line, "number");
   });
   await withCeilingProject({ plugin: true, source: CLEAN_SOURCE, ceiling: 0 }, async (dir) => {
     const clean = await reportCeilings(dir, "", "deno.json");
