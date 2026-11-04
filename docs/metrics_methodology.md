@@ -196,6 +196,302 @@ core rows of the generated engine bundle, and 22 core rows of evidence probes an
 tool-only file that no exclusion names counts against the coverage of the tool that lacks it. A parse failure, an
 ambiguous key or coverage below 99 percent makes the calibration insufficient.
 
+## Class design metrics
+
+Class metrics describe the design of one class. The class metric core measures what one file shows. The class pass of the health
+report adds what only other files show, such as inheritance and the type of a receiver. Each metric below names its source by a tag
+that the reference list resolves: [CK94] Chidamber and Kemerer, [BK95] Bieman and Kang, [HM95] Hitz and Montazeri and
+[LM06] Lanza and Marinescu. Every class value carries a `precision` label: `syntactic` for the per-file value of the lint rule
+and `typed` for the value of the health report.
+
+### The class unit
+
+A unit is one class declaration or class expression. Its methods are the methods and accessors it declares, and the
+constructor is not a method for NOM. Its attributes are the property declarations and the constructor parameter properties. A
+nested class is its own unit, and a function nested in a method belongs to that method. An object literal is not a class, and a
+mixin factory counts only for the class expression it returns. The exact member kinds that the engine reads are the ones of the
+Babel and the Deno host tree, and a test proves that both trees give equal values for the worked classes.
+
+<!-- class-example: class-unit -->
+
+```ts
+class Account {
+  private balance = 0;
+  readonly id = 1;
+  constructor(public owner: string) {}
+  deposit(amount: number): void {
+    this.balance += amount;
+  }
+  get total(): number {
+    return this.balance;
+  }
+}
+```
+
+```json
+{
+  "id": "class-unit",
+  "expected": {
+    "Account": { "nom": 2, "noa": 3, "wmc": 3, "tcc": 1, "lcom4": 1, "noap": 1, "noam": 1 }
+  }
+}
+```
+
+`Account` has two methods (`deposit` and the accessor `total`), three attributes (`balance`, `id` and the parameter property
+`owner`) and a WMC of 3, because the constructor and each method add 1. The Deno host tree does not report the accessibility of a
+constructor parameter property, so NOAP counts declared properties only: `id` is the one public attribute, and `owner` is not
+counted.
+
+### Chidamber and Kemerer metrics
+
+| Metric | Original definition [CK94]                             | unslop-ts definition                                                                                                         | Difference                                                                                                                       |
+| ------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| WMC    | Sum of the complexities of the methods of a class      | Sum of the classic cyclomatic values of the constructor and the methods, and a nested function adds its value minus its base | The original leaves the weight open. The engine uses McCabe, and the classic variant because the limits come from classic counts |
+| CBO    | Number of other classes that a class is coupled to     | Typed: the project classes and interfaces that the class names in types, `new`, receivers and `extends`, without itself      | The syntactic value counts imported or declared names used the same way and ignores externals                                    |
+| RFC    | Methods of the class plus the methods that it can call | NOM plus the distinct methods of other types that typed receivers call, interfaces included and the class family left out    | Null where the pass cannot type a receiver                                                                                       |
+| DIT    | Length of the path from the class to the root          | The longest `extends` chain among the walked classes. A base that no walked class declares adds 1 and ends the chain         | `implements` is not inheritance here                                                                                             |
+| NOC    | Number of immediate subclasses                         | The direct subclasses among the walked classes                                                                               | Subclasses outside the walked files are unknown                                                                                  |
+
+The original lack of cohesion of methods of [CK94] is not used. Section "Cohesion" explains the replacement.
+
+### Cohesion
+
+Tight class cohesion [BK95] is the share of visible method pairs that use a common attribute directly. A method is visible when
+it is not private and its name does not start with `#`. A pair is connected when both methods read the same attribute through
+`this`. The value is null for fewer than two visible methods, because no pair exists. A constructor takes no part, and a read in
+a nested function belongs to the method that holds it.
+
+LCOM4 [HM95] is the number of connected components of the graph whose nodes are the methods and whose edges join two methods
+that share an attribute or where one calls the other through `this`. A value of 1 means one cohesive group, and a value of 2 or
+more means that the class holds that many groups that could be separate classes. The original value of [CK94] counts method pairs
+and stops at zero, so it cannot tell a class of two groups from a class of five. The component count can.
+
+<!-- class-example: class-cohesion-groups -->
+
+```ts
+class Counter {
+  private count = 0;
+  private step = 1;
+  inc(): void {
+    this.count += this.step;
+  }
+  reset(): void {
+    this.count = 0;
+  }
+  label(): string {
+    return "counter";
+  }
+}
+```
+
+```json
+{
+  "id": "class-cohesion-groups",
+  "expected": {
+    "Counter": { "nom": 3, "wmc": 3, "noa": 2, "tcc": 0.3333333333333333, "lcom4": 2 }
+  }
+}
+```
+
+Of the three pairs only `inc` and `reset` share an attribute, so TCC is 1/3. `label` reads no attribute, so the graph has two
+components, `inc` with `reset` and `label` alone.
+
+### Foreign data
+
+Access to foreign data (ATFD) counts the distinct attributes of other classes that a class reads directly. Locality of attribute
+accesses (LAA) is the share of the attributes that a method reads that belong to its own class. Foreign data providers (FDP)
+counts the distinct classes whose attributes a method reads. All three come from [LM06].
+
+The lint rule has one file only. It counts the distinct `receiver.property` reads where the receiver is a plain identifier or
+`this.field`. It leaves out calls, plain assignments, receivers that start with an uppercase letter, namespace imports, declared
+types and the method names that the file declares. This is an approximation and its label is `syntactic`. The health report
+types the receiver from the declaration of a parameter, a field, a variable, a return type or a cast. It counts a read only when
+the receiver is a known class and the property is a field or an accessor of that class. An unknown or interface receiver adds
+nothing, so the typed value never counts a read that it cannot place. The two values can differ for this reason, and each
+carries its label.
+
+<!-- class-example: class-foreign-data -->
+
+```ts
+class Report {
+  total(order: { price: number; qty: number }, tax: { rate: number }): number {
+    return order.price * order.qty * tax.rate;
+  }
+}
+```
+
+```json
+{
+  "id": "class-foreign-data",
+  "expected": {
+    "Report": { "atfd": 3, "cbo": 0, "precision": "syntactic" }
+  }
+}
+```
+
+The syntactic count is 3: `order.price`, `order.qty` and `tax.rate`. A typed pass over the same file would count none of them,
+because the receivers have anonymous object types and no known class.
+
+### Detection strategies
+
+The strategies of [LM06] combine the metrics. A strategy is a conjunction of conditions, and each condition compares one
+metric with a limit.
+
+| Strategy     | Unit   | Condition                                                                                                                            |
+| ------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| God Class    | class  | `wmcVeryHigh` <= WMC and TCC < `tccLimit` and ATFD > `atfdFew`                                                                       |
+| Data Class   | class  | WOC < `wocLimit` and ((NOAP + NOAM > `dataClassFew` and WMC < `wmcHigh`) or (NOAP + NOAM > `dataClassMany` and WMC < `wmcVeryHigh`)) |
+| Feature Envy | method | ATFD > `atfdFew` and LAA < `laaLimit` and FDP <= `fdpFew`                                                                            |
+
+Weight of class (WOC) is the number of public methods that are not accessors, divided by all public members, and it is null when
+a class has no public member. NOAP counts public attributes and NOAM counts public accessor methods.
+
+The limits are second-hand values. The printed book was not available, so each value is a commonly cited figure with the
+sources that quote it and the date on which they were read. The table is checked against the constants of the engine.
+
+| Limit           | Value  | Used by                 | Retrieved  | Sources                                                                                                                                                                                                                                                |
+| --------------- | ------ | ----------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `wmcVeryHigh`   | 47     | God Class, Data Class   | 2026-11-04 | https://docs.rs/cha-core/1.20.0/src/cha_core/plugins/god_class.rs.html, https://homepages.dcc.ufmg.br/~figueiredo/disciplinas/lectures/bad-smell-detection_v01.pdf, https://simpleorientedarchitecture.com/how-to-identify-data-class-using-ndepend/   |
+| `tccLimit`      | 0.3333 | God Class               | 2026-11-04 | https://docs.rs/cha-core/1.20.0/src/cha_core/plugins/god_class.rs.html, https://homepages.dcc.ufmg.br/~figueiredo/disciplinas/lectures/bad-smell-detection_v01.pdf                                                                                     |
+| `atfdFew`       | 5      | God Class, Feature Envy | 2026-11-04 | https://docs.rs/cha-core/1.20.0/src/cha_core/plugins/god_class.rs.html, https://homepages.dcc.ufmg.br/~figueiredo/disciplinas/lectures/bad-smell-detection_v01.pdf, https://simpleorientedarchitecture.com/how-to-identify-feature-envy-using-ndepend/ |
+| `wmcHigh`       | 31     | Data Class              | 2026-11-04 | https://simpleorientedarchitecture.com/how-to-identify-data-class-using-ndepend/                                                                                                                                                                       |
+| `dataClassFew`  | 5      | Data Class              | 2026-11-04 | https://simpleorientedarchitecture.com/how-to-identify-data-class-using-ndepend/                                                                                                                                                                       |
+| `dataClassMany` | 8      | Data Class              | 2026-11-04 | https://simpleorientedarchitecture.com/how-to-identify-data-class-using-ndepend/                                                                                                                                                                       |
+| `wocLimit`      | 0.3333 | Data Class              | 2026-11-04 | https://simpleorientedarchitecture.com/how-to-identify-data-class-using-ndepend/                                                                                                                                                                       |
+| `laaLimit`      | 0.3333 | Feature Envy            | 2026-11-04 | https://simpleorientedarchitecture.com/how-to-identify-feature-envy-using-ndepend/, https://homepages.dcc.ufmg.br/~figueiredo/disciplinas/lectures/bad-smell-detection_v01.pdf                                                                         |
+| `fdpFew`        | 5      | Feature Envy            | 2026-11-04 | https://simpleorientedarchitecture.com/how-to-identify-feature-envy-using-ndepend/, https://homepages.dcc.ufmg.br/~figueiredo/disciplinas/lectures/bad-smell-detection_v01.pdf                                                                         |
+
+The article on Feature Envy uses `FDP <= 3` in its own query. The slides and the book formula use `FDP <= Few`, so the limit is the
+Few value of 5. A summary of a thesis that reported `NOAP + NOAM > 2` and `> 7` was not confirmed and is not used.
+
+The health report also derives the limits from the walked classes. For each metric it takes the mean and the population standard
+deviation over the classes that declare a method. LOW is the mean minus one deviation and never below zero, AVERAGE is the mean,
+HIGH is the mean plus one deviation, and VERY_HIGH is HIGH times 1.5. The report prints these bands beside the sourced defaults,
+which is the calibration check for TypeScript code.
+
+<!-- class-example: derived-bands -->
+
+```ts
+// The WMC values of eight classes: 2, 4, 4, 4, 5, 5, 7, 9.
+```
+
+```json
+{
+  "id": "derived-bands",
+  "bands": [2, 4, 4, 4, 5, 5, 7, 9]
+}
+```
+
+The mean is 5 and the deviation is 2, so the bands are 3, 5, 7 and 10.5.
+
+<!-- class-example: data-class -->
+
+```ts
+class Point {
+  x = 1;
+  y = 2;
+  z = 3;
+  w = 4;
+  v = 5;
+  u = 6;
+}
+```
+
+```json
+{
+  "id": "data-class",
+  "expected": {
+    "Point": { "nom": 0, "wmc": 0, "noap": 6, "noam": 0, "woc": 0 }
+  },
+  "strategies": { "Point": ["data-class"] }
+}
+```
+
+`Point` has six public attributes and no method, so WOC is 0, NOAP is 6, which is above 5, and WMC is 0, which is below 31.
+
+<!-- class-example: god-class -->
+
+```ts
+class Hub {
+  private a0 = 0;
+  private a1 = 0;
+  private a2 = 0;
+  private a3 = 0;
+  private a4 = 0;
+  private a5 = 0;
+  private a6 = 0;
+  m0(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f0 > this.a0 && a && b && c && d && e ? 1 : 2;
+  }
+  m1(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f1 > this.a1 && a && b && c && d && e ? 1 : 2;
+  }
+  m2(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f2 > this.a2 && a && b && c && d && e ? 1 : 2;
+  }
+  m3(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f3 > this.a3 && a && b && c && d && e ? 1 : 2;
+  }
+  m4(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f4 > this.a4 && a && b && c && d && e ? 1 : 2;
+  }
+  m5(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f5 > this.a5 && a && b && c && d && e ? 1 : 2;
+  }
+  m6(o: Other, a: boolean, b: boolean, c: boolean, d: boolean, e: boolean): number {
+    return o.f6 > this.a6 && a && b && c && d && e ? 1 : 2;
+  }
+}
+```
+
+```json
+{
+  "id": "god-class",
+  "expected": {
+    "Hub": { "nom": 7, "wmc": 49, "tcc": 0, "atfd": 7, "woc": 1 }
+  },
+  "strategies": { "Hub": ["god-class"] }
+}
+```
+
+Each method adds 1, five `&&` and one ternary, so its value is 7 and WMC is 49, above 47. No two methods read the same attribute, so
+TCC is 0. The class reads seven properties of `o`, so ATFD is 7, above 5. All three conditions hold.
+
+### The legacy score
+
+The class-size rule keeps its earlier weighted score under `strategy: "legacy-score"`, so a consumer can compare the two
+algorithms or return to the old one. The score is rounded from six terms: 1.5 per method up to 30 methods; 3 per constructor
+parameter when there are more than 7; one point per 50 lines above `minClassLines`; one point per 10 lines of the longest method above
+100; 1.5 per import above 24; and 0.8 per field above 3. A class under `minClassLines` is skipped, and a class is reported when its
+score exceeds `threshold`. The score measures size. It ranks a large cohesive class above a small tangled one, which is why the
+God Class strategy is the default. The legacy message also prints WMC, TCC and LCOM4 for comparison.
+
+### Parameter count
+
+The parameter count is a function metric and is not part of the God Class conditions. The rule `max-params` counts the declared
+parameters of a function, an arrow, a method and a constructor, once each, whether required, optional, defaulted or rest, and
+counts a constructor parameter property. An erased TypeScript `this` parameter is free. An interface method signature and a
+function type are not counted. A function with seven parameters passes and one with eight fails. A typed options object counts once,
+so it satisfies the rule, but it does not prove that the grouped values belong together, and a class design problem is not solved by
+moving its dependencies into one object.
+
+### Calibration of the strategies
+
+On 2026-11-04, at the cutover commit `faf52aa75`, the class-size rule found 39 classes with the God Class strategy and 17 with the
+legacy score in the lint roots of this repository. Eleven classes were in both runs, 28 only in the God Class run and 6 only in the
+legacy run. The classes only in the legacy run are large and cohesive, such as `FlowRunner` with TCC 1.00 and ATFD 0. The typed
+report found no god class in the same tree, because the worst classes read other objects through methods and injected interfaces
+and not through attributes. The two precisions therefore disagree on this repository, and the gate uses the syntactic rule with
+per-package ceilings. The ceilings only hold a count from rising.
+
+### Limits of class metrics from syntax
+
+The pass reads syntax and declared types. It does not run the type checker, so structural typing, an inferred type, a mixin, a
+decorator that adds members and a dynamic property access are invisible to it. A class declared inside a function or a class
+expression is measured on the Babel tree and gets syntactic values only. Only top-level class declarations get typed values and
+a position in the inheritance counts. A receiver whose declared type is a union of classes counts for each of them. The Deno host
+tree does not give the accessibility of a parameter property, so NOAP leaves such properties out in both trees.
+
 ## Limitations
 
 The measurement is syntax-only. The engine does not expand macros, evaluate types, follow generated code or
@@ -335,3 +631,10 @@ Each `case` adds one cyclomatic point and the `switch` adds one cognitive point.
 - LCOV coverage format. https://github.com/linux-test-project/lcov
 - Maintainability index, Visual Studio form.
   https://learn.microsoft.com/en-us/visualstudio/code-quality/code-metrics-maintainability-index-range-and-meaning
+- [CK94] Chidamber, S. R., and Kemerer, C. F. (1994). A Metrics Suite for Object Oriented Design. IEEE Transactions on Software
+  Engineering 20(6), 476-493. DOI 10.1109/32.295895.
+- [BK95] Bieman, J. M., and Kang, B.-K. (1995). Cohesion and reuse in an object-oriented system. Proceedings of the ACM Symposium
+  on Software Reusability, 259-262. DOI 10.1145/211782.211856.
+- [HM95] Hitz, M., and Montazeri, B. (1995). Measuring coupling and cohesion in object-oriented systems. International Symposium on
+  Applied Corporate Computing, Monterrey. No DOI is registered. The CiteSeerX record is 10.1.1.409.4862.
+- [LM06] Lanza, M., and Marinescu, R. (2006). Object-Oriented Metrics in Practice. Springer. DOI 10.1007/3-540-39538-5.

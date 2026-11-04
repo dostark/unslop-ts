@@ -7,12 +7,17 @@
  * @related-files [docs/metrics_methodology.md, src/metrics/mod.ts]
  */
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertMatch, assertStringIncludes, assertThrows } from "@std/assert";
 import { join } from "@std/path";
 import { createMeasurementContext } from "../src/metrics/context.ts";
 import { functionUnits, measureFunction } from "../src/metrics/function_metrics.ts";
 import { METRIC_CONTRIBUTION_KINDS } from "../src/metrics/types.ts";
-import type { IFunctionMetrics, IMetricOptions, MetricVariant } from "../src/metrics/types.ts";
+import type { IClassMetrics, IFunctionMetrics, IMetricOptions, MetricVariant } from "../src/metrics/types.ts";
+import { CLASS_THRESHOLDS } from "../src/metrics/class_thresholds.ts";
+import type { IPassClass } from "../src/report/class_pass.ts";
+import { bandsOf } from "../src/report/class_statistics.ts";
+import { designFindingsOf } from "../src/report/design_strategies.ts";
+import { measureClassesOnBabel } from "./helpers/class_measurement.ts";
 
 const DOC_PATH = join(import.meta.dirname!, "../docs/metrics_methodology.md");
 
@@ -298,4 +303,114 @@ Deno.test("postreview-methodology-examples: the gate, graph and history contract
   ) {
     assert(text.includes(claim), `missing contract statement: ${claim}`);
   }
+});
+
+const CLASS_MARKER = /^<!-- class-example: ([a-z0-9-]+) -->$/;
+const CLASS_REFERENCE_TAG = /\[([A-Z]{2,3}\d{2})\]/g;
+const DOI_PATTERN = /DOI 10\.\d{4,}\/\S+/;
+const NO_DOI_NOTE = "No DOI is registered";
+const CLASS_SECTION = "## Class design metrics";
+
+/** One class worked example: its source, the expected metrics per class, and the strategies that flag the class. */
+interface IClassExample {
+  readonly id: string;
+  readonly code: string;
+  readonly expected: Readonly<Record<string, Readonly<Partial<Record<keyof IClassMetrics, number | null>>>>>;
+  readonly strategies: Readonly<Record<string, readonly string[]>>;
+  readonly bands: readonly number[];
+}
+
+/** Parses the class examples of the document. A marker without both fences is an error. */
+function parseClassExamples(text: string): IClassExample[] {
+  const lines = text.split("\n");
+  const examples: IClassExample[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    const marker = CLASS_MARKER.exec(lines[index].trim());
+    if (!marker) continue;
+    const code = readFence(lines, index, "ts", marker[1]);
+    const json = readFence(lines, code.end, "json", marker[1]);
+    index = json.end;
+    const parsed = JSON.parse(json.body);
+    if (parsed.id !== marker[1]) throw new MethodologyError(`class example ${marker[1]}: JSON id mismatch`);
+    examples.push({
+      id: marker[1],
+      code: code.body,
+      expected: parsed.expected ?? {},
+      strategies: parsed.strategies ?? {},
+      bands: parsed.bands ?? [],
+    });
+  }
+  return examples;
+}
+
+/** The pass class that the strategies read for one measured class. */
+function passClassOf(metrics: IClassMetrics): IPassClass {
+  return { path: "example.ts", name: metrics.name, nameOffset: 0, metrics, methods: [] };
+}
+
+Deno.test("methodology-class-examples: every class worked example gives its stated metrics and strategy results", async () => {
+  const examples = parseClassExamples(await methodologyText());
+  assert(examples.length >= 6, `the document has ${examples.length} class examples`);
+  for (const example of examples) {
+    if (example.bands.length > 0) {
+      const bands = bandsOf(example.bands);
+      assertEquals(bands, { mean: 5, sd: 2, low: 3, average: 5, high: 7, very_high: 10.5 }, example.id);
+      continue;
+    }
+    const measured = measureClassesOnBabel(example.code);
+    for (const [name, values] of Object.entries(example.expected)) {
+      const metrics = measured.find((entry) => entry.name === name);
+      assert(metrics !== undefined, `${example.id}: no class ${name}`);
+      for (const [key, value] of Object.entries(values)) {
+        assertEquals(metrics[key as keyof IClassMetrics], value, `${example.id}: ${name}.${key}`);
+      }
+      const flagged = designFindingsOf([passClassOf(metrics)]).map((finding) => finding.strategy);
+      assertEquals(flagged, example.strategies[name] ?? [], `${example.id}: ${name} strategies`);
+    }
+  }
+});
+
+Deno.test("methodology-strategy-tables: the documented limits equal the constants and each condition holds at its boundary", async () => {
+  const text = await methodologyText();
+  const section = text.slice(text.indexOf("### Detection strategies"), text.indexOf("### The legacy score"));
+  const limits: Record<string, number> = {};
+  for (const row of section.split("\n")) {
+    const cells = row.split("|").map((cell) => cell.trim());
+    if (cells.length < 5 || !cells[1].startsWith("`")) continue;
+    limits[cells[1].replaceAll("`", "")] = Number(cells[2]);
+  }
+  for (const [name, threshold] of Object.entries(CLASS_THRESHOLDS)) {
+    assert(Math.abs(limits[name] - threshold.value) < 0.01, `${name}: ${limits[name]} against ${threshold.value}`);
+    for (const source of threshold.sources) assertStringIncludes(section, source, `${name}: source`);
+    assertStringIncludes(section, threshold.retrieved, `${name}: retrieval date`);
+  }
+  const base: IClassMetrics = measureClassesOnBabel("class Base {}")[0];
+  const flags = (overrides: Partial<IClassMetrics>): string[] =>
+    designFindingsOf([passClassOf({ ...base, ...overrides })]).map((finding) => finding.strategy);
+  const god = { wmc: limits.wmcVeryHigh, tcc: 0.3, atfd: limits.atfdFew + 1, woc: 1, noap: 0, noam: 0 };
+  assertEquals(flags(god), ["god-class"]);
+  assertEquals(flags({ ...god, wmc: limits.wmcVeryHigh - 1 }), []);
+  assertEquals(flags({ ...god, atfd: limits.atfdFew }), []);
+  assertEquals(flags({ ...god, tcc: CLASS_THRESHOLDS.tccLimit.value }), []);
+  const data = { wmc: 1, woc: limits.wocLimit - 0.01, noap: limits.dataClassFew + 1, noam: 0, tcc: 1, atfd: 0 };
+  assertEquals(flags(data), ["data-class"]);
+  assertEquals(flags({ ...data, noap: limits.dataClassFew }), []);
+  assertEquals(flags({ ...data, wmc: limits.wmcHigh }), []);
+  assertEquals(flags({ ...data, noap: limits.dataClassMany + 1, wmc: limits.wmcHigh }), ["data-class"]);
+  assertEquals(flags({ ...data, noap: limits.dataClassMany + 1, wmc: limits.wmcVeryHigh }), []);
+});
+
+Deno.test("methodology-class-references: every cited class source is in the reference list with a DOI or a stated absence", async () => {
+  const text = await methodologyText();
+  const classSection = text.slice(text.indexOf(CLASS_SECTION), text.indexOf("## References"));
+  const references = text.slice(text.indexOf("## References"));
+  const cited = new Set([...classSection.matchAll(CLASS_REFERENCE_TAG)].map((match) => match[1]));
+  assert(cited.size >= 4, `only ${cited.size} class sources are cited`);
+  for (const tag of cited) {
+    const entry = references.split("\n- ").find((candidate) => candidate.startsWith(`[${tag}]`));
+    assert(entry !== undefined, `${tag} is not in the reference list`);
+    const flat = entry.replace(/\s+/g, " ");
+    assert(DOI_PATTERN.test(flat) || flat.includes(NO_DOI_NOTE), `${tag} has neither a DOI nor a stated absence`);
+  }
+  assertMatch(references, /DOI 10\.1109\/32\.295895/);
 });
