@@ -39,6 +39,7 @@ const PARAMETER_PROPERTY = "TSParameterProperty";
 const PRIVATE_ACCESSIBILITY = "private";
 const PRIVATE_PREFIX = "#";
 const ANONYMOUS_CLASS = "(anonymous)";
+const parameterVisibility = new WeakMap<IMeasurementContext, ReadonlyMap<number, boolean>>();
 
 /** One method or accessor of the class with the members it reaches through `this`. */
 interface IClassMethod {
@@ -86,13 +87,48 @@ function parameterPropertyNames(constructorMember: ILintNode): string[] {
   const names: string[] = [];
   for (const param of params) {
     if (!isNodeLike(param) || asNode(param).type !== PARAMETER_PROPERTY) continue;
-    const parameter = asNode(param).parameter;
-    const target = isNodeLike(parameter) && asNode(parameter).type === "AssignmentPattern"
-      ? asNode(parameter).left
-      : parameter;
-    if (isNodeLike(target) && typeof asNode(target).name === "string") names.push(asNode(target).name as string);
+    const target = parameterTarget(asNode(param));
+    if (target && typeof target.name === "string") names.push(target.name);
   }
   return names;
+}
+
+/** The identifier of a parameter property, including one with a default value. */
+function parameterTarget(param: ILintNode): ILintNode | null {
+  const parameter = param.parameter;
+  const target = isNodeLike(parameter) && asNode(parameter).type === "AssignmentPattern"
+    ? asNode(parameter).left
+    : parameter;
+  return isNodeLike(target) ? asNode(target) : null;
+}
+
+/** Babel preserves parameter accessibility that the host AST omits. Index the existing tree once per file. */
+function publicParameters(context: IMeasurementContext): ReadonlyMap<number, boolean> {
+  const known = parameterVisibility.get(context);
+  if (known) return known;
+  const visibility = new Map<number, boolean>();
+  const visit = (node: ILintNode): void => {
+    if (node.type === PARAMETER_PROPERTY) {
+      const target = parameterTarget(node);
+      if (target) visibility.set(rangeOf(target)[0], isPublicMember(node));
+    }
+    forEachChildNode(node, visit);
+  };
+  visit(asNode(context.syntaxTree.program));
+  parameterVisibility.set(context, visibility);
+  return visibility;
+}
+
+function publicParameterCount(member: ILintNode, context: IMeasurementContext): number {
+  const params = functionOf(member).params;
+  if (!Array.isArray(params)) return 0;
+  let count = 0;
+  for (const param of params) {
+    if (!isNodeLike(param) || asNode(param).type !== PARAMETER_PROPERTY) continue;
+    const target = parameterTarget(asNode(param));
+    if (target && publicParameters(context).get(rangeOf(target)[0]) === true) count++;
+  }
+  return count;
 }
 
 /** The names of the declared attributes: properties and constructor parameter properties. */
@@ -122,13 +158,16 @@ function isPublicMember(member: ILintNode): boolean {
   return !(isNodeLike(member.key) && PRIVATE_NAME_KINDS.has(asNode(member.key).type));
 }
 
-/** Weight of class and the public attribute and accessor counts. A parameter property is skipped: the Deno AST omits its accessibility. */
-function publicSurface(members: readonly ILintNode[]): IPublicSurface {
+/** Weight of class and public attribute and accessor counts, including public constructor parameter properties. */
+function publicSurface(members: readonly ILintNode[], context: IMeasurementContext): IPublicSurface {
   let functional = 0;
   let accessors = 0;
   let attributes = 0;
   for (const member of members) {
-    if (isConstructor(member)) continue;
+    if (isConstructor(member)) {
+      attributes += publicParameterCount(member, context);
+      continue;
+    }
     if (METHOD_KINDS.has(member.type) && isPublicMember(member)) {
       if (typeof member.kind === "string" && ACCESSOR_KINDS.has(member.kind)) accessors++;
       else functional++;
@@ -264,7 +303,7 @@ export function measureClass(
   const methods = methodRecords(members, attributes);
   const range = rangeOf(classNode);
   const coupling = measureCoupling(classNode, context);
-  const surface = publicSurface(members);
+  const surface = publicSurface(members, context);
   return {
     name: classNameOf(classNode),
     line: context.positionAt(range[0]).line,

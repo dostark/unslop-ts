@@ -223,7 +223,18 @@ Deno.test("woc-noap-noam: two public functional methods, one getter and one publ
   const surface = classNamed(result, "Surface");
   assertEquals([surface.woc, surface.noap, surface.noam], [0.5, 1, 1]);
   const pair = classNamed(result, "Pair");
-  // A constructor parameter property is not a counted public attribute.
-  assertEquals([pair.woc, pair.noap, pair.noam], [0, 0, 2]);
+  // The public constructor property contributes to NOAP alongside the two accessors.
+  assertEquals([pair.woc, pair.noap, pair.noam], [0, 1, 2]);
   assertEquals(classNamed(result, "Closed").woc, null);
+});
+
+Deno.test("class-parameter-visibility-pass: typed reporting retains the public constructor surface", async () => {
+  const metrics = classNamed(
+    await passOver({
+      "dto.ts":
+        "export class Dto { constructor(public x = 0, private y = 0, protected z = 0, readonly label = '') {} run() {} }",
+    }),
+    "Dto",
+  );
+  assertEquals([metrics.noa, metrics.noap, metrics.woc, metrics.precision], [4, 2, 1 / 3, "typed"]);
 });

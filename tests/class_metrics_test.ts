@@ -156,3 +156,12 @@ Deno.test("class-this-owner-boundaries: arrows retain this while ordinary functi
     assertEquals([key.tcc, key.lcom4], [1, 1]);
   }
 });
+
+Deno.test("class-parameter-visibility: public and default readonly properties count while private, protected and ordinary parameters do not", () => {
+  const source =
+    "class Surface { constructor(public a: number, private b = 0, protected c = 0, readonly d = 0, public readonly e = 0, ordinary = 0) {} }";
+  for (const measure of [measureClasses, measureClassesOnBabel]) {
+    const [metrics] = measure(source);
+    assertEquals([metrics.noa, metrics.noap, metrics.noam, metrics.woc], [5, 3, 0, 0]);
+  }
+});

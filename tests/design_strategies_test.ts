@@ -65,6 +65,24 @@ Deno.test("data-class: the second branch needs more than eight members and a WMC
 
 const FIELDS = ["a", "b", "c", "d", "e", "f"];
 const OTHER = `export class Other {\n${FIELDS.map((name) => `  ${name} = 0;`).join("\n")}\n}\n`;
+
+Deno.test("data-class-public-parameter-properties: equivalent field and constructor DTOs both produce Data Class findings", async () => {
+  const result = await passOver({
+    "fields.ts": `export class Fields { ${FIELDS.map((name) => `public ${name} = 0;`).join(" ")} }`,
+    "parameters.ts": `export class Parameters { constructor(${
+      FIELDS.map((name) => `public ${name} = 0`).join(", ")
+    }) {} }`,
+  });
+  assertEquals(result.classes.map((entry) => [entry.name, entry.metrics.noap, entry.metrics.woc]), [["Fields", 6, 0], [
+    "Parameters",
+    6,
+    0,
+  ]]);
+  assertEquals(designFindingsOf(result.classes).map((finding) => [finding.strategy, finding.className]), [[
+    "data-class",
+    "Fields",
+  ], ["data-class", "Parameters"]]);
+});
 const ENVY = [
   'import { Other } from "./other.ts";',
   "export class Envy {",
