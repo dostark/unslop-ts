@@ -138,6 +138,7 @@ function recordAccess(receivers: IReceiverContext, access: IClassAccess, into: M
 /** Adds the types that the declaration of a class names: type references, `new` expressions and its heritage. */
 function recordDeclared(receivers: IReceiverContext, def: ITypeDef, usage: IUsage): void {
   const visit = (node: ts.Node): void => {
+    if (node !== def.node && ts.isClassLike(node)) return;
     if (ts.isTypeReferenceNode(node)) {
       for (const named of typeReferenceDefs(receivers, def.repoPath, node)) usage.coupled.add(named);
     } else if (ts.isNewExpression(node)) {

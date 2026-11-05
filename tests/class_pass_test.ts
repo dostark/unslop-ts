@@ -238,3 +238,27 @@ Deno.test("class-parameter-visibility-pass: typed reporting retains the public c
   );
   assertEquals([metrics.noa, metrics.noap, metrics.woc, metrics.precision], [4, 2, 1 / 3, "typed"]);
 });
+
+Deno.test("typed-cbo-nested-class-ownership: only the nested declaration or expression receives Remote", async () => {
+  for (const nested of ["class Local { dependency!: Remote; }", "const Made = class Local { dependency!: Remote; };"]) {
+    const result = await passOver({
+      "remote.ts": "export class Remote {}",
+      "outer.ts": `import { Remote } from "./remote.ts"; export class Outer { make() { ${nested} } }`,
+    });
+    assertEquals([classNamed(result, "Outer").cbo, classNamed(result, "Local").cbo], [0, 1]);
+    assertEquals(result.unjoined, []);
+  }
+});
+
+Deno.test("typed-cbo-outer-function-dependency: ordinary functions retain the outer class dependency", async () => {
+  const result = await passOver({
+    "remote.ts": "export class Remote {}",
+    "outer.ts":
+      'import { Remote } from "./remote.ts"; export class Outer { make() { function local() { return new Remote(); } return local; } }',
+  });
+  assertEquals([classNamed(result, "Outer").cbo, classNamed(result, "Outer").dit, classNamed(result, "Remote").noc], [
+    1,
+    0,
+    0,
+  ]);
+});
