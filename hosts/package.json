@@ -12,6 +12,7 @@
     "test:oxlint": "cd .. && node --test tests_node/oxlint_example.mjs"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.8",
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint/js": "10.0.1",
     "@typescript-eslint/parser": "8.72.0",
