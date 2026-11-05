@@ -8,8 +8,8 @@
  */
 
 import ts from "typescript";
-import { bindingsFor, type ITypeContext } from "./class_context.ts";
-import type { ITypeDef } from "./class_receivers.ts";
+import { createReceiverContext, type ITypeContext } from "./class_context.ts";
+import { expressionDefs, type IReceiverContext, type ITypeDef } from "./class_receivers.ts";
 
 /** The inheritance depth and the direct subclass count of one class. */
 export interface IHierarchy {
@@ -20,25 +20,28 @@ export interface IHierarchy {
 /** The classes that a class extends: none, a base that no walked class declares, or the declared bases. */
 type Base = "none" | "unresolved" | readonly ITypeDef[];
 
-function extendsExpression(node: ts.ClassDeclaration): ts.Expression | null {
+function extendsExpression(node: ts.ClassLikeDeclaration): ts.Expression | null {
   const clause = node.heritageClauses?.find((candidate) => candidate.token === ts.SyntaxKind.ExtendsKeyword);
   return clause?.types[0]?.expression ?? null;
 }
 
-function baseOf(context: ITypeContext, def: ITypeDef): Base {
-  const expression = ts.isClassDeclaration(def.node) ? extendsExpression(def.node) : null;
+function baseOf(receivers: IReceiverContext, def: ITypeDef): Base {
+  const expression = ts.isClassLike(def.node) ? extendsExpression(def.node) : null;
   if (expression === null) return "none";
   if (!ts.isIdentifier(expression)) return "unresolved";
-  const bases = bindingsFor(context, def.repoPath).names.get(expression.text)?.filter((candidate) =>
-    ts.isClassDeclaration(candidate.node)
+  const bases = expressionDefs(receivers, def.repoPath, expression).filter((candidate) =>
+    ts.isClassLike(candidate.node)
   );
   return bases && bases.length > 0 ? bases : "unresolved";
 }
 
 /** The inheritance depth and subclass count of every class declaration of the walked files. */
-export function hierarchyOf(context: ITypeContext): ReadonlyMap<ITypeDef, IHierarchy> {
-  const classes = [...context.defs.values()].filter((def) => ts.isClassDeclaration(def.node));
-  const bases = new Map(classes.map((def) => [def, baseOf(context, def)]));
+export function hierarchyOf(
+  context: ITypeContext,
+  receivers: IReceiverContext = createReceiverContext(context),
+): ReadonlyMap<ITypeDef, IHierarchy> {
+  const classes = [...context.defs.values()].filter((def) => ts.isClassLike(def.node));
+  const bases = new Map(classes.map((def) => [def, baseOf(receivers, def)]));
   const depths = new Map<ITypeDef, number>();
   const depthOf = (def: ITypeDef, path: ReadonlySet<ITypeDef>): number => {
     const known = depths.get(def);

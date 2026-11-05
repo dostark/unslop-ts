@@ -381,6 +381,9 @@ function classSectionLines(report: IHealthReport, topClasses: number): string[] 
     findings.filter((finding) => finding.strategy === strategy).length;
   const lines = [
     ...heading("CLASS DESIGN · unslop extension"),
+    `  Typed ${report.class_analysis.typed}/${report.class_analysis.total} · method analysis unavailable for ${
+      report.class_analysis.total - report.class_analysis.typed
+    } class(es)`,
     `  ${scores.length} classes · ${count("god-class")} god classes · ${count("data-class")} data classes · ` +
     `${count("feature-envy")} envious methods`,
     `  Defaults (second-hand) WMC >= ${defaults.wmcVeryHigh.value} · TCC < ${defaults.tccLimit.value.toFixed(2)} · ` +
@@ -553,8 +556,24 @@ interface IRenderChoice {
 
 /** The JSON of the class design view alone. */
 function classesJson(report: IHealthReport): unknown {
-  const { schema_version, formula_version, tool_version, class_scores, design_findings, class_thresholds } = report;
-  return { schema_version, formula_version, tool_version, class_scores, design_findings, class_thresholds };
+  const {
+    schema_version,
+    formula_version,
+    tool_version,
+    class_scores,
+    class_analysis,
+    design_findings,
+    class_thresholds,
+  } = report;
+  return {
+    schema_version,
+    formula_version,
+    tool_version,
+    class_scores,
+    class_analysis,
+    design_findings,
+    class_thresholds,
+  };
 }
 
 /** Prints the report in the requested format. */

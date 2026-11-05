@@ -102,7 +102,7 @@ function isPrivateMember(name: ts.Node | undefined, node: ts.Node): boolean {
 }
 
 /** The member names that an interface or class declaration lists. */
-function declaredNames(node: ts.ClassDeclaration | ts.InterfaceDeclaration): string[] {
+function declaredNames(node: ts.ClassLikeDeclaration | ts.InterfaceDeclaration): string[] {
   const names: string[] = [];
   for (const member of node.members) {
     const name = memberNameOf(ts.getNameOfDeclaration(member));

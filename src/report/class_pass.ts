@@ -123,7 +123,7 @@ interface ITypedClass extends IClassSite {
 function typedClassesOf(defs: Iterable<ITypeDef>): ITypedClass[] {
   const classes: ITypedClass[] = [];
   for (const def of defs) {
-    if (!ts.isClassDeclaration(def.node) || !def.node.name) continue;
+    if (!ts.isClassLike(def.node) || !def.node.name) continue;
     const nameOffset = def.node.name.getStart(def.node.getSourceFile());
     classes.push({ path: def.repoPath, name: def.name, nameOffset, def });
   }
@@ -152,9 +152,10 @@ function withTypedValues(metrics: IClassMetrics, typed: ITypedClassValues | unde
 
 /** Measures the classes of the snapshot and gives each joined class its typed ATFD and CBO. */
 export function classPassOf(input: IClassPassInput): IClassPassResult {
-  const context = createTypeContext(input.graph, typeScriptSourcesOf(input.files));
-  const coupling = typedCouplingOf(context, createReceiverContext(context));
-  const hierarchy = hierarchyOf(context);
+  const context = createTypeContext(input.graph, typeScriptSourcesOf(input.files), true);
+  const receivers = createReceiverContext(context);
+  const coupling = typedCouplingOf(context, receivers);
+  const hierarchy = hierarchyOf(context, receivers);
   const measured = [...input.files.values()].flatMap((file) => babelClassesOf(file, input.options));
   const { pairs, unjoined } = joinClasses(measured, typedClassesOf(context.defs.values()));
   const typedBy = new Map<IBabelClass, ITypedClassValues | undefined>(

@@ -10,6 +10,7 @@
 import { CLASS_THRESHOLDS, type ClassThresholdName } from "../metrics/class_thresholds.ts";
 import { DEFAULT_CLASS_WMC_VARIANT } from "../metrics/constants.ts";
 import type {
+  IHealthClassAnalysis,
   IHealthClassScore,
   IHealthClassThresholds,
   IHealthDesignFinding,
@@ -23,6 +24,7 @@ import type { IModuleGraph } from "../rules/whole_tree/unused_exports_resolved.t
 
 /** The class design section of one report. */
 export interface IClassSection {
+  readonly class_analysis: IHealthClassAnalysis;
   readonly class_scores: readonly IHealthClassScore[];
   readonly design_findings: readonly IHealthDesignFinding[];
   readonly class_thresholds: IHealthClassThresholds;
@@ -82,6 +84,11 @@ export function classSectionOf(
 ): IClassSection {
   const pass = classPassOf({ files, graph, options: { variant: DEFAULT_CLASS_WMC_VARIANT, countNullish } });
   return {
+    class_analysis: {
+      total: pass.classes.length,
+      typed: pass.classes.filter((entry) => entry.metrics.precision === "typed").length,
+      unjoined: pass.unjoined,
+    },
     class_scores: pass.classes.map(scoreOf).sort(byWeight),
     design_findings: designFindingsOf(pass.classes).map((finding) => ({
       strategy: finding.strategy,

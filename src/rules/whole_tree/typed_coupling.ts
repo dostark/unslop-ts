@@ -59,7 +59,7 @@ const MEMBER_SEPARATOR = "\0";
 
 /** The key of a member: the type that declares it and its name. */
 function memberKey(owner: ITypeDef, name: string): string {
-  return [owner.repoPath, owner.name, name].join(MEMBER_SEPARATOR);
+  return [owner.repoPath, owner.name, owner.node.getStart(owner.node.getSourceFile()), name].join(MEMBER_SEPARATOR);
 }
 
 function usageOf(into: Map<ITypeDef, IUsage>, def: ITypeDef): IUsage {
@@ -77,7 +77,7 @@ function usageOf(into: Map<ITypeDef, IUsage>, def: ITypeDef): IUsage {
 
 /** True when every receiver type is a class, so the property can be told from an interface contract. */
 function allClasses(targets: readonly ITypeDef[]): boolean {
-  return targets.every((target) => ts.isClassDeclaration(target.node));
+  return targets.every((target) => ts.isClassLike(target.node));
 }
 
 function memberUsageOf(usage: IUsage, member: ts.ClassElement): IMemberUsage {
@@ -180,7 +180,7 @@ export function typedCouplingOf(
   }
   const result = new Map<ITypeDef, ITypedCoupling>();
   for (const def of context.defs.values()) {
-    if (!ts.isClassDeclaration(def.node)) continue;
+    if (!ts.isClassLike(def.node)) continue;
     const usage = usageOf(usages, def);
     recordDeclared(receivers, def, usage);
     usage.coupled.delete(def);

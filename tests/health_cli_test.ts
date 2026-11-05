@@ -30,6 +30,32 @@ Deno.test("health-private-cohesion: a high-WMC private-field class retains cohes
   });
 });
 
+Deno.test("health-class-population-coverage: the CLI reports named lexical classes and unavailable anonymous analysis", async () => {
+  const source =
+    "export function make() { class Local { run() {} } const Made = class Named { run() {} }; return class {}; }";
+  await withHealthProject({ "packages/x/src/local.ts": source }, async (dir) => {
+    const result = await health(dir, ["--classes", "--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const report = JSON.parse(result.stdout) as IHealthReport;
+    assertEquals(report.class_scores.filter((entry) => entry.precision === "typed").map((entry) => entry.name).sort(), [
+      "Local",
+      "Named",
+    ]);
+    assert("class_analysis" in report);
+    assertEquals(report.class_analysis, {
+      total: 3,
+      typed: 2,
+      unjoined: [{
+        path: "packages/x/src/local.ts",
+        name: "(anonymous)",
+        nameOffset: source.indexOf("class {}"),
+        reportedBy: "babel",
+      }],
+    });
+    assertStringIncludes((await health(dir, ["--classes"])).stdout, "method analysis unavailable for 1 class(es)");
+  });
+});
+
 const MIXED = "export function wide(value: number | null): number {\n" +
   "  const first = value ?? 0;\n" +
   "  const second = value ?? 1;\n" +

@@ -76,11 +76,56 @@ Deno.test("class-join: a file whose two trees report the same classes joins ever
 Deno.test("class-join: a class that only the Babel tree reports is listed and keeps its syntactic metrics", async () => {
   const result = await passOver({
     "local.ts":
-      "export class Outer {}\nexport function make() {\n  return class Local {\n    m(): number {\n      return 1;\n    }\n  };\n}\n",
+      "export class Outer {}\nexport function make() {\n  return class {\n    m(): number {\n      return 1;\n    }\n  };\n}\n",
   });
-  assertEquals(result.unjoined.map((entry) => [entry.name, entry.reportedBy]), [["Local", "babel"]]);
-  assertEquals(classNamed(result, "Local").precision, "syntactic");
+  assertEquals(result.unjoined.map((entry) => [entry.name, entry.reportedBy]), [["(anonymous)", "babel"]]);
+  assertEquals(classNamed(result, "(anonymous)").precision, "syntactic");
   assertEquals(classNamed(result, "Outer").precision, "typed");
+});
+
+Deno.test("typed-shadowed-class-sites: same-name local classes retain separate receivers and hierarchy", async () => {
+  const scope = (fields: string[]) =>
+    `class Base {} class Remote { ${fields.map((name) => `${name} = 0;`).join(" ")} go() {} }
+    class Local extends Base { run(remote: Remote) { remote.go(); return ${
+      fields.map((name) => `remote.${name}`).join(" + ")
+    }; } } return Local;`;
+  const result = await passOver({
+    "local.ts": `export function first() { ${scope(["x"])} } export function second() { ${scope(["y", "z"])} }`,
+  });
+  const locals = result.classes.filter((entry) => entry.name === "Local");
+  assertEquals(
+    locals.map((
+      entry,
+    ) => [
+      entry.metrics.precision,
+      entry.metrics.atfd,
+      entry.metrics.cbo,
+      entry.metrics.rfc,
+      entry.metrics.dit,
+      entry.metrics.noc,
+    ]),
+    [
+      ["typed", 1, 2, 2, 1, 0],
+      ["typed", 2, 2, 2, 1, 0],
+    ],
+  );
+  assertEquals(result.classes.filter((entry) => entry.name === "Base").map((entry) => entry.metrics.noc), [1, 1]);
+  assertEquals(new Set(locals.map((entry) => entry.nameOffset)).size, 2);
+  assertEquals(result.unjoined, []);
+});
+
+Deno.test("typed-class-expression-alias: imported variable bindings resolve the named class without leaking its inner name", async () => {
+  const result = await passOver({
+    "made.ts":
+      "export const Alias = class Inner { x = 0; go() {} }; export class Ghost { run() { return new Inner().x; } }",
+    "user.ts":
+      'import { Alias } from "./made.ts"; export class User { run() { const made = new Alias(); made.go(); return made.x; } }',
+  });
+  const user = classNamed(result, "User");
+  assertEquals([user.atfd, user.cbo, user.rfc], [1, 1, 2]);
+  const ghost = classNamed(result, "Ghost");
+  assertEquals([ghost.atfd, ghost.cbo, ghost.rfc], [0, 0, 1]);
+  assertEquals(result.unjoined, []);
 });
 
 Deno.test("class-join: a class that only the compiler tree reports fails the join and is listed", () => {

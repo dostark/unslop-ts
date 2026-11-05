@@ -14,7 +14,7 @@ import type { IFileBindings } from "./definition_reach.ts";
 export interface ITypeDef {
   readonly repoPath: string;
   readonly name: string;
-  readonly node: ts.ClassDeclaration | ts.InterfaceDeclaration;
+  readonly node: ts.ClassDeclaration | ts.ClassExpression | ts.InterfaceDeclaration;
   exported: boolean;
 }
 
@@ -26,6 +26,8 @@ export interface IReceiverContext {
   readonly bindingsFor: (repoPath: string) => IFileBindings<ITypeDef>;
   readonly reach: (module: string, name: string) => ITypeDef[];
   readonly defOfNode: ReadonlyMap<ts.Node, ITypeDef>;
+  /** Resolves a type name at its lexical declaration site when the context supports local classes. */
+  readonly resolveName?: (repoPath: string, identifier: ts.Identifier) => readonly ITypeDef[];
   /** The types that a class or interface extends or implements. */
   readonly parentsOf: (def: ITypeDef) => readonly ITypeDef[];
   /** The type, its ancestors, and its descendants: every class that a call on the type may run. */
@@ -90,7 +92,9 @@ function referencedTypes(context: IReceiverContext, repoPath: string, reference:
   const typeName = reference.typeName;
   if (ts.isIdentifier(typeName)) {
     const wrapped = TRANSPARENT_GENERICS.has(typeName.text) ? reference.typeArguments?.[0] : undefined;
-    return wrapped ? typesOfTypeNode(context, repoPath, wrapped) : bindings.names.get(typeName.text) ?? null;
+    if (wrapped) return typesOfTypeNode(context, repoPath, wrapped);
+    const named = context.resolveName?.(repoPath, typeName) ?? bindings.names.get(typeName.text);
+    return named && named.length > 0 ? [...named] : null;
   }
   if (!ts.isIdentifier(typeName.left)) return null;
   const targets = bindings.namespaces.get(typeName.left.text) ?? [];
@@ -189,8 +193,8 @@ function enclosingClass(context: IReceiverContext, node: ts.Node): Resolved {
     if (ts.isFunctionExpression(current) || ts.isFunctionDeclaration(current)) return null;
     const isObjectMember = (ts.isMethodDeclaration(current) || ts.isAccessor(current)) &&
       ts.isObjectLiteralExpression(current.parent);
-    if (isObjectMember || ts.isClassExpression(current)) return null;
-    if (ts.isClassDeclaration(current)) {
+    if (isObjectMember) return null;
+    if (ts.isClassLike(current)) {
       const def = context.defOfNode.get(current);
       return def ? [def] : null;
     }
@@ -200,6 +204,7 @@ function enclosingClass(context: IReceiverContext, node: ts.Node): Resolved {
 
 /** What a local declaration says about the type of its variable: an annotation, an initializer, or nothing known. */
 interface ILocalDeclaration {
+  readonly classNode?: ts.ClassLikeDeclaration;
   readonly type?: ts.TypeNode;
   readonly initializer?: ts.Expression;
 }
@@ -213,6 +218,7 @@ function bindsName(name: ts.BindingName, text: string): boolean {
 
 function declarationInStatements(statements: readonly ts.Statement[], text: string): ILocalDeclaration | null {
   for (const statement of statements) {
+    if (ts.isClassDeclaration(statement) && statement.name?.text === text) return { classNode: statement };
     if (ts.isFunctionDeclaration(statement) && statement.name?.text === text) return UNKNOWN_LOCAL;
     if (!ts.isVariableStatement(statement)) continue;
     for (const declaration of statement.declarationList.declarations) {
@@ -261,9 +267,15 @@ function localDeclaration(identifier: ts.Identifier): ILocalDeclaration | null {
 }
 
 function classesNamed(context: IReceiverContext, repoPath: string, identifier: ts.Identifier): Resolved {
-  const defs = context.bindingsFor(repoPath).names.get(identifier.text)?.filter((def) =>
-    ts.isClassDeclaration(def.node)
-  );
+  const local = localDeclaration(identifier);
+  if (local) {
+    const node = local.classNode ??
+      (local.initializer && ts.isClassExpression(local.initializer) ? local.initializer : undefined);
+    const def = node ? context.defOfNode.get(node) : undefined;
+    return def ? [def] : null;
+  }
+  const defs = (context.resolveName?.(repoPath, identifier) ?? context.bindingsFor(repoPath).names.get(identifier.text))
+    ?.filter((def) => ts.isClassLike(def.node));
   return defs && defs.length > 0 ? defs : null;
 }
 
@@ -275,6 +287,10 @@ function typesOfIdentifier(
 ): Resolved {
   const local = localDeclaration(identifier);
   if (!local) return classesNamed(context, repoPath, identifier);
+  if (local.classNode) {
+    const def = context.defOfNode.get(local.classNode);
+    return def ? [def] : null;
+  }
   if (local.type) return typesOfTypeNode(context, repoPath, local.type);
   return local.initializer ? typesOfExpression(context, repoPath, local.initializer, depth + 1) : null;
 }
@@ -332,6 +348,10 @@ function typesOfExpression(
   if (depth > MAX_DEPTH) return null;
   if (ts.isNewExpression(expression)) {
     return ts.isIdentifier(expression.expression) ? classesNamed(context, repoPath, expression.expression) : null;
+  }
+  if (ts.isClassExpression(expression)) {
+    const def = context.defOfNode.get(expression);
+    return def ? [def] : null;
   }
   if (ts.isIdentifier(expression)) return typesOfIdentifier(context, repoPath, expression, depth);
   if (ts.isPropertyAccessExpression(expression)) return typesOfProperty(context, repoPath, expression, false, depth);
@@ -424,11 +444,10 @@ function roleOf(node: ts.Node): AccessRole | null {
   return isAssigned ? "write" : "read";
 }
 
-/** The class declaration that the node sits in. Null outside a class and inside a class expression. */
+/** The class declaration that the node sits in. Null outside a class or for an unregistered class site. */
 function enclosingDef(context: IReceiverContext, node: ts.Node): ITypeDef | null {
   for (let current = node.parent; current; current = current.parent) {
-    if (ts.isClassExpression(current)) return null;
-    if (ts.isClassDeclaration(current)) return context.defOfNode.get(current) ?? null;
+    if (ts.isClassLike(current)) return context.defOfNode.get(current) ?? null;
   }
   return null;
 }
@@ -436,12 +455,12 @@ function enclosingDef(context: IReceiverContext, node: ts.Node): ITypeDef | null
 /** The class member that holds the node: a method, an accessor, a constructor or a property. */
 function enclosingMember(node: ts.Node): ts.ClassElement | null {
   for (let current = node.parent; current; current = current.parent) {
-    if (ts.isClassElement(current) && ts.isClassDeclaration(current.parent)) return current;
+    if (ts.isClassElement(current) && ts.isClassLike(current.parent)) return current;
   }
   return null;
 }
 
-/** Reports each access that sits in a top-level class with its class, name, receiver types and role. */
+/** Reports each access that sits in a registered class with its class, name, receiver types and role. */
 export function recordClassAccesses(
   context: IReceiverContext,
   repoPath: string,

@@ -10,6 +10,7 @@
 import { z } from "zod";
 import type { ClassThresholdName } from "../metrics/class_thresholds.ts";
 import type { DerivedMetric } from "./class_statistics.ts";
+import type { IUnjoinedClass } from "./class_pass.ts";
 import type { DesignMetricName, DesignStrategy } from "./design_strategies.ts";
 import {
   type IClassMetrics,
@@ -228,6 +229,13 @@ export interface IHealthClassScore extends IClassMetrics {
   readonly path: string;
 }
 
+/** Coverage of typed class and method analysis, including every class the parser trees could not join. */
+export interface IHealthClassAnalysis {
+  readonly total: number;
+  readonly typed: number;
+  readonly unjoined: readonly IUnjoinedClass[];
+}
+
 /** One detection strategy match with the metric values that made it match. */
 export interface IHealthDesignFinding {
   readonly strategy: DesignStrategy;
@@ -291,6 +299,7 @@ export interface IHealthReport {
   readonly limits: IHealthLimits;
   /** The class design section, an unslop extension that the fallow-compatible keys do not read. */
   readonly class_scores: readonly IHealthClassScore[];
+  readonly class_analysis: IHealthClassAnalysis;
   readonly design_findings: readonly IHealthDesignFinding[];
   readonly class_thresholds: IHealthClassThresholds;
   /** The files above the module size limits, an advisory list that the fallow-compatible keys do not read. */
@@ -594,6 +603,18 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   errors: z.array(HealthErrorSchema),
   limits: HealthLimitsSchema,
   class_scores: z.array(HealthClassScoreSchema),
+  class_analysis: z.object({
+    total: nonNegativeInteger,
+    typed: nonNegativeInteger,
+    unjoined: z.array(
+      z.object({
+        path: z.string().min(1),
+        name: z.string().min(1),
+        nameOffset: nonNegativeInteger,
+        reportedBy: z.enum(["babel", "typescript"]),
+      }).strict(),
+    ),
+  }).strict(),
   design_findings: z.array(HealthDesignFindingSchema),
   class_thresholds: HealthClassThresholdsSchema,
   large_files: z.array(HealthLargeFileSchema),

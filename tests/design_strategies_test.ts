@@ -87,6 +87,34 @@ Deno.test("feature-envy: a method that reads six attributes of one other class a
   assertEquals(envious[0].metrics.laa, 1 / 7);
 });
 
+Deno.test("typed-local-class-feature-envy: local declarations and named expressions retain the top-level typed finding", async () => {
+  const body = ENVY.slice(ENVY.indexOf("export class")).replace("export class", "class");
+  const forms = [
+    ENVY,
+    `import { Other } from "./other.ts"; export function make() { ${body} return Envy; }`,
+    `import { Other } from "./other.ts"; export const Make = ${body};`,
+    `import { Other } from "./other.ts"; export function make() { return ${body}; }`,
+  ];
+  for (const source of forms) {
+    const result = await passOver({ "other.ts": OTHER, "envy.ts": source });
+    const entry = result.classes.find((item) => item.name === "Envy")!;
+    assertEquals(entry.metrics.precision, "typed", source);
+    assertEquals([entry.metrics.atfd, entry.metrics.cbo, entry.metrics.rfc, entry.metrics.dit, entry.metrics.noc], [
+      6,
+      1,
+      2,
+      0,
+      0,
+    ]);
+    const findings = designFindingsOf(result.classes).filter((item) => item.strategy === "feature-envy");
+    assertEquals(
+      findings.map((item) => [item.className, item.methodName, item.metrics.atfd, item.metrics.laa, item.metrics.fdp]),
+      [["Envy", "grab", 6, 1 / 7, 1]],
+    );
+    assertEquals(result.unjoined, []);
+  }
+});
+
 Deno.test("feature-envy: a method that reads the data of six classes is not envious, because FDP exceeds the limit", async () => {
   const providers = FIELDS.map((name) => `export class P${name} {\n  v = 0;\n}\n`);
   const files: Record<string, string> = {};
