@@ -31,6 +31,7 @@ const PROPERTY_KINDS: ReadonlySet<string> = new Set([
 const CLASS_KINDS: ReadonlySet<string> = new Set(["ClassDeclaration", "ClassExpression"]);
 const PRIVATE_NAME_KINDS: ReadonlySet<string> = new Set(["PrivateIdentifier", "PrivateName"]);
 const MEMBER_ACCESS_KINDS: ReadonlySet<string> = new Set(["MemberExpression", "OptionalMemberExpression"]);
+const REBOUND_THIS_KINDS: ReadonlySet<string> = new Set(["FunctionDeclaration", "FunctionExpression", "ObjectMethod"]);
 const CONSTRUCTOR_KIND = "constructor";
 const ACCESSOR_KINDS: ReadonlySet<string> = new Set(["get", "set"]);
 const HIDDEN_ACCESSIBILITY: ReadonlySet<string> = new Set(["private", "protected"]);
@@ -144,12 +145,17 @@ function thisMemberName(node: ILintNode): string | null {
   return keyName(node.property, node.computed);
 }
 
-/** Collects the `this.name` reads of a method without entering a nested class. */
+/** Collects method reads while preserving lexical arrows and excluding receivers rebound by nested functions. */
 function collectThisReads(node: ILintNode, into: Set<string>): void {
   const name = thisMemberName(node);
   if (name !== null) into.add(name);
   forEachChildNode(node, (child) => {
-    if (!CLASS_KINDS.has(child.type)) collectThisReads(child, into);
+    if (CLASS_KINDS.has(child.type)) return;
+    if (REBOUND_THIS_KINDS.has(child.type)) {
+      if (child.computed === true && isNodeLike(child.key)) collectThisReads(asNode(child.key), into);
+      return;
+    }
+    collectThisReads(child, into);
   });
 }
 

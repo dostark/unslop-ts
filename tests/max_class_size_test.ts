@@ -126,3 +126,13 @@ Deno.test("god-class-expression-negative: a named expression missing each condit
     assertEquals(godFindings(`const makeHub = ${godClassSource(spec)};`), []);
   }
 });
+
+Deno.test("god-class-unrelated-object-cannot-hide: a decoy object receiver cannot suppress the class warning", () => {
+  const original = godClassSource(GOD);
+  const decoy = original.replace("class Hub {", "class Hub { private shared = 0;")
+    .replaceAll("    let n =", "    const otherReceiver = { read() { return this.shared; } };\n    let n =");
+  assertEquals(godFindings(original).length, 1);
+  const found = godFindings(decoy);
+  assertEquals(found.length, 1);
+  assertStringIncludes(found[0].message, "TCC 0.20 < 0.33");
+});

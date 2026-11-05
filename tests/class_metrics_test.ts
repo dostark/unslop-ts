@@ -133,3 +133,26 @@ Deno.test("class-private-name-parity: private fields, methods and accessors reta
     assertEquals([members.noa, members.tcc, members.lcom4, members.wmc], [1, 0, 1, 4]);
   }
 });
+
+Deno.test("class-this-owner-boundaries: arrows retain this while ordinary functions and object methods rebind it", () => {
+  const rebound = [
+    "const other = { read() { return this.value; } }; return other.read();",
+    "const read = function() { return this.value; }; return read();",
+    "function read() { return this.value; } return read();",
+    "const other = { get read() { return this.value; } }; return other.read;",
+  ];
+  for (const measure of [measureClasses, measureClassesOnBabel]) {
+    for (const body of rebound) {
+      const [metrics] = measure(`class Owner { value = 0; a() { ${body} } b() { ${body} } }`);
+      assertEquals([metrics.tcc, metrics.lcom4], [0, 2], body);
+    }
+    const [arrow] = measure(
+      "class Owner { value = 0; a() { return (() => this.value)(); } b() { return this.value; } }",
+    );
+    assertEquals([arrow.tcc, arrow.lcom4], [1, 1]);
+    const [key] = measure(
+      "class Owner { value = 0; a() { return { [this.value]() {} }; } b() { return this.value; } }",
+    );
+    assertEquals([key.tcc, key.lcom4], [1, 1]);
+  }
+});
