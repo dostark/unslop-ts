@@ -389,7 +389,8 @@ Keep functions and classes small enough to read in one pass.
   - **NOM** and **NOA** count the methods (accessors included, the constructor not) and the attributes.
   - **WMC** sums the classic cyclomatic values of the constructor and the methods.
   - **TCC** is the share of visible method pairs that read a common attribute, and **LCOM4** is the number of
-    connected groups of methods that share an attribute or call each other through `this`.
+    connected groups of methods that share an attribute or call each other through `this`. Arrows retain the class receiver;
+    ordinary functions and object methods rebind it. A method reference alone is not a call; direct and optional calls count.
   - **ATFD** counts the distinct attributes of other classes that the class reads. **LAA** is the share of the
     attributes a method reads that belong to its own class, and **FDP** counts the classes whose attributes the
     method reads.
@@ -397,7 +398,10 @@ Keep functions and classes small enough to read in one pass.
     types that it calls.
   - **DIT** is the depth of the `extends` chain, and **NOC** counts the direct subclasses.
   - **WOC** is the share of public members that are functional methods, **NOAP** counts public attributes and
-    **NOAM** counts public accessor methods.
+    **NOAM** counts public accessor methods. Public constructor parameter properties count in NOAP and WOC, including
+    defaulted and readonly properties. Private and protected properties stay outside the public surface.
+    Named local declarations and named class expressions retain typed metrics and method analysis. Each nested class owns
+    its dependencies. The health report exposes `class_analysis` and lists unavailable typed analysis for unjoined sites.
 - **Class strategies:** the `max-class-size` rule has a `strategy` option. The default, `god-class`, reports a
   God Class: WMC at least 47, TCC below one third and ATFD above 5. The health report also finds a Data Class (a class
   that mostly holds public data) and Feature Envy (a method that uses the data of other classes more than its own).

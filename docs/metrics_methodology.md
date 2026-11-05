@@ -234,15 +234,16 @@ class Account {
 {
   "id": "class-unit",
   "expected": {
-    "Account": { "nom": 2, "noa": 3, "wmc": 3, "tcc": 1, "lcom4": 1, "noap": 1, "noam": 1 }
+    "Account": { "nom": 2, "noa": 3, "wmc": 3, "tcc": 1, "lcom4": 1, "noap": 2, "noam": 1 }
   }
 }
 ```
 
 `Account` has two methods (`deposit` and the accessor `total`), three attributes (`balance`, `id` and the parameter property
-`owner`) and a WMC of 3, because the constructor and each method add 1. The Deno host tree does not report the accessibility of a
-constructor parameter property, so NOAP counts declared properties only: `id` is the one public attribute, and `owner` is not
-counted.
+`owner`) and a WMC of 3, because the constructor and each method add 1. NOAP is 2: both `id` and the public parameter
+property `owner` are public attributes. The existing Babel context supplies parameter accessibility omitted by the Deno host.
+Private and protected parameter properties stay outside the public surface. A readonly parameter property without an explicit
+access modifier is public, and a default value does not change visibility.
 
 ### Chidamber and Kemerer metrics
 
@@ -261,10 +262,12 @@ The original lack of cohesion of methods of [CK94] is not used. Section "Cohesio
 Tight class cohesion [BK95] is the share of visible method pairs that use a common attribute directly. A method is visible when
 it is not private and its name does not start with `#`. A pair is connected when both methods read the same attribute through
 `this`. The value is null for fewer than two visible methods, because no pair exists. A constructor takes no part, and a read in
-a nested function belongs to the method that holds it.
+a lexical arrow belongs to the method that holds it. Ordinary functions and object methods rebind `this`, so their reads
+do not connect the enclosing class methods. Computed object-method keys still evaluate with the enclosing receiver.
 
 LCOM4 [HM95] is the number of connected components of the graph whose nodes are the methods and whose edges join two methods
-that share an attribute or where one calls the other through `this`. A value of 1 means one cohesive group, and a value of 2 or
+that share an attribute or where one calls the other through `this`. Direct and optional calls count; returning, storing or
+passing a method reference does not establish a call edge. A value of 1 means one cohesive group, and a value of 2 or
 more means that the class holds that many groups that could be separate classes. The original value of [CK94] counts method pairs
 and stops at zero, so it cannot tell a class of two groups from a class of five. The component count can.
 
@@ -486,13 +489,30 @@ report found no god class in the same tree, because the worst classes read other
 and not through attributes. The two precisions therefore disagree on this repository, and the gate uses the syntactic rule with
 per-package ceilings. The ceilings only hold a count from rising.
 
+The remediation comparison on 2026-11-05, using engine source `f13a685` and parent source through `12e32f715`, found
+36 God Classes and 13 legacy classes: 7 in both runs, 29 only in God Class and 6 only in legacy. The earlier comparison above
+remains a historical snapshot, since subsequent refactors and ownership corrections change the population. Per-owner ceilings
+are remeasured and may only decrease. The comparison requires the selected config to be the canonical file named by the selected
+descriptor's `configUrl`; mismatches are rejected before writes. Matching custom projects must wire their descriptor and plugin
+to that policy. Both strategy runs restore the original bytes on success or reporter failure.
+
+The same repository health run measured 1,005 classes: 1,002 named classes have typed analysis and the three anonymous classes
+are explicitly unjoined. There are 989 classes with positive WMC and three Data Class findings. Every per-owner God Class ceiling
+already equals its measured count, with total 36, so calibration changes no ceiling.
+
 ### Limits of class metrics from syntax
 
 The pass reads syntax and declared types. It does not run the type checker, so structural typing, an inferred type, a mixin, a
-decorator that adds members and a dynamic property access are invisible to it. A class declared inside a function or a class
-expression is measured on the Babel tree and gets syntactic values only. Only top-level class declarations get typed values and
-a position in the inheritance counts. A receiver whose declared type is a union of classes counts for each of them. The Deno host
-tree does not give the accessibility of a parameter property, so NOAP leaves such properties out in both trees.
+decorator that adds members and a dynamic property access are invisible to it. Named local declarations and named class
+expressions join by file, name and identifier offset. Their typed ATFD, CBO, RFC, DIT, NOC and method coupling use the same pass
+as top-level classes. Lexical bindings keep same-name classes separate, and exported variable aliases identify their expression
+class without exposing its inner name. Nested classes own their declared dependencies; ordinary nested functions remain part
+of their enclosing class unit.
+
+Anonymous classes remain syntactic. The report exposes `class_analysis.total`, `class_analysis.typed` and
+`class_analysis.unjoined`, including which parser reported each unmatched site. Both full and classes-only JSON retain these
+fields, and text names unavailable method analysis. A missing typed method analysis is not a clean Feature Envy result.
+A receiver whose declared type is a union of classes counts for each of them. No TypeScript type checker is run.
 
 ## Limitations
 

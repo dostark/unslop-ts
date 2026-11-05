@@ -462,19 +462,23 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
   no grade. Without `--min-score`, the score is advisory and does not affect the exit code. With `--min-score`,
   a partial score or a score below the threshold exits 1; `--min-score=0` gates completeness only.
 
-- **Class design:** the report adds three top-level keys that the fallow-compatible keys do not read, and the text view prints
+- **Class design:** the report adds four top-level keys that the fallow-compatible keys do not read, and the text view prints
   them after the score under the label `unslop extension`. `class_scores` holds the metrics of every class, `design_findings`
   holds the God Class, Data Class and Feature Envy matches with the values that made them match, and `class_thresholds` holds
   the sourced default limits beside the limits that this project's classes derive. `--classes` prints only this section, and
   `--top-classes` limits the text rows. Each class carries a `precision` label: `typed` for a class that both the Babel tree
-  and the TypeScript compiler tree report, and `syntactic` for the rest. The health score and its formula do not change.
+  and the TypeScript compiler tree report, including named local declarations and named expressions. `class_analysis` records
+  total and typed class counts and every unjoined site. Anonymous classes retain `syntactic` values, and unavailable method
+  analysis is explicit in text and JSON. The health score and its formula do not change.
 - **Large files:** when the catalog enables the `max-file-lines` rule, the report adds `large_files`, the files above the
   soft limit `softMax` or the hard limit `max`, largest first, each with its `limit` level. Only the files that the rule
   would lint appear, by its scope, `include` and `exclude`. The text view prints them as advice. The lint rule reports only
   the hard limit and counts physical lines.
 - **Class-size rule:** the `max-class-size` rule has a `strategy` option. `god-class`, the default, reports a class when WMC,
   TCC and ATFD all cross their limits. `legacy-score` keeps the earlier weighted size score, and only it reads `minClassLines`
-  and `threshold`. The rule reads one file, so its ATFD and CBO are `syntactic`. The limits and their sources are in
+  and `threshold`. God Class detection visits declarations and named expressions; the legacy strategy retains its
+  declaration-only behavior. Private names, lexical `this`, actual call edges and public constructor properties retain
+  their metric meanings across both parser hosts. The rule reads one file, so its ATFD and CBO are `syntactic`. The limits and their sources are in
   [docs/metrics_methodology.md](docs/metrics_methodology.md).
 
 The `./metrics` entry exports the measurement API: `createMeasurementContext`, `functionUnits`,
