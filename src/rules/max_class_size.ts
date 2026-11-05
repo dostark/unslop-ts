@@ -172,7 +172,12 @@ function createGodClass(context: IRuleContext, ctx: IPluginRuleContext): LintVis
       hint: "Split the class so that each part owns one responsibility and its own data.",
     });
   };
-  return { ClassDeclaration: check };
+  return {
+    ClassDeclaration: check,
+    ClassExpression(rawNode) {
+      if (isNodeLike(asNode(rawNode).id)) check(rawNode);
+    },
+  };
 }
 
 /** The legacy strategy: the weighted size score and its minimum line count. */

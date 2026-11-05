@@ -107,3 +107,22 @@ Deno.test("legacy-score-unchanged: the legacy strategy reports a small class tha
   assertEquals(found.length, 1);
   assertEquals(godFindings(classSource(5), { strategy: "god-class" }).length, 0);
 });
+
+Deno.test("god-class-named-expression: declarations and named expressions produce the same diagnostic", () => {
+  const declaration = godClassSource(GOD);
+  const expression = `const makeHub = ${declaration};`;
+  assertEquals(godFindings(declaration).map((finding) => finding.message), [
+    "Class Hub is a god class (WMC 50 >= 47, TCC 0.20 < 0.33, ATFD 6 > 5).",
+  ]);
+  assertEquals(
+    godFindings(expression).map((finding) => finding.message),
+    godFindings(declaration).map((finding) => finding.message),
+  );
+  assertEquals(findings(expression, { minClassLines: 1, threshold: 1 }), []);
+});
+
+Deno.test("god-class-expression-negative: a named expression missing each condition passes", () => {
+  for (const spec of [{ ...GOD, branches: 3 }, { ...GOD, cohesion: "shared" as const }, { ...GOD, foreignReads: 5 }]) {
+    assertEquals(godFindings(`const makeHub = ${godClassSource(spec)};`), []);
+  }
+});
