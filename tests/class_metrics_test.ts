@@ -121,3 +121,15 @@ Deno.test("class-metrics-cross-parser: the fixture classes measure the same on t
     }
   }
 });
+
+Deno.test("class-private-name-parity: private fields, methods and accessors retain exact metrics on both parsers", () => {
+  const counter = "class Counter { #value = 0; a() { return this.#value; } b() { return this.#value; } }";
+  const privateMembers = "class Counter { #value = 0; #read() { return this.#value; } " +
+    "get #current() { return this.#value; } a() { return this.#read(); } b() { return this.#value; } }";
+  for (const measure of [measureClasses, measureClassesOnBabel]) {
+    const [simple] = measure(counter);
+    assertEquals([simple.noa, simple.tcc, simple.lcom4, simple.wmc], [1, 1, 1, 2]);
+    const [members] = measure(privateMembers);
+    assertEquals([members.noa, members.tcc, members.lcom4, members.wmc], [1, 0, 1, 4]);
+  }
+});

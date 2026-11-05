@@ -12,9 +12,23 @@ import { join } from "@std/path";
 import { crapOf, DIRECT_COVERAGE_PERCENT } from "../src/report/crap.ts";
 import { HealthReportSchema, type IHealthReport } from "../src/report/mod.ts";
 import { enginePins, runDeno } from "./helpers/demo_project.ts";
+import { GOD, godClassSource } from "./helpers/god_class_fixture.ts";
 
 const SCRIPT = new URL("../src/cli/unslop.ts", import.meta.url).href;
 const ENGINE = new URL("../mod.ts", import.meta.url).href;
+
+Deno.test("health-private-cohesion: a high-WMC private-field class retains cohesion and stays below God Class detection", async () => {
+  const source = godClassSource({ ...GOD, cohesion: "shared" })
+    .replace("private shared", "#shared").replaceAll("this.shared", "this.#shared");
+  await withHealthProject({ "packages/x/src/counter.ts": source }, async (dir) => {
+    const result = await health(dir, ["--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const report = parseReport(result.stdout);
+    const counter = report.class_scores.find((entry) => entry.name === "Hub")!;
+    assertEquals([counter.wmc, counter.noa, counter.tcc, counter.lcom4], [50, 1, 1, 1]);
+    assertEquals(report.design_findings.filter((entry) => entry.strategy === "god-class"), []);
+  });
+});
 
 const MIXED = "export function wide(value: number | null): number {\n" +
   "  const first = value ?? 0;\n" +

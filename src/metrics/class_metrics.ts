@@ -54,6 +54,10 @@ function keyName(key: ILintNode["key"], computed: ILintNode["computed"]): string
   if (typeof node.name === "string") {
     return PRIVATE_NAME_KINDS.has(node.type) ? `${PRIVATE_PREFIX}${node.name}` : node.name;
   }
+  if (node.type === "PrivateName" && isNodeLike(node.id)) {
+    const name = asNode(node.id).name;
+    if (typeof name === "string") return `${PRIVATE_PREFIX}${name}`;
+  }
   return stringLiteralValue(key);
 }
 
