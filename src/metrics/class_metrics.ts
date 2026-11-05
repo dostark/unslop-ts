@@ -32,6 +32,7 @@ const CLASS_KINDS: ReadonlySet<string> = new Set(["ClassDeclaration", "ClassExpr
 const PRIVATE_NAME_KINDS: ReadonlySet<string> = new Set(["PrivateIdentifier", "PrivateName"]);
 const MEMBER_ACCESS_KINDS: ReadonlySet<string> = new Set(["MemberExpression", "OptionalMemberExpression"]);
 const REBOUND_THIS_KINDS: ReadonlySet<string> = new Set(["FunctionDeclaration", "FunctionExpression", "ObjectMethod"]);
+const CALL_KINDS: ReadonlySet<string> = new Set(["CallExpression", "OptionalCallExpression"]);
 const CONSTRUCTOR_KIND = "constructor";
 const ACCESSOR_KINDS: ReadonlySet<string> = new Set(["get", "set"]);
 const HIDDEN_ACCESSIBILITY: ReadonlySet<string> = new Set(["private", "protected"]);
@@ -185,16 +186,22 @@ function thisMemberName(node: ILintNode): string | null {
 }
 
 /** Collects method reads while preserving lexical arrows and excluding receivers rebound by nested functions. */
-function collectThisReads(node: ILintNode, into: Set<string>): void {
+function collectThisReads(node: ILintNode, into: Set<string>, calls: Set<string>): void {
   const name = thisMemberName(node);
   if (name !== null) into.add(name);
+  if (CALL_KINDS.has(node.type) && isNodeLike(node.callee)) {
+    let callee = asNode(node.callee);
+    while (callee.type === "ChainExpression" && isNodeLike(callee.expression)) callee = asNode(callee.expression);
+    const called = thisMemberName(callee);
+    if (called !== null) calls.add(called);
+  }
   forEachChildNode(node, (child) => {
     if (CLASS_KINDS.has(child.type)) return;
     if (REBOUND_THIS_KINDS.has(child.type)) {
-      if (child.computed === true && isNodeLike(child.key)) collectThisReads(asNode(child.key), into);
+      if (child.computed === true && isNodeLike(child.key)) collectThisReads(asNode(child.key), into, calls);
       return;
     }
-    collectThisReads(child, into);
+    collectThisReads(child, into, calls);
   });
 }
 
@@ -204,13 +211,14 @@ function methodRecords(members: readonly ILintNode[], attributes: ReadonlySet<st
   const names = new Set(methods.map((method) => keyName(method.key, method.computed)).filter((name) => name !== null));
   return methods.map((method) => {
     const reads = new Set<string>();
-    collectThisReads(functionOf(method), reads);
+    const calls = new Set<string>();
+    collectThisReads(functionOf(method), reads, calls);
     const name = keyName(method.key, method.computed);
     return {
       name,
       isVisible: method.accessibility !== PRIVATE_ACCESSIBILITY && !(name ?? "").startsWith(PRIVATE_PREFIX),
       attributes: new Set([...reads].filter((read) => attributes.has(read))),
-      calls: new Set([...reads].filter((read) => names.has(read))),
+      calls: new Set([...calls].filter((called) => names.has(called))),
     };
   });
 }

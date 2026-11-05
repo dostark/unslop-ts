@@ -165,3 +165,23 @@ Deno.test("class-parameter-visibility: public and default readonly properties co
     assertEquals([metrics.noa, metrics.noap, metrics.noam, metrics.woc], [5, 3, 0, 0]);
   }
 });
+
+Deno.test("lcom4-method-reference-is-not-call: returning or passing a method reference leaves two components", () => {
+  for (
+    const body of ["return this.second;", "return use(this.second);", "const callback = this.second; return callback;"]
+  ) {
+    for (const measure of [measureClasses, measureClassesOnBabel]) {
+      const [metrics] = measure(`class Ref { first() { ${body} } second() { return 0; } }`);
+      assertEquals([metrics.lcom4, metrics.tcc], [2, 0], body);
+    }
+  }
+});
+
+Deno.test("lcom4-direct-and-optional-calls: actual calls join the components on both parsers", () => {
+  for (const call of ["this.second()", "this.second?.()", "this?.second()"]) {
+    for (const measure of [measureClasses, measureClassesOnBabel]) {
+      const [metrics] = measure(`class Calls { first() { return ${call}; } second() { return 0; } }`);
+      assertEquals([metrics.lcom4, metrics.tcc], [1, 0], call);
+    }
+  }
+});
