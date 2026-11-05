@@ -11,7 +11,7 @@ import { asNode, type ILintNode, isNodeLike, stringLiteralValue } from "../engin
 import type { IRuleNode } from "../rules/types.ts";
 import { measureCoupling } from "./class_coupling.ts";
 import { forEachChildNode, rangeOf } from "./estree.ts";
-import { functionUnits, measureFunction } from "./function_metrics.ts";
+import { codeTokenLines, functionUnits, measureFunction } from "./function_metrics.ts";
 import type { IClassMetrics, IMeasurementContext, IMetricOptions } from "./types.ts";
 
 const METHOD_KINDS: ReadonlySet<string> = new Set([
@@ -235,14 +235,7 @@ function weightedMethods(
 
 /** The count of token lines inside the class range. */
 function classLines(range: readonly [number, number], context: IMeasurementContext): number {
-  const lines = new Set<number>();
-  for (const token of context.tokens) {
-    if (token.start < range[0] || token.end > range[1]) continue;
-    const first = context.positionAt(token.start).line;
-    const last = token.end > token.start ? context.positionAt(token.end - 1).line : first;
-    for (let line = first; line <= last; line++) lines.add(line);
-  }
-  return lines.size;
+  return codeTokenLines(range, context).size;
 }
 
 function classNameOf(classNode: ILintNode): string {

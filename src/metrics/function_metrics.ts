@@ -297,18 +297,26 @@ function isDescendantToken(token: IMetricToken, ranges: readonly (readonly [numb
   return ranges.some(([start, end]) => token.start >= start && token.end <= end);
 }
 
-/** The code-token line numbers the function owns, excluding every descendant function. */
-function ownedLines(unit: IFunctionUnit, context: IMeasurementContext): Set<number> {
-  const [start, end] = unit.range;
+/** The code-token lines inside a range, excluding the supplied descendant ranges. */
+export function codeTokenLines(
+  range: readonly [number, number],
+  context: IMeasurementContext,
+  descendants: readonly (readonly [number, number])[] = [],
+): Set<number> {
+  const [start, end] = range;
   const lines = new Set<number>();
   for (const token of context.tokens) {
     if (token.start < start || token.end > end) continue;
-    if (isDescendantToken(token, unit.descendantRanges)) continue;
+    if (isDescendantToken(token, descendants)) continue;
     const first = context.positionAt(token.start).line;
     const last = token.end > token.start ? context.positionAt(token.end - 1).line : first;
     for (let line = first; line <= last; line++) lines.add(line);
   }
   return lines;
+}
+
+function ownedLines(unit: IFunctionUnit, context: IMeasurementContext): Set<number> {
+  return codeTokenLines(unit.range, context, unit.descendantRanges);
 }
 
 /** The code-token line numbers one unit owns, excluding every descendant function. */

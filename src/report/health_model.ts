@@ -12,7 +12,7 @@ import type { ClassThresholdName } from "../metrics/class_thresholds.ts";
 import type { DerivedMetric } from "./class_statistics.ts";
 import type { DesignMetricName, DesignStrategy } from "./design_strategies.ts";
 import {
-  type ClassMetricPrecision,
+  type IClassMetrics,
   METRIC_CONTRIBUTION_KINDS,
   type MetricContributionKind,
   type MetricName,
@@ -224,25 +224,8 @@ export interface IHealthLimits {
 }
 
 /** The design metrics of one class, with its place and the precision of its coupling values. */
-export interface IHealthClassScore {
+export interface IHealthClassScore extends IClassMetrics {
   readonly path: string;
-  readonly name: string;
-  readonly line: number;
-  readonly nom: number;
-  readonly wmc: number;
-  readonly loc: number;
-  readonly noa: number;
-  readonly tcc: number | null;
-  readonly lcom4: number;
-  readonly atfd: number;
-  readonly cbo: number;
-  readonly rfc: number | null;
-  readonly dit: number | null;
-  readonly noc: number | null;
-  readonly woc: number | null;
-  readonly noap: number;
-  readonly noam: number;
-  readonly precision: ClassMetricPrecision;
 }
 
 /** One detection strategy match with the metric values that made it match. */
