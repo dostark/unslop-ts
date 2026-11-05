@@ -20,12 +20,15 @@ const ENGINE = new URL("../mod.ts", import.meta.url).href;
 Deno.test("health-private-cohesion: a high-WMC private-field class retains cohesion and stays below God Class detection", async () => {
   const source = godClassSource({ ...GOD, cohesion: "shared" })
     .replace("private shared", "#shared").replaceAll("this.shared", "this.#shared");
-  await withHealthProject({ "packages/x/src/counter.ts": source }, async (dir) => {
+  const other = `class Other { ${
+    Array.from({ length: GOD.foreignReads }, (_, index) => `field${index} = 0;`).join(" ")
+  } }`;
+  await withHealthProject({ "packages/x/src/counter.ts": `${other}\n${source}` }, async (dir) => {
     const result = await health(dir, ["--format=json"]);
     assertEquals(result.code, 0, result.stderr);
     const report = parseReport(result.stdout);
     const counter = report.class_scores.find((entry) => entry.name === "Hub")!;
-    assertEquals([counter.wmc, counter.noa, counter.tcc, counter.lcom4], [50, 1, 1, 1]);
+    assertEquals([counter.wmc, counter.noa, counter.tcc, counter.lcom4, counter.atfd], [50, 1, 1, 1, 6]);
     assertEquals(report.design_findings.filter((entry) => entry.strategy === "god-class"), []);
   });
 });
