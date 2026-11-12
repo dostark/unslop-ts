@@ -16,6 +16,26 @@ holds 4 rules about `deno-lint-ignore` comments and Deno script headers. Every r
 description, category, guide anchor, preset membership, and overlaps in code. A project can add its
 own rule packs and script checks, so project-specific rules stay in the project.
 
+## Why unslop-ts exists
+
+Code is now generated faster than a team can read it. The dominant failure of generated code is not
+bad formatting or a syntax error. It is **low-evidence code**: a type assertion that stands in for
+parsing, an `unknown` contract that moves the decision to the caller, a `Record<string, unknown>`
+dictionary instead of a shape, a test that asserts a string is truthy, a comment that records the
+previous attempt. The code compiles and the tests pass, so nothing reports it.
+
+Ordinary linters check form and known bug classes, and they remain the right tool for both.
+`unslop-ts` checks evidence and signal, and adds the checks a per-file linter cannot make: unused
+exports and files, duplicate types, constants, and blocks, repeated literals, and optionality that
+drifted from its call sites. It runs the same 44 rules and 8 checks under `deno lint`, ESLint, and
+Oxlint, and ships a health report, so one vocabulary covers every runtime in a mixed repository.
+
+It is not a replacement for ESLint, `typescript-eslint`, Biome, or Sonar. Keep those for formatting,
+type checking, framework rules, and type-aware checks. Read
+[Why unslop-ts exists](docs/concepts/motivation.md) for the problem statement and the niche against
+anti-slop, deslop, and fallow, and [Comparison with other linters](docs/concepts/comparison.md) for
+the decision guide.
+
 ## Install
 
 ```sh
@@ -33,6 +53,7 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 - [Whole-tree checks](docs/reference/whole-tree-checks.md) — the eight checks.
 - [Report schema](docs/reference/report-schema.md) — report and health fields.
 - [API reference](docs/reference/api.md) — package subpaths and signatures.
+- [Why unslop-ts exists](docs/concepts/motivation.md) — the problem, the niche and the lineage.
 - [Architecture](docs/concepts/architecture.md) — the pipeline and module boundaries.
 - [Comparison with other linters](docs/concepts/comparison.md) — overlaps and when to use it.
 - [Migration](docs/how-to/migration.md) — version 1 to version 2.

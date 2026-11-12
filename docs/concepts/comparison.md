@@ -1,8 +1,10 @@
 # Comparison with other linters
 
 This page answers two questions: where `unslop-ts` overlaps an ordinary linter, and why a project
-would choose it anyway. The rule ids are in [Rules and presets](../reference/rules.md); the host
-matrix is in [Hosts and runtimes](../how-to/hosts.md).
+would choose it anyway. The problem it was built for is in
+[Why unslop-ts exists](motivation.md). The rule ids are in
+[Rules and presets](../reference/rules.md); the host matrix is in
+[Hosts and runtimes](../how-to/hosts.md).
 
 ## Short answer
 

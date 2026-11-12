@@ -22,6 +22,7 @@ This is the document index for the package. The root `README.md` is the GitHub l
 
 ## Concepts
 
+- [Why unslop-ts exists](concepts/motivation.md) — the problem, the niche and the lineage.
 - [Architecture](concepts/architecture.md) — the pipeline and module boundaries.
 - [Comparison with other linters](concepts/comparison.md) — overlaps and when to prefer unslop-ts.
 

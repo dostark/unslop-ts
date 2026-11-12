@@ -1,7 +1,8 @@
 # User guide
 
 This guide takes you from an empty project to unslop-ts findings in CI. It is the narrative path;
-the reference pages hold the field-by-field details.
+the reference pages hold the field-by-field details. For why the package exists, read
+[Why unslop-ts exists](concepts/motivation.md).
 
 ## Who this is for
 
