@@ -18,15 +18,19 @@ export interface IMagicLiteralFile {
   readonly isTest: boolean;
 }
 
+/** A file's contribution to a magic-literal count. */
 export interface IMagicFileBreakdown {
   readonly file: string;
   readonly count: number;
   readonly firstLine: number;
 }
 
+/** The literal kind a magic-value rule inspects. */
 export type MagicLiteralKind = "string" | "number";
+/** Whether a violation is measured across the project or one module. */
 export type MagicViolationScope = "global" | "local";
 
+/** One repeated literal with its evidence and score. */
 export interface IMagicViolation {
   readonly value: string;
   readonly kind: MagicLiteralKind;

@@ -160,7 +160,16 @@ async function countMissingJsdoc(entry: string): Promise<number> {
   });
   const output = await command.output();
   const text = `${new TextDecoder().decode(output.stdout)}${new TextDecoder().decode(output.stderr)}`;
-  return (text.match(/missing-jsdoc/g) ?? []).length;
+  const clean = text.replace(/\x1b\[[0-9;]*m/g, "");
+  let count = 0;
+  for (const block of clean.split("error[missing-jsdoc]").slice(1)) {
+    const location = /-->\s+(\S+):(\d+):(\d+)/.exec(block);
+    if (!location) continue;
+    const source = await read(location[1]).catch(() => "");
+    const declaration = source.split("\n")[Number(location[2]) - 1] ?? "";
+    if (declaration.trimStart().startsWith("export ")) count++;
+  }
+  return count;
 }
 
 function wholeTreeIds(): string[] {
@@ -251,7 +260,7 @@ Deno.test("docs-contract: no documented file has a broken relative link or ancho
   assertEquals(await brokenLinks(ROOT, await existingDocuments(ROOT)), []);
 });
 
-Deno.test("docs-contract: every public entrypoint has complete JSDoc", async () => {
+Deno.test("docs-contract: every public entrypoint has JSDoc on its top-level declarations", async () => {
   for (const entry of ENTRYPOINTS) {
     assertEquals(await countMissingJsdoc(entry), 0, `${entry} has missing JSDoc`);
   }

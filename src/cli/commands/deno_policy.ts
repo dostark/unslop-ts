@@ -26,6 +26,7 @@ import { bundleEngine } from "../bundle_engine.ts";
 /** The packs a policy directory can load, in the order the plugin lists them. */
 export const DENO_POLICY_PACKS = ["typescript", "deno"] as const;
 
+/** A pack name accepted by the Deno policy builder. */
 export type DenoPolicyPack = typeof DENO_POLICY_PACKS[number];
 
 /** The version of the manifest layout. */
@@ -63,6 +64,7 @@ export interface IEngineBundler {
   bundle(outFile: string): Promise<void>;
 }
 
+/** The inputs for building a Deno lint policy directory. */
 export interface IDenoPolicyOptions {
   /** Path of the version 2 configuration file. */
   readonly config: string;
@@ -79,6 +81,7 @@ export interface IDenoPolicyFileHash {
   readonly bytes: number;
 }
 
+/** The manifest written beside a generated Deno policy. */
 export interface IDenoPolicyManifest {
   readonly format_version: number;
   readonly deno_version: string;
@@ -88,6 +91,7 @@ export interface IDenoPolicyManifest {
   readonly files: Readonly<Record<string, IDenoPolicyFileHash>>;
 }
 
+/** The result of a successful policy build. */
 export interface IDenoPolicyReport {
   readonly out: string;
   readonly files: readonly string[];

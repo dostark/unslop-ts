@@ -57,6 +57,7 @@ export function projectCeilings(ceilings: ICeilings, rule: string): ICeilings {
   return { [rule]: row };
 }
 
+/** The distance between one rule's count and its package ceiling. */
 export interface ICeilingDelta {
   readonly rule: string;
   readonly packageName: string;
@@ -65,6 +66,7 @@ export interface ICeilingDelta {
   readonly delta: number;
 }
 
+/** The ceiling evaluation: over, under, and unknown entries. */
 export interface IEvaluation {
   readonly over: ICeilingDelta[];
   readonly under: ICeilingDelta[];

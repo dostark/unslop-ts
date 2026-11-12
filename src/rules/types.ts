@@ -57,6 +57,7 @@ export type LintVisitor = Record<string, (node: IRuleNode) => void>;
 /** A suppression-comment dialect the comment rules can check. */
 export type SuppressionDialect = "deno" | "eslint" | "oxlint";
 
+/** The per-file context a plugin rule receives. */
 export interface IPluginRuleContext {
   /** Options parsed and defaulted from the rule's catalog entry. */
   readonly options: Record<string, JsonValue>;
@@ -82,6 +83,7 @@ export interface IRuleOverlap {
   readonly kind: "duplicate" | "related";
 }
 
+/** A plugin rule's metadata, host requirements, overlaps, and factory. */
 export interface IPluginRule {
   /** Description, category, guide anchor, preset, and limits of the rule. */
   readonly meta: IRuleMeta;

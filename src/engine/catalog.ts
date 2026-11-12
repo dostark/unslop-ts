@@ -11,8 +11,11 @@ import { globToRegExp } from "./glob.ts";
 import { z } from "zod";
 import type { IRuleRegistry } from "./registry.ts";
 
+/** Path classes used to decide a rule's applicability. */
 export type PathClass = "prod" | "test" | "fixture";
+/** Rule scopes: production, test, or all paths. */
 export type RuleScope = "prod" | "test" | "all";
+/** Rule severities supported by the catalog. */
 export type RuleSeverity = "error" | "warn" | "off";
 
 /** A JSON-serializable value. Catalog payloads and option values use this, not a raw unknown. */
@@ -44,6 +47,7 @@ export interface ICatalogLoadOptions {
   readonly registry: IRuleRegistry;
 }
 
+/** A rule's settings after presets and overrides are resolved. */
 export interface IResolvedRuleSettings {
   readonly severity: RuleSeverity;
   readonly scope: RuleScope;

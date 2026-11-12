@@ -105,6 +105,12 @@ function checkedRunId(value: string | null): string | null {
   return value;
 }
 
+/**
+ * Resolves the trace run id from an explicit value or the environment.
+ * @param explicit - The run id passed on the command line.
+ * @param envValue - The run id from the trace environment variable.
+ * @returns The validated run id, or null when tracing is off.
+ */
 export function resolveTraceRunId(explicit: string | undefined, envValue: string | undefined): string | null {
   if (explicit !== undefined) return checkedRunId(normalizeTraceValue(explicit));
   try {
