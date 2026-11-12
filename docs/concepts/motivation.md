@@ -49,23 +49,52 @@ different questions from "does this code carry evidence for what it claims?".
 
 The rules that do target this failure mode are a narrow, recent family. Each has a real strength,
 and each leaves a gap that `unslop-ts` was built to fill. The comparison below reflects each
-project's README in November 2026.
+project's README and documentation in November 2026.
 
-|                         | `unslop-ts`                                | [anti-slop](https://github.com/dmmulroy/anti-slop) | [deslop](https://github.com/maharshi365/deslop)           | [fallow](https://github.com/fallow-rs/fallow)           | Ordinary linter                      |
-| ----------------------- | ------------------------------------------ | -------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------ |
-| Hosts                   | `deno lint`, ESLint, Oxlint                | Oxlint                                             | Oxlint                                                    | its own binary                                          | the host's own rules                 |
-| Distribution            | JSR package and a CLI                      | vendored copy, no package                          | npm package                                               | binary                                                  | package                              |
-| Per-file rules          | 44                                         | 19 generic plus an Effect group                    | anti-slop plus extras, and some type-aware standard rules | none — analysis only                                    | hundreds, in the plugins you install |
-| Whole-repository checks | 8 checks                                   | none                                               | 2 opt-in duplicate checks                                 | one graph: unused code, duplication, cycles, boundaries | plugin-dependent                     |
-| Health report           | schema 2 report in the same package        | none                                               | none                                                      | health and hotspots                                     | plugin-dependent                     |
-| Suppression model       | a reason is required, in each host dialect | safety comment on assertions                       | safety comment on assertions                              | not a lint host                                         | host-dependent                       |
-| Fixer                   | none                                       | some rules autofix                                 | some rules autofix                                        | not applicable                                          | many                                 |
+|                         | `unslop-ts`                                | [anti-slop](https://github.com/dmmulroy/anti-slop) | [deslop](https://github.com/maharshi365/deslop)           | [fallow](https://github.com/fallow-rs/fallow)                                                             | Ordinary linter                      |
+| ----------------------- | ------------------------------------------ | -------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Hosts                   | `deno lint`, ESLint, Oxlint                | Oxlint                                             | Oxlint                                                    | its own CLI, LSP, MCP and editor integrations                                                             | the host's own rules                 |
+| Distribution            | JSR package and a CLI                      | vendored copy, no package                          | npm package                                               | one Rust binary via npm or cargo                                                                          | package                              |
+| Rule set                | 44                                         | 19 generic plus an Effect group                    | anti-slop plus extras, and some type-aware standard rules | about 70 named rules with `error`/`warn`/`off` severities, per-path overrides, and declarative rule packs | hundreds, in the plugins you install |
+| Whole-repository checks | 8 checks                                   | none                                               | 2 opt-in duplicate checks                                 | the core strength: unused code, duplication, cycles, boundaries, and health from one graph                | plugin-dependent                     |
+| Health report           | schema 2 report in the same package        | none                                               | none                                                      | a scored report with hotspots and history                                                                 | plugin-dependent                     |
+| Suppression model       | a reason is required, in each host dialect | safety comment on assertions                       | safety comment on assertions                              | `fallow-ignore` comments, an opt-in reason check, and stale-suppression detection                         | host-dependent                       |
+| Fixer                   | none                                       | some rules autofix                                 | some rules autofix                                        | `fallow fix` removes unused code                                                                          | many                                 |
 
 Read the table as a division of labor, not a ranking. `anti-slop` is the best-articulated statement
 of the evidence thesis and is deliberately vendored so a team can own it. `deslop` packages that
 thesis for Oxlint, adds cross-file duplicate checks, and enables a few type-aware standard rules.
-`fallow` reads the whole repository as one graph and is strong exactly where a per-file linter is
-blind.
+
+`fallow` is the strongest whole-repository engine in this group, and it is a rule engine, not only
+an analyzer. One Rust binary reads a very large repository as one graph, with about 70 named rules
+and per-path severities of its own, framework plugins, an LSP and MCP server, auto-fix, mutation
+testing, and a changed-file audit that fails only on the findings a pull request introduces. It is
+faster and broader than the whole-tree pass here, and it does not need a TypeScript compiler to
+start.
+
+What it does not do is run inside the lint host. There is no `deno lint` or ESLint plugin, so a
+finding does not arrive through the editor's existing lint integration, and a team cannot use one
+selection variable and one suppression dialect across Deno, Node, and Bun. That remains the gap
+this package fills.
+
+## What unslop-ts borrows from fallow
+
+Fallow is the reference implementation for several numbers and for one report in this package. The
+borrowings are deliberate, documented, and calibrated rather than paraphrased:
+
+| Surface               | Borrowing                                                                                                                                                                                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unused exports        | `unused-exports --parity` is the fallow-aligned report. It matches each import to the module that defines the export, follows named and star re-exports, and treats entry points, tests, scripts, default exports, and namespaces as public. `--enum-members`, `--class-members`, and `--production` extend it. |
+| Health report         | `unslop health` prints a report with fallow-compatible top-level keys and zero-based `col` values. The class-design and large-file sections are unslop extensions outside those keys.                                                                                                                           |
+| Complexity            | The `extended` variant counts `?.`, `??`, `&&=`, `\|\|=`, and `??=` as fallow does, and it is the default.                                                                                                                                                                                                      |
+| Maintainability index | The density variant is fallow's, named as such.                                                                                                                                                                                                                                                                 |
+| Parameters            | The `max-params` default of 7 matches fallow's limit.                                                                                                                                                                                                                                                           |
+| Duplication           | The token accounting is documented against fallow: `minTokens: 50` matches about `--min-tokens 25`.                                                                                                                                                                                                             |
+| Calibration           | The metrics methodology pins fallow 3.36.0, schema 12, and records the matched populations: 46,137 of 46,138 function rows on each side, 99.998 percent coverage.                                                                                                                                               |
+
+The parity report is the migration path. A team already running `fallow dead-code` can compare the
+two reports on the same tree and then keep one gate. The numbers are not claimed to be identical,
+and [Metrics methodology](../metrics_methodology.md) records every known difference.
 
 ## The niche
 
@@ -76,18 +105,21 @@ blind.
    Deno services and Node packages gets one vocabulary, not three.
 2. **Per-file rules and whole-repository checks in one package.** Evidence rules and the graph
    checks that catch dead structure, duplicated declarations, and drifted optionality.
-3. **A shipped health report.** Complexity, maintainability, CRAP, churn, duplication, and class
-   design, gated by score, with no second service.
+3. **A shipped health report that speaks fallow's numbers.** Complexity, maintainability, CRAP,
+   churn, duplication, and class design, gated by score, with the shared keys and formulas
+   calibrated against fallow so an existing report stays comparable.
 4. **Governance.** Presets, scopes, profiles, selection variables, parked opt-in rules with a
    required reason, per-package ceilings, edits that refuse an unsupported control, and a migration
    that never overwrites an input.
 5. **Distribution as a package.** No vendoring step and no copy to keep in sync; the CLI installs
    from JSR.
 
-Where the others are stronger, use them. Keep `typescript-eslint` for type-aware rules, Biome or
-`deno fmt` for formatting, and `fallow` when you want one graph and its architecture boundaries.
-The [comparison page](comparison.md) gives the decision guide by project type and the combination
-that avoids double reporting.
+Where the others are stronger, use them. Keep `typescript-eslint` for type-aware rules and Biome or
+`deno fmt` for formatting. Keep `fallow` when you want the fastest whole-repository pass,
+framework-aware dead-code detection, styling drift, auto-fix, mutation testing, an LSP or MCP
+server, or a changed-file audit; this package complements it rather than replacing it, and the
+parity report is the bridge between the two. The [comparison page](comparison.md) gives the decision
+guide by project type and the combination that avoids double reporting.
 
 ## What slop is not
 
@@ -105,8 +137,12 @@ The evidence rules are not invented here. The rule ideas come from
 reimplemented against the Deno ESTree, ported test cases keep their upstream names and MIT notice,
 and any skipped or changed case carries its reason in the test file. That lineage covers the
 type-evidence group, the assertion and safety-comment rules, the test-assertion rules, and the
-duplicate type and constant checks. The host parity, the whole-tree engine, the health report, the
-suppression dialects, and the configuration model are original to this package.
+duplicate type and constant checks. The health and complexity methodology follows fallow 3.36.0
+(schema 12): the density maintainability index, the `extended` cyclomatic variant, the parameter
+limit, the parity unused-export report, and the fallow-compatible report keys. The calibration and
+every known difference are in [Metrics methodology](../metrics_methodology.md). The host parity, the
+whole-tree engine, the suppression dialects, and the configuration model are original to this
+package.
 
 ## Boundaries
 

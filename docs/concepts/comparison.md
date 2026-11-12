@@ -10,7 +10,8 @@ would choose it anyway. The problem it was built for is in
 
 Choose `unslop-ts` when **one rule set must behave the same under `deno lint`, ESLint, and Oxlint**,
 and when you want per-file rules, whole-tree checks, and a health report from one package. Keep the
-host's own tooling for formatting, type checking, framework rules, and type-aware checks.
+host's own tooling for formatting, type checking, framework rules, and type-aware checks, and keep
+`fallow` when you want its graph depth, auto-fix, or framework plugins.
 
 `unslop-ts` is not a general replacement for ESLint, `typescript-eslint`, Biome, or Sonar.
 
@@ -79,24 +80,36 @@ usually installed separately:
 
 | Check                                                                            | Usual standalone tool                                                                       |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `unused-exports`, `unused-files`                                                 | `knip`, `ts-prune`                                                                          |
-| `duplicate-code`                                                                 | `jscpd`                                                                                     |
+| `unused-exports`, `unused-files`                                                 | `knip`, `ts-prune`, `fallow dead-code`                                                      |
+| `duplicate-code`                                                                 | `jscpd`, `fallow dupes`                                                                     |
 | `duplicate-type`, `duplicate-constant`, `magic-literals`, `constant-restatement` | SonarJS rules, project-wide instead of per file                                             |
 | `optional-params`                                                                | No common single-rule equivalent; it compares a parameter's optionality with its call sites |
 
 The health report's duplication _signal_ can use `jscpd` when it is installed, but the
 `duplicate-code` check makes its own comparison.
 
+`fallow` is the strongest comparison here: one Rust binary reads the whole repository as one graph
+and also covers circular dependencies, architecture boundaries, styling drift, and framework-aware
+dead code. `unslop-ts` does not try to match that breadth. It provides a deliberate compatibility
+path instead: `unused-exports --parity` is the fallow-aligned report, and the health report keeps
+fallow-compatible keys so the shared numbers stay comparable. See
+[What unslop-ts borrows from fallow](motivation.md#what-unslop-ts-borrows-from-fallow).
+
 ## Health report and code-quality platforms
 
 `unslop health` computes cyclomatic and cognitive complexity, the maintainability index, CRAP,
 churn hotspots, duplication, and class design (WMC, TCC, ATFD, CBO, RFC, and the God, Data Class,
 and Feature Envy findings). That overlaps SonarQube, SonarJS, fallow, and Code Climate. The
-per-package ceilings from `unslop:report`/`rule_ceiling` overlap budget tools such as `size-limit`.
+per-package rule ceilings in the `./cli/rule_ceiling` subpath overlap budget tools such as
+`size-limit`.
 
-The differences are operational: the report is schema 2 with a formula version, gates through
-`--min-score`, takes an LCOV file for CRAP, and ships in the same package as the rules. See
-[Report schema](../reference/report-schema.md).
+Fallow is the reference for the shared numbers, not a coincidental lookalike. The `extended`
+complexity variant and its default, the density maintainability index, the parameter limit, the
+zero-based `col`, and the report keys are documented borrowings, and the methodology pins fallow
+3.36.0 (schema 12) with a recorded calibration. The differences are operational too: the report is
+schema 2 with a formula version, gates through `--min-score`, takes an LCOV file for CRAP, and ships
+in the same package as the rules. See [Report schema](../reference/report-schema.md) and
+[Metrics methodology](../metrics_methodology.md).
 
 ## What unslop-ts does not do
 
@@ -171,7 +184,9 @@ pretend to type-check is easier to trust than a type-aware rule running without 
   `unslop-ts` adds parity and whole-tree checks, but it reports TypeScript files and its rule set is
   narrower, so it does not replace a full ESLint setup.
 - **Codebase with dead-code and duplication problems.** `unslop-ts` replaces `knip`, `jscpd`, and a
-  metrics tool with one gate. That is the clearest operational win.
+  metrics tool with one gate. That is the clearest operational win; when the tree is very large or
+  framework-heavy, run `fallow` and use `unused-exports --parity` to compare the two on the same
+  tree.
 - **Team that needs one finding vocabulary across runtimes.** This is the strongest reason to
   prefer it: no other tool ships one conformance-tested rule set for all three hosts.
 
@@ -182,6 +197,9 @@ pretend to type-check is easier to trust than a type-aware rule running without 
    checks.
 3. On ESLint, spread `typescript-eslint-compat` last so the one duplicate does not report twice.
 4. Leave the fifteen `related` overlaps running; the unslop rule is narrower and names its reason.
+5. Where whole-repository depth matters, add `fallow` and compare with `unused-exports --parity`.
+   The two gates overlap by design on unused exports, so choose one as the failing gate and use the
+   other as evidence.
 
 ## Verify the facts
 

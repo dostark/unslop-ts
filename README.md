@@ -30,11 +30,13 @@ exports and files, duplicate types, constants, and blocks, repeated literals, an
 drifted from its call sites. It runs the same 44 rules and 8 checks under `deno lint`, ESLint, and
 Oxlint, and ships a health report, so one vocabulary covers every runtime in a mixed repository.
 
-It is not a replacement for ESLint, `typescript-eslint`, Biome, or Sonar. Keep those for formatting,
-type checking, framework rules, and type-aware checks. Read
-[Why unslop-ts exists](docs/concepts/motivation.md) for the problem statement and the niche against
-anti-slop, deslop, and fallow, and [Comparison with other linters](docs/concepts/comparison.md) for
-the decision guide.
+It is not a replacement for ESLint, `typescript-eslint`, Biome, Sonar, or fallow. Keep those for
+formatting, type checking, framework rules, type-aware checks, and whole-repository depth. Where
+this package shares a number with fallow, it follows fallow deliberately: `unused-exports --parity`
+is the fallow-aligned report, and `unslop health` keeps fallow-compatible keys. Read
+[Why unslop-ts exists](docs/concepts/motivation.md) for the problem statement, the borrowings, and
+the niche against anti-slop, deslop, and fallow, and
+[Comparison with other linters](docs/concepts/comparison.md) for the decision guide.
 
 ## Install
 
