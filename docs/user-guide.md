@@ -73,7 +73,72 @@ The message names the field that failed. The full field list is in
 The rules, messages, and suppression model are shared, so a finding means the same thing on every
 host. See [Compatibility](compatibility.md) for the supported versions.
 
-## 4. Use the CLI
+## 4. Run a selected set of rules
+
+Selection narrows a run to the rules you name. It never enables a rule the configuration turned
+off, except an opt-in rule you name explicitly.
+
+Find the ids first:
+
+```sh
+unslop rules list --status=parked       # opt-in rules you can select
+unslop presets show unslop:recommended  # the ids a preset enables
+```
+
+### Deno host
+
+Set `<PLUGIN>_LINT_RULES`, where `<PLUGIN>` is the configuration's `plugin` value in upper case. The
+value is a comma-separated list of full ids, unambiguous bare keys, or `tag:<tag>` tokens:
+
+```sh
+# two rules by bare key
+DEMO_LINT_RULES="max-params,no-explicit-unknown" deno lint
+
+# full ids, including a whole-tree check
+DEMO_LINT_RULES="demo/max-params,unused-exports" deno lint
+
+# every rule tagged "comments"
+DEMO_LINT_RULES="tag:comments" deno lint
+```
+
+An empty value means no selection: every configured rule keeps its own level.
+
+### CLI queries and edits
+
+`--select` and `--profile` replace the selection variable for one CLI call:
+
+```sh
+unslop rules list --select=max-params,unused-exports
+unslop rules show max-params
+unslop rules list --profile=ci
+```
+
+A profile is a named selector list in the configuration:
+
+```json
+"profiles": { "ci": ["tag:comments", "max-params"] }
+```
+
+`unslop report` passes the same selection to the host it runs.
+
+### ESLint and Oxlint
+
+Those adapters read rule levels from their own configuration, so select there:
+
+```js
+// eslint.config.mjs
+{ rules: { "unslop/max-params": "error", "unslop/no-explicit-unknown": "off" } }
+```
+
+```json
+// .oxlintrc.json
+{ "rules": { "unslop/max-params": "error" } }
+```
+
+A preset sets `warn`; a later object overrides it. Selection narrows a run; it never widens a
+configuration that disabled a rule.
+
+## 5. Use the CLI
 
 | You want to                         | Command                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------ |
@@ -91,7 +156,7 @@ host. See [Compatibility](compatibility.md) for the supported versions.
 Read commands and dry runs need no write permission. A real edit, a migration, or `unslop report`
 needs the write or run permission the [Command line](reference/cli.md) page lists.
 
-## 5. Read and act on a finding
+## 6. Read and act on a finding
 
 A finding carries a rule id, a message, an optional hint, and a source location. Fix the code, or
 suppress the finding with a reason. A suppression without a reason is itself a finding.
@@ -105,7 +170,7 @@ suppress the finding with a reason. A suppression without a reason is itself a f
 A rule that is `parked` is off until you select it; `off` means it cannot be selected on. The
 statuses and the selection rules are in [Rules and presets](reference/rules.md).
 
-## 6. Add it to CI
+## 7. Add it to CI
 
 Run the host command in CI and let its exit code gate the build:
 
@@ -125,7 +190,7 @@ Keep the configuration validated in CI too:
 unslop config validate
 ```
 
-## 7. Measure and report
+## 8. Measure and report
 
 `unslop health` prints the schema 2 report with complexity, maintainability, CRAP, duplication,
 history, and class-design signals. Use `--min-score` to gate the project score, and `--coverage`
@@ -135,13 +200,13 @@ with an LCOV file when coverage is available.
 fired. Use `--format=markdown` for a pull-request comment or `--format=sarif` for a code-scanning
 upload.
 
-## 8. Migrate from version 1
+## 9. Migrate from version 1
 
 Run `unslop migrate` with the project descriptor and the version 1 catalog. The command writes a
 new version 2 file and a separate layout file; it never overwrites an input or an existing
 destination. The mapping and the rollback conditions are in [Migration](how-to/migration.md).
 
-## 9. Troubleshoot
+## 10. Troubleshoot
 
 Most startup failures are a configuration field, a refused edit, or a host adapter setting. The
 error class and the fix are in [Troubleshooting](troubleshooting.md).

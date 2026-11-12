@@ -20,7 +20,7 @@ Prerequisites: Deno 2.9, a project with a `deno.json`, and a copy of the `exampl
 1. To run a subset locally, export `<NAME>_LINT_RULES`, where `<NAME>` is the plugin name in upper case
    (`demo` gives `DEMO_LINT_RULES`). The value is a list of full ids, unambiguous bare keys, or
    `tag:<tag>` selectors. The CLI `--select` and `--profile` options replace that variable for one call.
-   `selectionEnvName(name)` returns the variable name.
+   `selectionEnvName(name)` returns the variable name. For example, `DEMO_LINT_RULES="max-params" deno lint` runs only the `max-params` rule for that call.
 
 ## Verify
 
