@@ -126,7 +126,7 @@ async function unindexedDocuments(root: string, index: string, required: readonl
       .filter((link) => link.target.length > 0)
       .map((link) => relative(root, resolve(indexDir, link.target))),
   );
-  return required.filter((document) => !linked.has(document));
+  return required.filter((document) => document !== index && !linked.has(document));
 }
 
 async function brokenLinks(root: string, files: readonly string[]): Promise<string[]> {

@@ -5,24 +5,36 @@ This is the document index for the package. The root `README.md` is the GitHub l
 ## Start
 
 - [README](../README.md) — purpose, install, quick start.
-- [Compatibility](compatibility.md) — supported runtimes, hosts, and the deprecation policy.
-- [Troubleshooting](troubleshooting.md) — error classes, causes, fixes, and exit codes.
+- [Tutorial](tutorial.md) — a first end-to-end run.
+- [Glossary](glossary.md) — the terms this documentation uses.
 
 ## Reference
 
 - [API](reference/api.md) — package subpaths, signatures, returns, errors.
+- [Configuration](reference/config.md) — every configuration field.
+- [Command line](reference/cli.md) — every command group and flag.
+- [Rules and presets](reference/rules.md) — rule ids, categories, presets, options.
+- [Whole-tree checks](reference/whole-tree-checks.md) — the eight checks.
+- [Report schema](reference/report-schema.md) — report and health fields.
+- [Style guide](style_guide.md) — the rule guide.
+- [Metrics methodology](metrics_methodology.md) — the metric formulas.
 
-## Rules
+## Concepts
 
-- [Style guide](style_guide.md) — the rule guide and its anchors.
-- [Metrics methodology](metrics_methodology.md) — the metric formulas and calibration evidence.
+- [Architecture](concepts/architecture.md) — the pipeline and module boundaries.
+
+## How-to
+
+- [Hosts and runtimes](how-to/hosts.md) — Deno, ESLint, Oxlint, Biome.
+- [Migration](how-to/migration.md) — version 1 to version 2.
+- [Editing](how-to/editing.md) — read and write routes.
+- [Lockfiles](how-to/lockfiles.md) — lockfile behavior.
 
 ## Operations and contribution
 
+- [Troubleshooting](troubleshooting.md) — error classes, causes, fixes.
+- [Compatibility](compatibility.md) — supported runtimes and hosts.
 - [Changelog](../CHANGELOG.md) — released changes.
 - [Contributing](../CONTRIBUTING.md) — setup, tests, add a rule.
 - [Security](../SECURITY.md) — reporting and the trust model.
 - [Examples](../examples/README.md) — the example index.
-
-More pages — tutorial, API, configuration, CLI, rules, whole-tree checks, report schema,
-architecture, glossary, and the how-to guides — are linked here as they land.
