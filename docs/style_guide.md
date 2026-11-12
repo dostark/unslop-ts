@@ -622,7 +622,7 @@ Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these
    and the compatibility overlay read that metadata.
 4. A rule emits the bare message and an optional hint. The host entry adds the plugin id and the docs
    link, so a message never names a host.
-5. A rule's cases live in `unslop-ts/tests/cases/conformance.json`. The conformance suite runs the same case on
+5. A rule's cases live in `../tests/cases/conformance.json`. The conformance suite runs the same case on
    every host, so a new rule without a case fails the check.
 6. Suppression parsing stays in the shared ignore-directive helper. A rule never parses a
    `deno-lint-ignore`, `eslint-disable`, or `oxlint-disable` comment itself.

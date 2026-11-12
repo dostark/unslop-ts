@@ -8,6 +8,10 @@ This is the document index for the package. The root `README.md` is the GitHub l
 - [Compatibility](compatibility.md) — supported runtimes, hosts, and the deprecation policy.
 - [Troubleshooting](troubleshooting.md) — error classes, causes, fixes, and exit codes.
 
+## Reference
+
+- [API](reference/api.md) — package subpaths, signatures, returns, errors.
+
 ## Rules
 
 - [Style guide](style_guide.md) — the rule guide and its anchors.
