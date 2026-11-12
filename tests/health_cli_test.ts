@@ -674,11 +674,11 @@ Deno.test("health-min-score-exit: a partial score never passes a gate", async ()
   });
 });
 
-Deno.test("the_readme_documents_every_health_flag", async () => {
-  const readme = await Deno.readTextFile(new URL("../README.md", import.meta.url));
-  const start = readme.indexOf("## Health report");
+Deno.test("the_report_reference_documents_every_health_flag", async () => {
+  const report = await Deno.readTextFile(new URL("../docs/reference/report-schema.md", import.meta.url));
+  const start = report.indexOf("## Health report");
   assert(start >= 0);
-  const section = readme.slice(start, readme.indexOf("## Editing", start));
+  const section = report.slice(start, report.indexOf("## Reports and consumer adoption", start));
   for (
     const flag of [
       "--root",

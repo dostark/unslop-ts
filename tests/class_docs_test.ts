@@ -1,10 +1,10 @@
 /**
  * @module ClassDocsTest
  * @path tests/class_docs_test.ts
- * @description Proves that the style guide defines every class metric and strategy and that the README documents the class-size strategy option, the health class section, its flags and the precision labels.
+ * @description Proves that the style guide defines every class metric and strategy and that the report reference documents the class-size strategy option, the health class section, its flags and the precision labels.
  * @architectural-layer Test
  * @dependencies [@std/assert]
- * @related-files [docs/style_guide.md, README.md, docs/metrics_methodology.md]
+ * @related-files [docs/style_guide.md, docs/reference/report-schema.md, docs/reference/rules.md, docs/metrics_methodology.md]
  */
 
 import { assertMatch, assertNotMatch, assertStringIncludes } from "@std/assert";
@@ -55,15 +55,15 @@ Deno.test("docs-class-metrics: the style guide separates the generic preset from
   assertMatch(section, /`max-params`[^.]*opt-in/);
 });
 
-Deno.test("docs-strategies: the README documents the strategy option, the class section, its flags and the precision labels", async () => {
-  const readme = await read("README.md");
+Deno.test("docs-strategies: the report reference documents the strategy option, the class section, its flags and the precision labels", async () => {
+  const report = await read("docs/reference/report-schema.md");
   for (const text of ["`strategy`", "god-class", "legacy-score", "--classes", "--top-classes", "class_scores"]) {
-    assertStringIncludes(readme, text);
+    assertStringIncludes(report, text);
   }
   for (const label of ["syntactic", "typed", "design_findings", "class_thresholds"]) {
-    assertStringIncludes(readme, label);
+    assertStringIncludes(report, label);
   }
-  assertStringIncludes(readme, "docs/metrics_methodology.md");
+  assertStringIncludes(report, "metrics_methodology.md");
 });
 
 /** The agent context section of the style guide, from its heading to the next second-level heading. */
@@ -99,7 +99,8 @@ Deno.test("docs-agent-context: the guide names the module size rule with its sof
   assertStringIncludes(section, "800");
   assertMatch(section, /1,?000/);
   assertMatch(guide, /\| `max-file-lines`\s+\|/);
-  const readme = await read("README.md");
-  assertStringIncludes(readme, "unslop/max-file-lines");
-  assertStringIncludes(readme, "large_files");
+  const report = await read("docs/reference/report-schema.md");
+  assertStringIncludes(report, "large_files");
+  const rules = await read("docs/reference/rules.md");
+  assertStringIncludes(rules, "unslop/max-file-lines");
 });

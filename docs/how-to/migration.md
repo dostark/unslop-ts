@@ -8,6 +8,9 @@ applicability, options, docs, and tags, and maps the six whole-tree setting sect
 The layout moves to a separate file and requires `--layout-out` when the input has one. An engine limit
 that differs from the rule metadata is refused instead of discarded.
 
+The whole-tree CLI accepts `--catalog=<path>` for a version 1 catalog. The descriptor form,
+`--descriptor=<entry>`, is the current one.
+
 The pair is written without overwriting: canonical parent paths, sibling locks, staged temporary files,
 and no-clobber hard links. Layout commits first and the configuration last. If the second commit fails,
 only the layout inode created by that invocation is removed. If cleanup cannot complete, the command

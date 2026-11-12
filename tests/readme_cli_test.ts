@@ -1,10 +1,10 @@
 /**
  * @module ReadmeCliTest
  * @path tests/readme_cli_test.ts
- * @description The README names every command, and every documented `deno task` example runs under the permissions its task grants.
+ * @description The CLI reference names every command, and every documented `deno task` example runs under the permissions its task grants.
  * @architectural-layer Test
  * @dependencies [@std/fs, @std/path]
- * @related-files [README.md, deno.json, src/cli/unslop.ts, tests/helpers/cli_project.ts]
+ * @related-files [docs/reference/cli.md, docs/how-to/migration.md, deno.json, src/cli/unslop.ts, tests/helpers/cli_project.ts]
  */
 
 import { assert, assertEquals, assertNotEquals, assertStringIncludes } from "@std/assert";
@@ -14,6 +14,11 @@ import { CLI_PATH, withCliProject } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
 
 const README_URL = new URL("../README.md", import.meta.url);
+const CLI_URL = new URL("../docs/reference/cli.md", import.meta.url);
+const MIGRATION_URL = new URL("../docs/how-to/migration.md", import.meta.url);
+const EDITING_URL = new URL("../docs/how-to/editing.md", import.meta.url);
+const CONFIG_URL = new URL("../docs/reference/config.md", import.meta.url);
+const SECURITY_URL = new URL("../SECURITY.md", import.meta.url);
 const DENO_JSON_URL = new URL("../deno.json", import.meta.url);
 
 const COMMANDS = [
@@ -71,6 +76,10 @@ async function readReadme(): Promise<string> {
   return await Deno.readTextFile(README_URL);
 }
 
+async function readCli(): Promise<string> {
+  return await Deno.readTextFile(CLI_URL);
+}
+
 function exampleLines(readme: string): string[] {
   const section = readme.split("### Command examples")[1] ?? "";
   const block = section.split("```sh")[1]?.split("```")[0] ?? "";
@@ -106,24 +115,24 @@ async function copyProject(base: string): Promise<{ dir: string; cleanup: string
   return { dir, cleanup };
 }
 
-Deno.test("the_readme_lists_every_cli_command", async () => {
-  const readme = await readReadme();
-  for (const command of COMMANDS) assertStringIncludes(readme, command);
-  for (const concept of ["--dry-run", "--descriptor", "--plugin", "Exit codes", "JSONC", "no-clobber"]) {
-    assertStringIncludes(readme, concept);
+Deno.test("the_cli_reference_lists_every_cli_command", async () => {
+  const cli = await readCli();
+  for (const command of COMMANDS) assertStringIncludes(cli, command);
+  for (const concept of ["--dry-run", "--descriptor", "--plugin", "Exit codes", "JSONC"]) {
+    assertStringIncludes(cli, concept);
   }
-  assertStringIncludes(readme, "trusted executable project code");
-  assertStringIncludes(readme, "Phase 232");
-  assertEquals(readme.includes("examples/catalog.json"), false);
+  assertStringIncludes(await Deno.readTextFile(SECURITY_URL), "trusted executable project code");
+  assertStringIncludes(await Deno.readTextFile(MIGRATION_URL), "no-clobber");
+  assertEquals((await readReadme()).includes("examples/catalog.json"), false);
 
   for (const file of ["unslop.config.json", "unslop.project.ts", "lint_plugin.ts"]) {
     assert(await exists(new URL(`../examples/${file}`, import.meta.url)), file);
   }
 });
 
-Deno.test("every_readme_example_runs_with_its_documented_task", async () => {
-  const examples = examplesOf(await readReadme());
-  assertNotEquals(examples.length, 0, "the README holds runnable examples");
+Deno.test("every_cli_reference_example_runs_with_its_documented_task", async () => {
+  const examples = examplesOf(await readCli());
+  assertNotEquals(examples.length, 0, "the CLI reference holds runnable examples");
   await withCliProject(async (base) => {
     await Deno.writeTextFile(join(base, "catalog.json"), JSON.stringify(V1_CATALOG, null, 2));
     await Deno.mkdir(join(base, "src"), { recursive: true });
@@ -158,8 +167,8 @@ Deno.test("a_write_route_fails_under_the_read_only_task", async () => {
   });
 });
 
-Deno.test("removing_an_example_from_the_readme_fails_the_test", async () => {
-  const examples = examplesOf(await readReadme());
+Deno.test("removing_an_example_from_the_cli_reference_fails_the_test", async () => {
+  const examples = examplesOf(await readCli());
   assertEquals(missingRoutes(examples), []);
   assertEquals(missingRoutes(examples.slice(1)).length > 0, true);
   for (const route of ROUTES) {
@@ -178,27 +187,27 @@ async function exists(url: URL): Promise<boolean> {
   }
 }
 
-Deno.test("the_readme_names_the_bridge_and_the_two_tasks", async () => {
-  const readme = await readReadFile();
+Deno.test("the_docs_name_the_bridge_and_the_two_tasks", async () => {
+  const docs = [
+    await readCli(),
+    await Deno.readTextFile(MIGRATION_URL),
+    await Deno.readTextFile(EDITING_URL),
+    await Deno.readTextFile(CONFIG_URL),
+  ].join("\n");
   for (
     const text of [
       "deno task cli:write",
       "unslop config print",
       "--catalog",
       "whole-tree",
-      "Phase 232 Step 5",
       "exclusionCodes",
       "optIn",
       "profile token is validated",
     ]
   ) {
-    assertStringIncludes(readme, text);
+    assertStringIncludes(docs, text);
   }
 });
-
-async function readReadFile(): Promise<string> {
-  return await Deno.readTextFile(README_URL);
-}
 
 Deno.test("report_runs_with_documented_task_permissions", async () => {
   const flags = await taskFlags("cli:report");
