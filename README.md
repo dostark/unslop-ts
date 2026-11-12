@@ -34,6 +34,7 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 - [Report schema](docs/reference/report-schema.md) — report and health fields.
 - [API reference](docs/reference/api.md) — package subpaths and signatures.
 - [Architecture](docs/concepts/architecture.md) — the pipeline and module boundaries.
+- [Comparison with other linters](docs/concepts/comparison.md) — overlaps and when to use it.
 - [Migration](docs/how-to/migration.md) — version 1 to version 2.
 - [Editing](docs/how-to/editing.md) — read and write routes.
 - [Lockfiles](docs/how-to/lockfiles.md) — lockfile behavior.

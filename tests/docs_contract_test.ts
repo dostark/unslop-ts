@@ -37,6 +37,7 @@ const REQUIRED_DOCUMENTS: readonly string[] = [
   "docs/reference/whole-tree-checks.md",
   "docs/reference/report-schema.md",
   "docs/concepts/architecture.md",
+  "docs/concepts/comparison.md",
   "docs/how-to/hosts.md",
   "docs/how-to/migration.md",
   "docs/how-to/editing.md",

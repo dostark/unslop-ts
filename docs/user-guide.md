@@ -220,3 +220,5 @@ error class and the fix are in [Troubleshooting](troubleshooting.md).
 - [Whole-tree checks](reference/whole-tree-checks.md) — the eight project-wide checks.
 - [API reference](reference/api.md) — the programmatic surface.
 - [Architecture](concepts/architecture.md) — how a rule reaches a diagnostic.
+- [Comparison with other linters](concepts/comparison.md) — where it overlaps one and when to
+  prefer it.
