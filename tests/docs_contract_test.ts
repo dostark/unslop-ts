@@ -25,6 +25,7 @@ const REQUIRED_DOCUMENTS: readonly string[] = [
   "SECURITY.md",
   "examples/README.md",
   "docs/README.md",
+  "docs/user-guide.md",
   "docs/tutorial.md",
   "docs/glossary.md",
   "docs/troubleshooting.md",

@@ -4,6 +4,7 @@ This is the document index for the package. The root `README.md` is the GitHub l
 
 ## Start
 
+- [User guide](user-guide.md) — install, configure, run, and read findings.
 - [README](../README.md) — purpose, install, quick start.
 - [Tutorial](tutorial.md) — a first end-to-end run.
 - [Glossary](glossary.md) — the terms this documentation uses.

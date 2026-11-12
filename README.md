@@ -24,6 +24,7 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 
 ## Documentation
 
+- [User guide](docs/user-guide.md) — install, configure, run, and read findings.
 - [Tutorial](docs/tutorial.md) — a first end-to-end run.
 - [Hosts and runtimes](docs/how-to/hosts.md) — Deno, ESLint, Oxlint, Biome.
 - [Configuration](docs/reference/config.md) — every version 2 field.
