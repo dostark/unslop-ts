@@ -1,0 +1,3 @@
+# Phase 244 fixture
+
+This file mentions an internal phase.

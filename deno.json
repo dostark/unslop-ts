@@ -28,6 +28,7 @@
   },
   "tasks": {
     "test": "deno test --allow-all",
+    "check:docs": "deno test --allow-read --allow-run=deno tests/docs_contract_test.ts",
     "lint": "deno lint --config=deno.json",
     "check": "deno check mod.ts deno.ts eslint.ts src/report/mod.ts src/ src/bundle/engine.ts tests/ examples/lint_plugin.ts examples/unslop.project.ts examples/eslint/sample.ts scripts/bundle.ts examples/node-project/sample.ts examples/bun-project/sample.ts",
     "fmt": "deno fmt",

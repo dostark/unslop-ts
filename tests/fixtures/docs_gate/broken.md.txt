@@ -1,0 +1,5 @@
+# Broken links
+
+- [Missing file](./missing.md)
+- [Missing anchor](present.md#nope)
+- [Good anchor](present.md#custom-anchor)
