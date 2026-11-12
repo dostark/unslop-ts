@@ -134,30 +134,39 @@ conformance suite in `../../tests/cases/conformance.json` runs the same case on 
 tested property. An ordinary setup needs a separate configuration per host, each with its own rule
 names and ignore dialect.
 
-### 2. Per-file rules and project-wide checks in one tool
+### 2. A Deno-native plugin, not a separate analyzer
+
+`fallow` runs on Deno projects and reads Deno workspaces and import maps, but it is a separate
+binary. This package compiles the version 2 configuration into a `Deno.lint.Plugin` that runs inside
+`deno lint`: the finding uses the host exit code and the `deno-lint-ignore` dialect, the editor's
+Deno integration already shows it, and the Deno pack adds four rules about ignore comments and
+script headers. On a Deno project, prefer the Deno-native path and add `fallow` only for the graph
+depth it brings.
+
+### 3. Per-file rules and project-wide checks in one tool
 
 Unused exports, unused files, duplicate code, duplicate types and constants, repeated literals, and
 optional-parameter drift usually take three or four tools. Here they are one configuration, one
 report, and one CI step.
 
-### 3. A shipped health report
+### 4. A shipped health report
 
 The same package that reports a finding also measures complexity, maintainability, CRAP, churn,
 duplication, and class design, and can gate on the score. No second service is required.
 
-### 4. A controlled rule budget
+### 5. A controlled rule budget
 
 Beyond on and off, a project can use presets, scopes (`prod`, `test`, `all`), path classification,
 profiles, selection variables, parked opt-in rules with a required reason, per-package ceilings, safe
 configuration edits that refuse an unsupported control, and a version 1 to 2 migration that never
 overwrites an input. See [Configuration](../reference/config.md).
 
-### 5. Suppressions need a reason
+### 6. Suppressions need a reason
 
 `ignore-needs-reason` and `no-forbidden-lint-ignore` enforce a reason after `--` in each host's
 dialect. A suppression without one is itself a finding.
 
-### 6. Stated boundaries
+### 7. Stated boundaries
 
 The documentation says the rules are syntactic and per file. A predictable rule that does not
 pretend to type-check is easier to trust than a type-aware rule running without the type checker.

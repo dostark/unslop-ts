@@ -28,7 +28,8 @@ Ordinary linters check form and known bug classes, and they remain the right too
 `unslop-ts` checks evidence and signal, and adds the checks a per-file linter cannot make: unused
 exports and files, duplicate types, constants, and blocks, repeated literals, and optionality that
 drifted from its call sites. It runs the same 44 rules and 8 checks under `deno lint`, ESLint, and
-Oxlint, and ships a health report, so one vocabulary covers every runtime in a mixed repository.
+Oxlint — as a native `Deno.lint.Plugin` on Deno, and as a plugin on Node and Bun — and ships a
+health report, so one vocabulary covers every runtime in a mixed repository.
 
 It is not a replacement for ESLint, `typescript-eslint`, Biome, Sonar, or fallow. Keep those for
 formatting, type checking, framework rules, type-aware checks, and whole-repository depth. Where

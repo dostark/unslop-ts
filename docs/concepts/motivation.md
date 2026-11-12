@@ -54,6 +54,7 @@ project's README and documentation in November 2026.
 |                         | `unslop-ts`                                | [anti-slop](https://github.com/dmmulroy/anti-slop) | [deslop](https://github.com/maharshi365/deslop)           | [fallow](https://github.com/fallow-rs/fallow)                                                             | Ordinary linter                      |
 | ----------------------- | ------------------------------------------ | -------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | Hosts                   | `deno lint`, ESLint, Oxlint                | Oxlint                                             | Oxlint                                                    | its own CLI, LSP, MCP and editor integrations                                                             | the host's own rules                 |
+| Runtimes                | Deno 2.9, Node.js 24, Bun 1.4              | the Oxlint runtime                                 | the Oxlint runtime on Bun, Deno, or Node                  | Node, Bun, and Deno projects; one Rust binary                                                             | the host's own                       |
 | Distribution            | JSR package and a CLI                      | vendored copy, no package                          | npm package                                               | one Rust binary via npm or cargo                                                                          | package                              |
 | Rule set                | 44                                         | 19 generic plus an Effect group                    | anti-slop plus extras, and some type-aware standard rules | about 70 named rules with `error`/`warn`/`off` severities, per-path overrides, and declarative rule packs | hundreds, in the plugins you install |
 | Whole-repository checks | 8 checks                                   | none                                               | 2 opt-in duplicate checks                                 | the core strength: unused code, duplication, cycles, boundaries, and health from one graph                | plugin-dependent                     |
@@ -72,10 +73,17 @@ testing, and a changed-file audit that fails only on the findings a pull request
 faster and broader than the whole-tree pass here, and it does not need a TypeScript compiler to
 start.
 
-What it does not do is run inside the lint host. There is no `deno lint` or ESLint plugin, so a
-finding does not arrive through the editor's existing lint integration, and a team cannot use one
-selection variable and one suppression dialect across Deno, Node, and Bun. That remains the gap
-this package fills.
+Fallow runs on Node, Bun, and Deno projects. It reads npm, yarn, pnpm, and Deno workspaces,
+resolves Deno import maps, and accepts a pure Deno root without `node_modules`.
+
+What it does not do is run inside the lint host. There is no `deno lint`, ESLint, or Oxlint plugin,
+so a finding does not arrive through the editor's existing lint integration, and a team cannot use
+one selection variable and one suppression dialect across Deno, Node, and Bun. On a Deno project
+that gap is widest. `unslop-ts` compiles the version 2 configuration into a `Deno.lint.Plugin` that
+runs inside `deno lint`, uses the host exit code and the `deno-lint-ignore` dialect, and ships four
+Deno-specific rules: `ignore-needs-reason`, `no-forbidden-lint-ignore`, `require-deno-shebang`, and
+`require-script-usage`. A Deno-native tool is the better fit there. Fallow is the better fit for the
+graph depth it adds.
 
 ## What unslop-ts borrows from fallow
 
