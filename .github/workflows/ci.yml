@@ -17,6 +17,7 @@ jobs:
       - run: deno task lint
       - run: deno task check
       - run: deno task test
+      - run: deno task check:docs
 
   hosts-node:
     runs-on: ubuntu-latest

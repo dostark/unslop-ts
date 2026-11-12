@@ -19,8 +19,8 @@ Run the CLI from a checkout with `deno task unslop`, or as the package subpath `
 | `unslop config schema`                                                         | The generated structural JSON Schema.                                             |
 | `unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=]` | Migrate a version 1 catalog without overwriting an input or existing destination. |
 | `unslop deno-policy --config=<file> --out=<dir> [--packs=typescript[,deno]]`   | Build an offline Deno lint policy directory from a version 2 configuration.       |
-| `unslop health [--format=text\|json] [--descriptor=] [--root=]`                | Measure the project and print the schema 2 health report.                          |
-| `unslop report [--format=table\|json\|markdown\|sarif] [--out=] [--] <paths>`   | Run a real lint host and report per-rule coverage and findings.                    |
+| `unslop health [--format=text\|json] [--descriptor=] [--root=]`                | Measure the project and print the schema 2 health report.                         |
+| `unslop report [--format=table\|json\|markdown\|sarif] [--out=] [--] <paths>`  | Run a real lint host and report per-rule coverage and findings.                   |
 
 Use `deno task unslop` for read commands and dry runs. Use `deno task unslop:write` for a real edit, a
 migration, or any command that locks, stages, and writes files. The read task grants no write access,
