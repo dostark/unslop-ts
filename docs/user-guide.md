@@ -17,11 +17,14 @@ You maintain a TypeScript project and want one set of rules that behaves the sam
 
 ## 1. Install
 
-For the CLI:
+The registry release is pending. From the checkout root, install the CLI:
 
 ```sh
-deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop-ts/cli
+deno install --global --name unslop --allow-read --allow-env --config=deno.json ./src/cli/unslop.ts
 ```
+
+Use `jsr:@dostark/unslop-ts/cli` instead of the path once the release is published. Add
+`--allow-write` for edits and `--allow-run=deno` for `unslop report`.
 
 For ESLint or Oxlint, install the package in that project. For the Deno host, add the package to
 the project's import map or use the release plugin bundle described in

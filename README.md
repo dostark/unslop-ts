@@ -41,6 +41,16 @@ the niche against anti-slop, deslop, and fallow, and
 
 ## Install
 
+The registry release is pending. Install the CLI from a checkout:
+
+```sh
+git clone https://github.com/dostark/unslop-ts.git
+cd unslop-ts
+deno install --global --name unslop --allow-read --allow-env --config=deno.json ./src/cli/unslop.ts
+```
+
+Once the release is published, the same CLI installs from JSR:
+
 ```sh
 deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop-ts/cli
 ```

@@ -29,13 +29,15 @@ equivalent write-enabled CLI alias.
 
 ### Get the `unslop` command
 
-The package publishes a module, not a binary. Install the command with Deno:
+The package publishes a module, not a binary. While the registry release is pending, install the
+command from the checkout root:
 
 ```sh
-deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop-ts/cli
+deno install --global --name unslop --allow-read --allow-env --config=deno.json ./src/cli/unslop.ts
 ```
 
-Add `--allow-write` for edits and `--allow-run=deno` for `unslop report`. Then run
+Once the release is published, install `jsr:@dostark/unslop-ts/cli` instead. Add `--allow-write`
+for edits and `--allow-run=deno` for `unslop report`. Then run
 `unslop rules list`. In a checkout, `deno task unslop` and `deno task unslop:write` run the same
 entry with the same permissions.
 

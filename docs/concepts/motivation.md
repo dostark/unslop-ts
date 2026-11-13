@@ -55,7 +55,7 @@ project's README and documentation in November 2026.
 | ----------------------- | ------------------------------------------ | -------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | Hosts                   | `deno lint`, ESLint, Oxlint                | Oxlint                                             | Oxlint                                                    | its own CLI, LSP, MCP and editor integrations                                                             | the host's own rules                 |
 | Runtimes                | Deno 2.9, Node.js 24, Bun 1.4              | the Oxlint runtime                                 | the Oxlint runtime on Bun, Deno, or Node                  | Node, Bun, and Deno projects; one Rust binary                                                             | the host's own                       |
-| Distribution            | JSR package and a CLI                      | vendored copy, no package                          | npm package                                               | one Rust binary via npm or cargo                                                                          | package                              |
+| Distribution            | package and a CLI (JSR release pending)    | vendored copy, no package                          | npm package                                               | one Rust binary via npm or cargo                                                                          | package                              |
 | Rule set                | 44                                         | 19 generic plus an Effect group                    | anti-slop plus extras, and some type-aware standard rules | about 70 named rules with `error`/`warn`/`off` severities, per-path overrides, and declarative rule packs | hundreds, in the plugins you install |
 | Whole-repository checks | 8 checks                                   | none                                               | 2 opt-in duplicate checks                                 | the core strength: unused code, duplication, cycles, boundaries, and health from one graph                | plugin-dependent                     |
 | Health report           | schema 2 report in the same package        | none                                               | none                                                      | a scored report with hotspots and history                                                                 | plugin-dependent                     |
@@ -119,8 +119,8 @@ and [Metrics methodology](../metrics_methodology.md) records every known differe
 4. **Governance.** Presets, scopes, profiles, selection variables, parked opt-in rules with a
    required reason, per-package ceilings, edits that refuse an unsupported control, and a migration
    that never overwrites an input.
-5. **Distribution as a package.** No vendoring step and no copy to keep in sync; the CLI installs
-   from JSR.
+5. **Distribution as a package.** No vendoring step and no copy to keep in sync; the CLI is one
+   installable entry, with the JSR release still pending.
 
 Where the others are stronger, use them. Keep `typescript-eslint` for type-aware rules and Biome or
 `deno fmt` for formatting. Keep `fallow` when you want the fastest whole-repository pass,

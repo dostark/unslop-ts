@@ -97,7 +97,9 @@ import { parseWholeTreeSettings, WHOLE_TREE_CHECKS } from "@dostark/unslop-ts/wh
 ## CLI: `@dostark/unslop-ts/cli`
 
 The `unslop` command entry. It parses arguments, loads a local project, and dispatches the read and
-write routes. Install it with `deno install --global ... jsr:@dostark/unslop-ts/cli`.
+write routes. Once the registry release is published, install it with
+`deno install --global ... jsr:@dostark/unslop-ts/cli`; until then, install `../../src/cli/unslop.ts`
+with `--config=deno.json`.
 
 ## CLI ceiling: `@dostark/unslop-ts/cli/rule_ceiling`
 
