@@ -618,7 +618,7 @@ Every engine rule runs on `deno lint`, ESLint, and Oxlint, so a rule obeys these
    passes the paths it needs.
 2. A rule reads only the `IRuleContext` subset: `sourceCode.text`, `report`, `filename`, and the
    normalized `options`. Host-specific state does not reach a rule.
-3. A rule declares `meta`, `requiresTestGlobs`, and `overlaps`. The presets, the README overlap table,
+3. A rule declares `meta`, `requiresTestGlobs`, and `overlaps`. The presets, the generated overlap table,
    and the compatibility overlay read that metadata.
 4. A rule emits the bare message and an optional hint. The host entry adds the plugin id and the docs
    link, so a message never names a host.

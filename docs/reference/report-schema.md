@@ -78,3 +78,7 @@ from captured operand bytes, and a changed diagnosed source makes the report fai
 absolute operands, supports `--` for a leading-dash path, and refuses `--out` unless the write task is
 used. Authored `limits` is optional: omission keeps the owner limit, and an empty string is preserved
 through migration and edits.
+
+The command exits with the host result: `0` when the host reports no errors, `1` when it reports at
+least one, and `2` for a usage error. A project with lint findings therefore exits `1` even though
+the report is complete.

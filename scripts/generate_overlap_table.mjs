@@ -2,10 +2,10 @@
 /**
  * @module GenerateOverlapTable
  * @path scripts/generate_overlap_table.mjs
- * @description Regenerates the README overlap table from IPluginRule.overlaps.
+ * @description Regenerates the overlap table in docs/reference/rules.md from IPluginRule.overlaps.
  *
  * Usage:
- *   node scripts/generate_overlap_table.mjs          # rewrite README
+ *   node scripts/generate_overlap_table.mjs          # rewrite the rules page
  *   node scripts/generate_overlap_table.mjs --check  # fail when stale
  */
 
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { DENO_RULE_PACK, TYPESCRIPT_RULE_PACK } from "../mod.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const README = join(ROOT, "README.md");
+const RULES_PAGE = join(ROOT, "docs", "reference", "rules.md");
 const BEGIN = "<!-- BEGIN GENERATED OVERLAPS -->";
 const END = "<!-- END GENERATED OVERLAPS -->";
 
@@ -45,17 +45,17 @@ function table() {
   return [line(header), `| ${widths.map((width) => "-".repeat(width)).join(" | ")} |`, ...rows.map(line)].join("\n");
 }
 
-const readme = readFileSync(README, "utf8");
-const start = readme.indexOf(BEGIN);
-const end = readme.indexOf(END);
-if (start < 0 || end < start) throw new Error("README has no generated-overlap markers");
-const next = `${readme.slice(0, start + BEGIN.length)}\n\n${table()}\n\n${readme.slice(end)}`;
+const page = readFileSync(RULES_PAGE, "utf8");
+const start = page.indexOf(BEGIN);
+const end = page.indexOf(END);
+if (start < 0 || end < start) throw new Error("docs/reference/rules.md has no generated-overlap markers");
+const next = `${page.slice(0, start + BEGIN.length)}\n\n${table()}\n\n${page.slice(end)}`;
 
 if (process.argv.includes("--check")) {
-  if (next !== readme) {
-    console.error("README overlap table is stale; run node scripts/generate_overlap_table.mjs");
+  if (next !== page) {
+    console.error("overlap table is stale; run node scripts/generate_overlap_table.mjs");
     process.exit(1);
   }
   process.exit(0);
 }
-writeFileSync(README, next);
+writeFileSync(RULES_PAGE, next);

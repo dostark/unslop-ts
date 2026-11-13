@@ -1,7 +1,8 @@
 # Examples
 
-Each example is an input you can copy. Run the Deno example from the repository root; the Node and
-Bun examples run from their own directory.
+Each example is an input you can copy. Run the Deno example from the repository root. The Node and
+Bun examples run from their own directory and resolve `eslint`, `typescript-eslint` and `zod` from
+the host test install, linked once from the repository root.
 
 | Path                       | Runtime   | Shows                                                                                   |
 | -------------------------- | --------- | --------------------------------------------------------------------------------------- |
@@ -23,15 +24,17 @@ deno lint --config=deno.json
 ## Node quick start
 
 ```sh
+npm ci --prefix hosts --ignore-scripts
+node hosts/link_node_modules.mjs
 cd examples/node-project
-npm install --ignore-scripts
 npx eslint sample.ts
 ```
 
 ## Bun quick start
 
 ```sh
+bun install --frozen-lockfile --ignore-scripts --cwd hosts
+node hosts/link_node_modules.mjs
 cd examples/bun-project
-bun install --ignore-scripts
 bunx eslint sample.ts
 ```

@@ -29,3 +29,6 @@ deno task unslop config print > catalog.json
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-exports
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --catalog=catalog.json --rule=unused-files
 ```
+
+`config print` emits the `wholeTree` section only when the configuration enables a whole-tree rule.
+A project that enables none keeps the plugin rules but has no whole-tree checks to run.

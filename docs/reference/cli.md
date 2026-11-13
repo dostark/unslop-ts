@@ -43,23 +43,24 @@ entry with the same permissions.
 
 ### Command examples
 
-These examples run in a checkout of this repository. Each line uses the task whose permissions it
-needs. The `migrate` example assumes a version 1 project and writes a separate output name so it cannot
+These examples run from the repository root in a checkout of this repository. Each line uses the
+task whose permissions it needs. The `demo/...` lines select the example plugin with `--plugin`;
+`config schema` is static and takes no plugin. The `migrate` example assumes a version 1 project and writes a separate output name so it cannot
 clobber a live version 2 file.
 
 ```sh
 deno task unslop rules list --format=json
-deno task unslop rules show demo/max-params --format=json
-deno task unslop rules enable demo/no-boolean-assert --dry-run
-deno task unslop rules disable demo/no-chained-type-assertions --reason=unused --dry-run
-deno task unslop rules set demo/max-params max=4 --dry-run
-deno task unslop rules unset demo/max-params max --dry-run
+deno task unslop rules show demo/max-params --plugin=./examples/lint_plugin.ts --format=json
+deno task unslop rules enable demo/no-boolean-assert --plugin=./examples/lint_plugin.ts --dry-run
+deno task unslop rules disable demo/no-chained-type-assertions --plugin=./examples/lint_plugin.ts --reason=unused --dry-run
+deno task unslop rules set demo/max-params max=4 --plugin=./examples/lint_plugin.ts --dry-run
+deno task unslop rules unset demo/max-params max --plugin=./examples/lint_plugin.ts --dry-run
 deno task unslop presets list --format=json
 deno task unslop presets show unslop:strict --format=json
-deno task unslop config validate
-deno task unslop config print
+deno task unslop config validate --plugin=./examples/lint_plugin.ts
+deno task unslop config print --plugin=./examples/lint_plugin.ts
 deno task unslop config schema
-deno task unslop:write rules set demo/max-params max=3
+deno task unslop:write rules set demo/max-params max=3 --plugin=./examples/lint_plugin.ts
 deno task unslop:write migrate --descriptor=examples/unslop.project.ts --from=catalog.json --out=unslop.migrated.config.json --layout-out=layout.json
 deno task unslop:report report --format=json src
 deno task unslop:report report --format=markdown src

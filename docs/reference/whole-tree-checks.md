@@ -32,6 +32,10 @@ deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project desc
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=unused-exports --parity --fail
 ```
 
+The project configuration must enable the check: add the whole-tree rule to the configuration with
+a `level` and its options. A project that enables no whole-tree rule has no `wholeTree` section, and
+the command exits `2` with a message naming it.
+
 | Flag                     | Effect                                                                                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--all`                  | Broad report. Drops the trusted-only exemptions, and prints the directories with the most findings.                                                             |
