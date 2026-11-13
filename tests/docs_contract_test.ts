@@ -158,12 +158,12 @@ async function countMissingJsdoc(entry: string): Promise<number> {
     args: ["doc", "--lint", entry],
     cwd: ROOT,
     clearEnv: true,
+    env: { NO_COLOR: "1" },
     stdout: "piped",
     stderr: "piped",
   });
   const output = await command.output();
-  const text = `${new TextDecoder().decode(output.stdout)}${new TextDecoder().decode(output.stderr)}`;
-  const clean = text.replace(/\x1b\[[0-9;]*m/g, "");
+  const clean = `${new TextDecoder().decode(output.stdout)}${new TextDecoder().decode(output.stderr)}`;
   let count = 0;
   for (const block of clean.split("error[missing-jsdoc]").slice(1)) {
     const location = /-->\s+(\S+):(\d+):(\d+)/.exec(block);
