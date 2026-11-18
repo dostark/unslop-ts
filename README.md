@@ -27,7 +27,7 @@ previous attempt. The code compiles and the tests pass, so nothing reports it.
 Ordinary linters check form and known bug classes, and they remain the right tool for both.
 `unslop-ts` checks evidence and signal, and adds the checks a per-file linter cannot make: unused
 exports and files, duplicate types, constants, and blocks, repeated literals, and optionality that
-drifted from its call sites. It runs the same 44 rules and 8 checks under `deno lint`, ESLint, and
+drifted from its call sites. It runs the same 44 rules and 9 checks under `deno lint`, ESLint, and
 Oxlint — as a native `Deno.lint.Plugin` on Deno, and as a plugin on Node and Bun — and ships a
 health report, so one vocabulary covers every runtime in a mixed repository.
 
@@ -78,6 +78,29 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 - [Contributing](CONTRIBUTING.md) — setup and rule authoring.
 - [Security](SECURITY.md) — reporting and trust model.
 - [Changelog](CHANGELOG.md) — released changes.
+
+## Import-cycle reporting
+
+`import-cycles` reports every strongly connected component of the import graph: its member files, its internal
+edges, one shortest cycle that starts and ends at the smallest member, a stable `cyc-` id, and a kind of `runtime`,
+`type-only` or `mixed`. It reads the `wholeTree.importCycles` section and runs through the whole-tree CLI:
+
+```sh
+deno run -A src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=import-cycles
+```
+
+The flags are `--format=text|json|sarif`, `--min-files`, `--include-self`, `--include-type-only`, `--top`,
+`--trace=<path>`, `--baseline=<path>`, `--fail-on-new`, `--fail-on-stale`, `--update-baseline` and `--fail`.
+The JSON document carries `version`, `truncated`, `totals`, `graph` and `cycles`, plus a `baseline` block when a
+baseline runs. SARIF writes one `unslop/import-cycle` result per cycle with a location per member file and the cycle
+id in `properties.cycleId`. The text report prints the runtime, type-only and mixed counts, the largest cycle and
+each finding.
+
+A committed baseline holds `{ version, allowed_unresolved, cycles }` and fails a runtime cycle that it does not
+list, or one whose member set changed. Type-only and mixed cycles stay advisory. `allowed_unresolved` names each
+reviewed unresolved reference with a reason, so the gate never certifies a cycle-free repository while an import can
+hide an edge. The report honours `--top`, a 1,000-row cap and an 8 MiB cap, and it never prints source text. See
+[Whole-tree checks](docs/reference/whole-tree-checks.md#import-cycles).
 
 ## License
 

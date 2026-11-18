@@ -204,6 +204,17 @@ so that a package can expose its public interface from one place.
 
 The engine has no rule for the layout of named imports. Let the formatter wrap them.
 
+### Import Cycles {#import-cycles}
+
+A runtime cycle is a group of files that import each other, so module initialization can loop. `import-cycles`
+reports every cycle with its members and one shortest path, so the fix is a concrete break rather than a guess.
+Break the cycle; do not add an indirection that hides it.
+
+Type-only and mixed cycles are advisory: TypeScript erases a type import, so such a cycle is a design signal, not a
+runtime risk. The gate fails on a new or grown runtime cycle against a committed baseline. `allowed_unresolved`
+records each reviewed unresolved import with a reason, and the gate fails on any reference that the list does not
+cover, so an incomplete graph never reads as a clean one.
+
 ## No Magic Values {#no-magic-values}
 
 A value that carries meaning needs a name.

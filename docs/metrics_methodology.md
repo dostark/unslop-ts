@@ -514,6 +514,37 @@ Anonymous classes remain syntactic. The report exposes `class_analysis.total`, `
 fields, and text names unavailable method analysis. A missing typed method analysis is not a clean Feature Envy result.
 A receiver whose declared type is a union of classes counts for each of them. No TypeScript type checker is run.
 
+## Import cycles {#import-cycles}
+
+A cycle is a strongly connected component (SCC) of the import graph: a set of files where each file reaches every
+other one. The analysis runs one iterative Tarjan pass over the union graph, so the cost is linear in the edges. A
+component of one file counts only as a self-import, and only under `includeSelf`.
+
+- **Kind.** Project the SCC onto its runtime edges. If that subgraph stays strongly connected, the cycle is
+  `runtime`, and module initialization can loop. Otherwise project onto the type edges: if that subgraph stays
+  connected, the cycle is `type-only`, because type imports are erased. A cycle that needs both a runtime edge and a
+  type edge to close is `mixed`.
+- **Canonical path.** Take the lexicographically smallest member as the root and find a shortest cycle through it
+  inside the SCC, tie-broken by the smallest file sequence. The stored path starts and ends at the root and is capped
+  at 64 nodes; the member list is never truncated.
+- **Stable id.** `cyc-` plus 16 hex characters of a 64-bit FNV-1a hash over the sorted member paths, joined by a
+  newline. A line move keeps the id, and a change of membership changes it, because growth is a new risk. The hash is
+  synchronous, so the health report stays synchronous.
+- **Health metrics.** `vital_signs.cycles.sccs` keeps the fallow-compatible runtime count, which a mixed SCC also
+  contributes to. `runtime_sccs`, `type_only_sccs` and `mixed_sccs` classify the findings; `files` counts the unique
+  files in runtime cycles; `edges` counts the unique internal runtime edges; `largest_files` is the largest runtime
+  SCC; `file_share` is `files / code_files`; and `per_thousand` stays `runtime_sccs / code_files * 1000`. The cycle
+  score signal and the score formula do not change, and an incomplete graph marks that signal unavailable.
+- **Baseline.** The committed file holds `{ version, allowed_unresolved, cycles }` with no timestamp and no tool
+  version. Only runtime cycles enter it, each with its stable id and sorted members. The gate reports a cycle that the
+  file does not list as new, and one that shares a file with an unmatched entry as changed. A baseline entry that no
+  longer exists is stale and advisory unless `failOnStale` turns it into a failure.
+- **Allowlist.** Each entry names a specifier, its source file and a reason. The gate fails on any unresolved
+  reference outside the list and on any measured unresolved count above the list size, so the list may shrink but not
+  grow without a reviewed edit.
+- **Comparison with fallow.** fallow reports a cycle count, not members or paths. The `sccs` key keeps that number
+  comparable, while the findings and the three classification counts are the unslop extension.
+
 ## Limitations
 
 The measurement is syntax-only. The engine does not expand macros, evaluate types, follow generated code or
