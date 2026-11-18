@@ -67,7 +67,7 @@ type-safety rules are reimplementations; the licence text is not copied here.
   test runner helper.
 - `src/rules/` — rule implementations, option schemas, metadata, and the two packs. `src/rules/deno/`
   holds the Deno pack. Every pack entry carries the rule's `meta`.
-- `src/rules/whole_tree/` — the eight whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
+- `src/rules/whole_tree/` — the nine whole-tree checks, their option schemas, and `WHOLE_TREE_CHECKS`
   descriptors (metadata, controls, host command). The Deno-only entry `@dostark/unslop-ts/whole-tree`
   exports the duplicate, duplicate-code, constant-restatement, optional-parameter, unused-export, and
   magic-literal checkers so a host script can call them in-process.

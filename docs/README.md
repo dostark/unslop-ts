@@ -15,7 +15,7 @@ This is the document index for the package. The root `README.md` is the GitHub l
 - [Configuration](reference/config.md) — every configuration field.
 - [Command line](reference/cli.md) — every command group and flag.
 - [Rules and presets](reference/rules.md) — rule ids, categories, presets, options.
-- [Whole-tree checks](reference/whole-tree-checks.md) — the eight checks.
+- [Whole-tree checks](reference/whole-tree-checks.md) — the nine checks.
 - [Report schema](reference/report-schema.md) — report and health fields.
 - [Style guide](style_guide.md) — the rule guide.
 - [Metrics methodology](metrics_methodology.md) — the metric formulas.

@@ -1,7 +1,7 @@
 /**
  * @module WholeTreeChecks
  * @path src/rules/whole_tree/checks.ts
- * @description Engine descriptors of the eight whole-tree checks: metadata, option schema, controls, and host command.
+ * @description Engine descriptors of the nine whole-tree checks: metadata, option schema, controls, and host command.
  * @architectural-layer Shared
  * @dependencies [zod]
  * @related-files [src/rules/whole_tree/options.ts, src/config/descriptor.ts, src/rules/meta.ts]
@@ -15,6 +15,7 @@ import {
   DuplicateCodeSettingsSchema,
   DuplicateConstantOptionsSchema,
   DuplicateTypeOptionsSchema,
+  ImportCyclesSettingsSchema,
   MagicLiteralOptionsSchema,
   OptionalParamsSettingsSchema,
   UnusedExportsSettingsSchema,
@@ -30,7 +31,8 @@ export type WholeTreeCheckKey =
   | "unused-exports"
   | "unused-files"
   | "optional-params"
-  | "duplicate-code";
+  | "duplicate-code"
+  | "import-cycles";
 
 /** One whole-tree check that a host script runs in process. */
 export interface IWholeTreeCheck {
@@ -46,6 +48,7 @@ const CLI_SEGMENTS = ["src", "cli", "whole_tree.ts"] as const;
 const CLI_PATH = CLI_SEGMENTS.join("/");
 const CATALOG_ARGUMENT = "--catalog=<catalog>";
 const UNUSED_EXPORTS_FAIL = "--fail";
+const IMPORT_CYCLES_FAIL = "--fail";
 const OPTIONAL_PARAMS_FAIL = "--fail";
 const OPTIONAL_PARAMS_STAGED = "--staged";
 const ERROR_MODE = "error";
@@ -95,11 +98,21 @@ const OPTIONAL_PARAMS_CONTROLS: IRuleControls = {
   },
 };
 
+/** The import-cycles check warns; a host adds --fail to make a runtime cycle fatal. */
+const IMPORT_CYCLES_CONTROLS: IRuleControls = {
+  editable: ["options"],
+  fixedLevel: null,
+  fixedScope: null,
+  fixedInclude: null,
+  fixedExclude: null,
+  hostModes: { [DEFAULT_HOST_MODE]: WARN_MODE, [IMPORT_CYCLES_FAIL]: ERROR_MODE },
+};
+
 function hostCommand(rule: WholeTreeCheckKey): readonly string[] {
   return ["deno", "run", "-A", CLI_PATH, CATALOG_ARGUMENT, `--rule=${rule}`];
 }
 
-/** The eight whole-tree checks, in guide order. */
+/** The nine whole-tree checks, in guide order. */
 export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeCheck>> = {
   "duplicate-type": {
     meta: {
@@ -202,5 +215,18 @@ export const WHOLE_TREE_CHECKS: Readonly<Record<WholeTreeCheckKey, IWholeTreeChe
     optionSchema: DuplicateCodeSettingsSchema,
     controls: FIXED_ERROR_CONTROLS,
     command: hostCommand("duplicate-code"),
+  },
+  "import-cycles": {
+    meta: {
+      description: "A set of files that import each other in a cycle.",
+      category: "imports",
+      docs: "#imports",
+      preset: "opt-in",
+      limits:
+        "Relative and import-map imports resolve inside the walked root. A computed dynamic import, a tsconfig path alias, and a package export resolve to no edge.",
+    },
+    optionSchema: ImportCyclesSettingsSchema,
+    controls: IMPORT_CYCLES_CONTROLS,
+    command: hostCommand("import-cycles"),
   },
 };

@@ -86,7 +86,7 @@ import { createMeasurementContext, functionUnits } from "@dostark/unslop-ts/metr
 
 ## Whole-tree: `@dostark/unslop-ts/whole-tree`
 
-The eight whole-tree checks as library functions, for a host script that calls them in-process.
+The nine whole-tree checks as library functions, for a host script that calls them in-process.
 
 ```ts
 import { parseWholeTreeSettings, WHOLE_TREE_CHECKS } from "@dostark/unslop-ts/whole-tree";

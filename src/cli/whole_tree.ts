@@ -16,13 +16,15 @@
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-type
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=duplicate-constant
  *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=magic-literals [--include-tests]
+ *   deno run -A src/cli/whole_tree.ts --catalog=<path> --rule=import-cycles [--format=text|json]
+ *     [--min-files=<n>] [--include-self] [--include-type-only] [--top=<n>] [--fail]
  */
 
 import { flagValue } from "./flags.ts";
 import { fromFileUrl, relative } from "@std/path";
 import { CliError } from "./error.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
-import { asJsonValue, CatalogError, type JsonValue } from "../engine/catalog.ts";
+import { asJsonRecord, asJsonValue, CatalogError, type ICatalogScopes, type JsonValue } from "../engine/catalog.ts";
 import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
 import {
@@ -58,9 +60,13 @@ import {
 } from "../rules/whole_tree/duplicate_views.ts";
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
 import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
+import type { ICycleAnalysis, ICycleFinding } from "../rules/whole_tree/import_cycles.ts";
+import { collectCycleAnalysis } from "../report/health.ts";
+import { DEFAULT_TOP_CYCLES } from "../report/constants.ts";
 import {
   type IConstantRestatementSettings,
   type IDuplicateCodeSettings,
+  type IImportCyclesSettings,
   type IOptionalParamsSettings,
   type IUnusedExportsSettings,
   type IUnusedFilesManifestSettings,
@@ -70,6 +76,7 @@ import {
 } from "../rules/whole_tree/options.ts";
 
 const MAGIC_RULE = "magic-literals";
+const IMPORT_CYCLES_RULE = "import-cycles";
 const RULES: readonly string[] = [
   "constant-restatement",
   "unused-exports",
@@ -78,9 +85,27 @@ const RULES: readonly string[] = [
   "duplicate-code",
   MAGIC_RULE,
   ...DUPLICATE_RULES,
+  IMPORT_CYCLES_RULE,
 ];
 const USAGE_EXIT = 2;
 const GROUP_FLAG = "--group=";
+const TEXT_FORMAT = "text";
+const JSON_FORMAT = "json";
+const REPORT_FORMATS: readonly TReportFormat[] = [TEXT_FORMAT, JSON_FORMAT];
+const FAIL_FLAG = "--fail";
+const INCLUDE_SELF_FLAG = "--include-self";
+const INCLUDE_TYPE_ONLY_FLAG = "--include-type-only";
+
+/** A report format a whole-tree check can write. */
+type TReportFormat = typeof TEXT_FORMAT | typeof JSON_FORMAT;
+
+/** The report format the command line asks for, or the text default. */
+function parseReportFormat(args: readonly string[]): TReportFormat {
+  const format = flagValue(args, "format") ?? TEXT_FORMAT;
+  const known = REPORT_FORMATS.find((candidate) => candidate === format);
+  if (known === undefined) exitWithUsage(`--format must be ${REPORT_FORMATS.join(" or ")}.`);
+  return known;
+}
 
 function parseMinLines(value: string | undefined): number {
   if (value === undefined) return 1;
@@ -94,6 +119,15 @@ function parseTop(value: string | undefined): number {
   const top = Number(value);
   if (!Number.isInteger(top) || top < 1) return exitWithUsage("--top must be a positive integer.");
   return top;
+}
+
+/** A positive integer flag, or the fallback when the command line omits it. */
+function positiveIntFlag(args: readonly string[], name: string, fallback: number): number {
+  const raw = flagValue(args, name);
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) return exitWithUsage(`--${name} must be a positive integer.`);
+  return value;
 }
 
 async function runConstantRestatement(settings: IConstantRestatementSettings): Promise<void> {
@@ -370,8 +404,7 @@ interface IDuplicateRun {
 }
 
 function parseDuplicateRun(settings: IDuplicateCodeSettings, args: readonly string[]): IDuplicateRun {
-  const format = flagValue(args, "format") ?? "text";
-  if (format !== "text" && format !== "json") exitWithUsage("--format must be text or json.");
+  const format = parseReportFormat(args);
   const updating = args.includes("--update-baseline");
   const surveying = flagValue(args, "max-gap-lines") !== undefined;
   if (updating && settings.baseline === null) {
@@ -385,7 +418,7 @@ function parseDuplicateRun(settings: IDuplicateCodeSettings, args: readonly stri
       view: parseView(flagValue(args, "by")) ?? exitWithUsage("--by must be pair, file, or block."),
       minLines: parseMinLines(flagValue(args, "min-lines")),
     },
-    json: format === "json",
+    json: format === JSON_FORMAT,
     updating,
     surveying,
   };
@@ -415,6 +448,129 @@ async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly
   console.error(`\n❌ ${failed.length} scan group(s) fail the duplication check: ${failed.join(", ")}`);
   if (!run.listing.verbose && !run.json) console.error("  Add `--verbose` to list every clone.");
   Deno.exit(1);
+}
+
+const REPORT_VERSION = 1;
+
+/** The catalog fields that select the files a scan reads. */
+interface ICycleScan {
+  readonly scopes: ICatalogScopes;
+  readonly ignoreGlobs: readonly string[];
+}
+
+function recordOrEmpty(value: JsonValue | undefined): Record<string, JsonValue> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? asJsonRecord(value) : {};
+}
+
+function stringList(value: JsonValue | undefined): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+/** The catalog scopes and ignore globs of one cycle scan. A legacy catalog without them scans every file. */
+function cycleScanOf(catalog: JsonValue): ICycleScan {
+  const root = recordOrEmpty(catalog);
+  const scopes = recordOrEmpty(root.scopes);
+  const ignore = Array.isArray(root.ignore) ? root.ignore : [];
+  return {
+    scopes: { test: stringList(scopes.test), fixture: stringList(scopes.fixture) },
+    ignoreGlobs: ignore.map((entry) => recordOrEmpty(entry).glob).filter((glob): glob is string =>
+      typeof glob === "string"
+    ),
+  };
+}
+
+/** The summary lines of one cycle report, shared by the text and the JSON view. */
+function cycleSummaryLines(analysis: ICycleAnalysis): string[] {
+  const { totals, graph } = analysis;
+  const lines = [
+    `${totals.runtime_sccs} runtime cycle(s) · ${totals.files} file(s) in runtime cycles · ` +
+    `${totals.type_only_sccs} type-only cycle(s) · ${totals.mixed_sccs} mixed cycle(s)`,
+    `${graph.runtime_edges} runtime edge(s) · ${graph.type_edges} type edge(s) · ${graph.code_files} code file(s)`,
+  ];
+  if (graph.complete) {
+    lines.push("Graph complete within the scan scope.");
+    return lines;
+  }
+  lines.push(
+    `Graph incomplete · ${graph.unresolved} unresolved reference(s); the gate cannot certify a cycle-free run.`,
+  );
+  for (const reference of graph.unresolved_refs) {
+    lines.push(`  ${reference.from} imports '${reference.specifier}'`);
+  }
+  return lines;
+}
+
+/** The lines of one cycle finding. */
+function findingLines(finding: ICycleFinding): string[] {
+  const lines = [
+    `${finding.kind} ${finding.id} · ${finding.size} file(s) · ${finding.edge_count} edge(s)`,
+    `  members: ${finding.files.join(", ")}`,
+    `  path: ${finding.path.join(" -> ")}${finding.path_truncated ? " (truncated)" : ""}`,
+  ];
+  if (finding.edges.length > 0) {
+    lines.push("  edges:");
+    for (const edge of finding.edges) lines.push(`    ${edge.from} -> ${edge.to} (${edge.kind}, ${edge.form})`);
+  }
+  return lines;
+}
+
+/** The text view of one cycle report. */
+function printCycleReport(analysis: ICycleAnalysis, top: number): void {
+  console.log("UNSLOP IMPORT CYCLES");
+  console.log("====================");
+  for (const line of cycleSummaryLines(analysis)) console.log(line);
+  if (analysis.cycles.length === 0) {
+    console.log("\n✅ No import cycles found.");
+    return;
+  }
+  const shown = analysis.cycles.slice(0, top);
+  console.log(`\n${shown.length} shown of ${analysis.cycles.length} cycle(s):`);
+  for (const finding of shown) console.log([...findingLines(finding), ""].join("\n"));
+}
+
+/** The JSON view of one cycle report. */
+interface ICycleJsonReport {
+  readonly version: number;
+  readonly truncated: boolean;
+  readonly totals: ICycleAnalysis["totals"];
+  readonly graph: ICycleAnalysis["graph"];
+  readonly cycles: readonly ICycleFinding[];
+}
+
+/** The JSON view of one cycle report; `truncated` says whether `--top` hid a row. */
+function cycleJsonReport(analysis: ICycleAnalysis, top: number): ICycleJsonReport {
+  return {
+    version: REPORT_VERSION,
+    truncated: analysis.cycles.length > top,
+    totals: analysis.totals,
+    graph: analysis.graph,
+    cycles: analysis.cycles.slice(0, top),
+  };
+}
+
+async function runImportCycles(
+  settings: IImportCyclesSettings,
+  input: ILoadedInput,
+  args: readonly string[],
+): Promise<void> {
+  const format = parseReportFormat(args);
+  const options = {
+    minFiles: positiveIntFlag(args, "min-files", settings.minFiles),
+    includeSelf: settings.includeSelf || args.includes(INCLUDE_SELF_FLAG),
+    includeTypeOnly: settings.includeTypeOnly || args.includes(INCLUDE_TYPE_ONLY_FLAG),
+  };
+  const scan = cycleScanOf(input.catalog);
+  const analysis = await collectCycleAnalysis(
+    { rootPath: input.rootPath, ignoreGlobs: scan.ignoreGlobs, scopes: scan.scopes },
+    options,
+  );
+  const top = positiveIntFlag(args, "top", DEFAULT_TOP_CYCLES);
+  if (format === JSON_FORMAT) console.log(JSON.stringify(cycleJsonReport(analysis, top), null, 2));
+  else printCycleReport(analysis, top);
+  if (args.includes(FAIL_FLAG) && analysis.totals.runtime_sccs > 0) {
+    console.error(`\n❌ ${analysis.totals.runtime_sccs} runtime cycle(s) found — break the cycle.`);
+    Deno.exit(1);
+  }
 }
 
 const OPTIONAL_SECTIONS: ReadonlyArray<readonly [TOptionalViolationKind, string, boolean]> = [
@@ -621,8 +777,14 @@ function inputCount(args: readonly string[]): number {
   return ["catalog", "descriptor", "plugin"].filter((name) => flagValue(args, name) !== undefined).length;
 }
 
+/** The compiled or legacy catalog, and the project root that a scan walks. */
+interface ILoadedInput {
+  readonly catalog: JsonValue;
+  readonly rootPath: string;
+}
+
 /** Loads either the legacy catalog or a compiled descriptor, with exactly one explicit input. */
-async function loadCatalog(args: readonly string[]): Promise<JsonValue> {
+async function loadCatalog(args: readonly string[]): Promise<ILoadedInput> {
   if (inputCount(args) !== 1) {
     return exitWithUsage("Pass exactly one of --catalog, --descriptor, or --plugin.");
   }
@@ -633,7 +795,7 @@ async function loadCatalog(args: readonly string[]): Promise<JsonValue> {
     }
     try {
       const local = catalogPath.startsWith("file:") ? fromFileUrl(new URL(catalogPath)) : catalogPath;
-      return JSON.parse(await Deno.readTextFile(local)) as JsonValue;
+      return { catalog: JSON.parse(await Deno.readTextFile(local)) as JsonValue, rootPath: await Deno.realPath(".") };
     } catch (error) {
       return exitWithUsage(
         `Cannot read the catalog '${catalogPath}': ${error instanceof Error ? error.message : String(error)}`,
@@ -650,7 +812,10 @@ async function loadCatalog(args: readonly string[]): Promise<JsonValue> {
   try {
     const descriptor = await loadConfigDescriptor(Deno.cwd(), descriptorArg, pluginArg);
     const compiled = await readAndCompile(descriptor);
-    return asJsonValue(structuredClone(compiled.catalog));
+    return {
+      catalog: asJsonValue(structuredClone(compiled.catalog)),
+      rootPath: await Deno.realPath(fromFileUrl(descriptor.rootUrl)),
+    };
   } catch (error) {
     if (error instanceof CliError) return exitWithUsage(error.message);
     throw error;
@@ -703,13 +868,18 @@ async function runUnusedRule(settings: IWholeTreeSettings, args: readonly string
 async function main(): Promise<void> {
   const rule = flagValue(Deno.args, "rule");
   if (rule === undefined || !RULES.includes(rule)) exitWithUsage("Missing or unknown --rule.");
-  const catalog = await loadCatalog(Deno.args);
-  if (isDuplicateRule(rule)) return await runDuplicates(rule, catalog);
-  if (rule === MAGIC_RULE) return await runMagicLiterals(catalog, Deno.args.includes("--include-tests"));
-  await runSettingsRule(rule, loadSettings(catalog), Deno.args);
+  const input = await loadCatalog(Deno.args);
+  if (isDuplicateRule(rule)) return await runDuplicates(rule, input.catalog);
+  if (rule === MAGIC_RULE) return await runMagicLiterals(input.catalog, Deno.args.includes("--include-tests"));
+  await runSettingsRule(rule, loadSettings(input.catalog), Deno.args, input);
 }
 
-async function runSettingsRule(rule: string, settings: IWholeTreeSettings, args: readonly string[]): Promise<void> {
+async function runSettingsRule(
+  rule: string,
+  settings: IWholeTreeSettings,
+  args: readonly string[],
+  input: ILoadedInput,
+): Promise<void> {
   if (rule === "constant-restatement") {
     if (!settings.constantRestatement) exitWithUsage("The catalog has no wholeTree.constantRestatement section.");
     await runConstantRestatement(settings.constantRestatement);
@@ -723,6 +893,10 @@ async function runSettingsRule(rule: string, settings: IWholeTreeSettings, args:
   if (rule === "duplicate-code") {
     if (!settings.duplicateCode) exitWithUsage("The catalog has no wholeTree.duplicateCode section.");
     await runDuplicateCode(settings.duplicateCode, args);
+  }
+  if (rule === IMPORT_CYCLES_RULE) {
+    if (!settings.importCycles) exitWithUsage("The catalog has no wholeTree.importCycles section.");
+    await runImportCycles(settings.importCycles, input, args);
   }
   if (rule === "optional-params") {
     if (!settings.optionalParams) exitWithUsage("The catalog has no wholeTree.optionalParams section.");

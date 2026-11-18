@@ -41,6 +41,7 @@ const WHOLE_TREE_SECTIONS: Readonly<Record<string, string>> = {
   "unused-files": "unusedFiles",
   "constant-restatement": "constantRestatement",
   "duplicate-code": "duplicateCode",
+  "import-cycles": "importCycles",
 };
 
 type IRawSetting = z.infer<typeof RuleSettingSchema>;

@@ -12,6 +12,54 @@
 | `unused-files`         | opt-in      | A production file that no entry point reaches.                             |
 | `optional-params`      | opt-in      | An optional parameter whose optionality does not match its call sites.     |
 | `duplicate-code`       | opt-in      | Code duplication above the configured percentage in a scan group.          |
+| `import-cycles`        | opt-in      | A set of files that import each other in a cycle.                          |
+
+## Import cycles {#import-cycles}
+
+`--rule=import-cycles` reports every strongly connected component (SCC) of the import graph that reaches the
+configured minimum size. A cycle here is a real group of files, not a count: each finding names its member files,
+its internal edges, its kind, and one shortest cycle that starts and ends at the smallest member. The check reads
+the `wholeTree.importCycles` section:
+
+```json
+{ "minFiles": 2, "includeSelf": false, "includeTypeOnly": true }
+```
+
+`minFiles`, `includeSelf`, and `includeTypeOnly` are optional and default to the values shown. The check does not
+need a scan group and it starts no child process.
+
+Run it on a project the compiled descriptor names:
+
+```sh
+deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=import-cycles
+```
+
+| Flag                  | Source | Default | Effect                                                          |
+| --------------------- | ------ | ------- | --------------------------------------------------------------- |
+| `--format=text\|json` | both   | `text`  | Report renderer.                                                |
+| `--min-files=<n>`     | both   | `2`     | The smallest SCC that counts as a cycle.                        |
+| `--include-self`      | both   | `false` | Report a one-file self-import.                                  |
+| `--include-type-only` | both   | `true`  | Report type-only and mixed cycles as advisory findings.         |
+| `--top=<n>`           | CLI    | `50`    | Display rows only. The totals always count the full population. |
+| `--fail`              | CLI    | off     | Exit 1 when a runtime cycle exists.                             |
+
+A command-line flag wins over the catalog setting. A bad value exits `2` before any report.
+
+**Kinds.** Each union-graph SCC is projected onto the runtime edges and then onto the type edges. The cycle is
+`runtime` when the runtime projection alone stays strongly connected, so runtime initialization can loop. It is
+`type-only` when only the type projection stays connected, because TypeScript erases those imports. A `mixed` cycle
+needs both a runtime path and a type path, so it can loop at runtime but needs a type edge to stay closed.
+
+**Output.** The text report counts runtime, type-only, and mixed cycles, then lists each finding with its members,
+its shortest path, and every internal edge. The JSON report carries the same data under `version`, `truncated`,
+`totals`, `graph`, and `cycles`. `graph.complete` is false when an unresolved specifier or a parse failure can hide
+an edge; the report then names each unresolved reference, bounded to the first 100. Each cycle has a stable
+`cyc-` id that hashes the sorted member paths, so a line move keeps the id and a change of membership changes it.
+
+**Limits.** The graph resolves relative imports and the `imports` maps of the project configs, like the health
+report does. A computed dynamic import, a `tsconfig` path alias, and a package export resolve to no edge, and the
+report states that the graph is incomplete instead of claiming a cycle-free run. Files that the catalog classifies
+as fixtures and the paths that its `ignore` list names are not measured, as for the other whole-tree checks.
 
 ## Unused exports {#unused-exports}
 

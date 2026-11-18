@@ -81,6 +81,16 @@ Deno.test("health-graph-projections: side-effect, type, barrel, dynamic and alia
   assertEquals(forms, ["import", "re-export", "side-effect"]);
 });
 
+Deno.test("health-graph-projections: the self-import option keeps a self edge that the default drops", async () => {
+  const snapshot = await snapshotOf({
+    "src/self.ts": 'import { helper } from "./self.ts";\nexport const helper = 1;\n',
+  });
+  assertEquals(buildHealthGraph(snapshot).edges, []);
+  assertEquals(buildHealthGraph(snapshot, {}, new Set(), new Set(), { includeSelf: true }).edges, [
+    { from: "src/self.ts", to: "src/self.ts", kind: "runtime", form: "import" },
+  ]);
+});
+
 Deno.test("health-graph-projections: unresolved, external and nonliteral specifiers are attributed", async () => {
   const snapshot = await snapshotOf({
     "src/ext.ts": 'import "npm:left-pad";\nimport { x } from "./missing.ts";\n' +

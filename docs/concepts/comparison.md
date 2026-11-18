@@ -75,7 +75,7 @@ overlaps:
 
 ## Whole-tree checks and standalone tools
 
-The eight checks in [Whole-tree checks](../reference/whole-tree-checks.md) replace tools that are
+The nine checks in [Whole-tree checks](../reference/whole-tree-checks.md) replace tools that are
 usually installed separately:
 
 | Check                                                                            | Usual standalone tool                                                                       |

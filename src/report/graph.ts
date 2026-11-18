@@ -171,7 +171,7 @@ function classifySpecifier(
     }
     return null;
   }
-  return target === fromPath ? null : target;
+  return target;
 }
 
 /** The specifiers one file declares for the structural projection. */
@@ -222,11 +222,21 @@ function dynamicSourceOf(node: ILintNode): { readonly text: string | null } | nu
 }
 
 /** Builds the structural and runtime projections of one parsed snapshot. */
+/** The graph projection options. */
+export interface IGraphOptions {
+  /** Keep an edge whose target is the source file, so a self-import policy can read it. */
+  readonly includeSelf?: boolean;
+}
+
+/**
+ * The structural projection of one snapshot: edges, fan counts, and the limits of the evidence.
+ */
 export function buildHealthGraph(
   files: ReadonlyMap<string, IParsedHealthFile>,
   aliases: Readonly<Record<string, string>> = {},
   excluded: ReadonlySet<string> = new Set(),
   resources: ReadonlySet<string> = new Set(),
+  options: IGraphOptions = {},
 ): IHealthGraph {
   const known = new Set(files.keys());
   const limitations = {
@@ -242,7 +252,9 @@ export function buildHealthGraph(
     const specifiers = specifiersOf(asNode(file.tree.program), limitations);
     for (const { text, kind, form } of specifiers) {
       const target = classifySpecifier(text, path, known, excluded, resources, aliases, limitations);
-      if (target !== null) edges.push({ from: path, to: target, kind, form });
+      if (target === null) continue;
+      if (target === path && options.includeSelf !== true) continue;
+      edges.push({ from: path, to: target, kind, form });
     }
   }
   const fanOut = new Map<string, Set<string>>();

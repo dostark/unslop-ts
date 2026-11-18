@@ -228,6 +228,7 @@ const ALL_RULES = [
   "magic-literals",
   "duplicate-type",
   "duplicate-constant",
+  "import-cycles",
 ] as const;
 
 async function writeWholeTreeConfig(dir: string): Promise<void> {
@@ -238,6 +239,7 @@ async function writeWholeTreeConfig(dir: string): Promise<void> {
   config.rules["magic-literals"] = ["error", {}];
   config.rules["duplicate-type"] = ["error", {}];
   config.rules["duplicate-constant"] = ["error", {}];
+  config.rules["import-cycles"] = ["warn", {}];
   config.rules["unused-exports"] = ["warn", {
     productionRoots: ["src"],
     testSegments: ["tests"],
@@ -268,7 +270,7 @@ async function compiledCatalog(dir: string): Promise<void> {
   await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(compiled.catalog, null, 2));
 }
 
-Deno.test("v2_whole_tree_adapter_covers_six_checks", async () => {
+Deno.test("v2_whole_tree_adapter_covers_seven_checks", async () => {
   await withCliProject(async (dir) => {
     await writeWholeTreeConfig(dir);
     await compiledCatalog(dir);

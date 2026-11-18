@@ -64,7 +64,7 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 - [Configuration](docs/reference/config.md) — every version 2 field.
 - [Command line](docs/reference/cli.md) — every command group and flag.
 - [Rules and presets](docs/reference/rules.md) — rule ids, presets, options.
-- [Whole-tree checks](docs/reference/whole-tree-checks.md) — the eight checks.
+- [Whole-tree checks](docs/reference/whole-tree-checks.md) — the nine checks.
 - [Report schema](docs/reference/report-schema.md) — report and health fields.
 - [API reference](docs/reference/api.md) — package subpaths and signatures.
 - [Why unslop-ts exists](docs/concepts/motivation.md) — the problem, the niche and the lineage.

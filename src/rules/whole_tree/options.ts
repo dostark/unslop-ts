@@ -4,12 +4,13 @@
  * @description Whole-tree rule settings: the schema of a catalog's `wholeTree` section and its parser.
  * @architectural-layer Shared
  * @dependencies [zod]
- * @related-files [src/rules/whole_tree/constant_restatement.ts, src/cli/whole_tree.ts]
+ * @related-files [src/rules/whole_tree/constant_restatement.ts, src/rules/whole_tree/import_cycles.ts, src/cli/whole_tree.ts]
  */
 
 import { z } from "zod";
 import { CatalogError } from "../../engine/catalog.ts";
 import { RegexSourceSchema } from "../../engine/regex_option.ts";
+import { DEFAULT_MIN_CYCLE_FILES } from "./import_cycles.ts";
 
 const WHOLE_TREE_KEY = "wholeTree";
 
@@ -78,6 +79,35 @@ export interface IMagicLiteralOptionsInput {
   statusLiterals?: string[];
   definitionFileSuffixes?: string[];
   testScaffoldPattern?: string;
+}
+
+/** Options of the import-cycles check. */
+export interface IImportCyclesSettings {
+  /** The smallest SCC that counts as a cycle. */
+  minFiles: number;
+  /** Report a one-file self-import. */
+  includeSelf: boolean;
+  /** Report type-only and mixed cycles as well as runtime cycles. */
+  includeTypeOnly: boolean;
+  /** The production roots the gate uses. The report may walk more. */
+  gateRoots: string[];
+  /** The committed baseline path, or null for a count-only report. */
+  baseline: string | null;
+  /** Fail on a cycle that the baseline does not list. */
+  failOnNew: boolean;
+  /** Fail on a baseline entry that no longer exists. */
+  failOnStale: boolean;
+}
+
+/** Options of the import-cycles check before defaults apply. */
+export interface IImportCyclesSettingsInput {
+  minFiles?: number;
+  includeSelf?: boolean;
+  includeTypeOnly?: boolean;
+  gateRoots?: string[];
+  baseline?: string | null;
+  failOnNew?: boolean;
+  failOnStale?: boolean;
 }
 
 /** Options of the optional-parameter check. */
@@ -212,6 +242,7 @@ interface IWholeTreeSettingsInput {
   constantRestatement?: IConstantRestatementSettings;
   magicLiterals?: IMagicLiteralOptionsInput;
   duplicateCode?: IDuplicateCodeSettingsInput;
+  importCycles?: IImportCyclesSettingsInput;
 }
 
 /** The catalog `wholeTree` section. */
@@ -222,6 +253,7 @@ export interface IWholeTreeSettings {
   constantRestatement?: IConstantRestatementSettings;
   magicLiterals?: IMagicLiteralOptions;
   duplicateCode?: IDuplicateCodeSettings;
+  importCycles?: IImportCyclesSettings;
 }
 
 /** One allow entry as the schema yields it. */
@@ -369,6 +401,17 @@ export const DuplicateCodeSettingsSchema: z.ZodType<IDuplicateCodeSettings, IDup
   ),
 }).strict();
 
+/** Options of the import-cycles check. */
+export const ImportCyclesSettingsSchema: z.ZodType<IImportCyclesSettings, IImportCyclesSettingsInput> = z.object({
+  minFiles: z.number().int().positive().default(DEFAULT_MIN_CYCLE_FILES),
+  includeSelf: z.boolean().default(false),
+  includeTypeOnly: z.boolean().default(true),
+  gateRoots: z.array(z.string()).default([]),
+  baseline: z.string().min(1).nullable().default(null),
+  failOnNew: z.boolean().default(true),
+  failOnStale: z.boolean().default(false),
+}).strict();
+
 /** Schema of the catalog `wholeTree` section. Each section is optional, and an unknown key is rejected. */
 const WholeTreeSettingsSchema: z.ZodType<IWholeTreeSettings, IWholeTreeSettingsInput> = z.object({
   optionalParams: OptionalParamsSettingsSchema,
@@ -377,6 +420,7 @@ const WholeTreeSettingsSchema: z.ZodType<IWholeTreeSettings, IWholeTreeSettingsI
   constantRestatement: ConstantRestatementSettingsSchema,
   magicLiterals: MagicLiteralOptionsSchema,
   duplicateCode: DuplicateCodeSettingsSchema,
+  importCycles: ImportCyclesSettingsSchema,
 }).partial().strict();
 
 const DuplicateAllowEntrySchema: z.ZodType<IDuplicateAllow, IDuplicateAllow> = z.object({

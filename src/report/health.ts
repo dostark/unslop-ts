@@ -15,7 +15,13 @@ import { measureFunction, moduleCyclomaticOf, ownedLineNumbers } from "../metric
 import type { IMetricOptions, MetricVariant } from "../metrics/types.ts";
 import type { IDuplicateCodeSettings } from "../rules/whole_tree/options.ts";
 import type { TJscpdRunner } from "../rules/whole_tree/duplicate_code.ts";
-import { couplingSignalOf, runtimeCyclesOf } from "../rules/whole_tree/import_cycles.ts";
+import {
+  analyzeCycles,
+  couplingSignalOf,
+  type ICycleAnalysis,
+  type ICycleOptions,
+  runtimeCyclesOf,
+} from "../rules/whole_tree/import_cycles.ts";
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
 import { coverageOfUnit, crapBandOf, crapOf, type RuntimeReach } from "./crap.ts";
 import { collectChurn, hotspotScoresOf, type IHotspotScore } from "./churn.ts";
@@ -100,11 +106,15 @@ export interface IHealthSettings {
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
-/** Everything one collection run reads. */
-export interface ICollectHealthInput {
+/** The repository selection that one scan reads. */
+export interface IScanInput {
   readonly rootPath: string;
   readonly ignoreGlobs: readonly string[];
   readonly scopes: ICatalogScopes;
+}
+
+/** Everything one collection run reads. */
+export interface ICollectHealthInput extends IScanInput {
   readonly settings: IHealthSettings;
   readonly sort: HealthSortKey;
   /** The raw LCOV text, or null when the run has no coverage input. */
@@ -209,7 +219,7 @@ interface IMeasuredFinding extends IHealthFinding {
 }
 
 /** A source file that the walk excludes, with its reason. */
-function isExcluded(relativePath: string, input: ICollectHealthInput): boolean {
+function isExcluded(relativePath: string, input: IScanInput): boolean {
   if (relativePath.endsWith(".d.ts")) return true;
   if (classifyPath(relativePath, input.scopes) === "fixture") return true;
   return matchesAnyGlob(relativePath, input.ignoreGlobs);
@@ -217,7 +227,7 @@ function isExcluded(relativePath: string, input: ICollectHealthInput): boolean {
 
 /** The source files of one root, sorted, without excluded paths or directories. */
 async function sourceFiles(
-  input: ICollectHealthInput,
+  input: IScanInput,
 ): Promise<{ files: string[]; excludedPaths: string[]; resourcePaths: string[] }> {
   const files: string[] = [];
   const excludedPaths: string[] = [];
@@ -530,7 +540,7 @@ interface ISnapshot {
 }
 
 /** Parses every measured file once, attributing each failure. */
-async function parseSnapshot(input: ICollectHealthInput): Promise<ISnapshot> {
+async function parseSnapshot(input: IScanInput): Promise<ISnapshot> {
   const { files, excludedPaths, resourcePaths } = await sourceFiles(input);
   const parsed = new Map<string, IParsedHealthFile>();
   const errors: IHealthError[] = [];
@@ -551,6 +561,24 @@ async function parseSnapshot(input: ICollectHealthInput): Promise<ISnapshot> {
     excludedPaths: new Set(excludedPaths),
     resourcePaths: new Set(resourcePaths),
   };
+}
+
+/** The import cycle analysis of one repository, over the snapshot and graph that the health report reads. */
+export async function collectCycleAnalysis(
+  input: IScanInput,
+  options: ICycleOptions,
+): Promise<ICycleAnalysis> {
+  const { parsed, errors, excludedPaths, resourcePaths } = await parseSnapshot(input);
+  const graph = buildHealthGraph(parsed, await readImportAliases(input.rootPath), excludedPaths, resourcePaths, {
+    includeSelf: options.includeSelf,
+  });
+  // A parse failure can hide an edge, so it counts as an incomplete graph.
+  return analyzeCycles(graph.edges, {
+    complete: graph.complete && errors.length === 0,
+    code_files: parsed.size,
+    unresolved: graph.limitations.unresolved,
+    unresolved_refs: graph.limitations.unresolved_refs,
+  }, options);
 }
 
 /** Every measured function of one root, with the failures and exclusions attributed. */

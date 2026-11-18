@@ -29,7 +29,7 @@ interface IDescriptor {
 }
 
 const PACK_RULE_COUNT = 44;
-const WHOLE_TREE_CHECK_COUNT = 8;
+const WHOLE_TREE_CHECK_COUNT = 9;
 const DESCRIPTOR_COUNT = PACK_RULE_COUNT + WHOLE_TREE_CHECK_COUNT;
 const GUIDE_ANCHOR = /^#[a-z0-9-]+$/;
 const EMPTY = 0;
@@ -103,6 +103,7 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
     "unused-files": null,
     "optional-params": null,
     "duplicate-code": "error",
+    "import-cycles": null,
   };
   for (const [id, check] of Object.entries(WHOLE_TREE_CHECKS)) {
     assertEquals(check.controls.editable, ["options"], `${id} must allow option edits only`);
@@ -118,6 +119,7 @@ Deno.test("whole_tree_checks_declare_only_option_edits_and_their_host_modes", ()
   assertEquals(WHOLE_TREE_CHECKS["unused-exports"].controls.hostModes["--fail"], "error");
   assertEquals(WHOLE_TREE_CHECKS["optional-params"].controls.hostModes["--fail"], "error");
   assertEquals(WHOLE_TREE_CHECKS["optional-params"].controls.hostModes["--staged"], "error");
+  assertEquals(WHOLE_TREE_CHECKS["import-cycles"].controls.hostModes["--fail"], "error");
 });
 
 Deno.test("every plugin rule declares requiresTestGlobs and only the test-aware rules set it", () => {

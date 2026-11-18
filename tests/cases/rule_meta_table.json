@@ -79,6 +79,12 @@
       "docs": "#import-boundaries"
     },
     {
+      "id": "import-cycles",
+      "category": "imports",
+      "preset": "opt-in",
+      "docs": "#imports"
+    },
+    {
       "id": "import-inside-statement",
       "category": "imports",
       "preset": "recommended",
