@@ -78,16 +78,6 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 - [Security](SECURITY.md) — reporting and trust model.
 - [Changelog](CHANGELOG.md) — released changes.
 
-## Preserved anchors
-
-## Unused exports {#unused-exports}
-
-See [Whole-tree checks](docs/reference/whole-tree-checks.md#unused-exports).
-
-## Unused files from the manifests {#unused-files-manifest}
-
-See [Whole-tree checks](docs/reference/whole-tree-checks.md#unused-files-manifest).
-
 ## License
 
 MIT
