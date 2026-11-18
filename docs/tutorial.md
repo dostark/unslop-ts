@@ -15,8 +15,21 @@ Prerequisites: Deno 2.9, a project with a `deno.json`, and a copy of the `exampl
 1. Write the plugin entry. `../examples/lint_plugin.ts` imports `createUnslopProject` from
    `@dostark/unslop-ts/deno`, compiles the configuration with
    `createUnslopProject({ descriptor, config })`, and default-exports `project.plugin`.
-1. Register the entry in the project's `deno.json` with
-   `"lint": { "plugins": ["./examples/lint_plugin.ts"] }`, and run `deno lint`.
+1. Register the entry in the project's `deno.json`, add the package to its import map, and run
+   `deno lint`:
+
+   ```json
+   {
+     "imports": {
+       "@dostark/unslop-ts": "<path to the checkout>/mod.ts",
+       "@dostark/unslop-ts/deno": "<path to the checkout>/deno.ts"
+     },
+     "lint": { "plugins": ["./examples/lint_plugin.ts"] }
+   }
+   ```
+
+   The registry release is pending, so the import map points at a checkout. Replace both entries with
+   `jsr:@dostark/unslop-ts` and `jsr:@dostark/unslop-ts/deno` once the package is published.
 1. To run a subset locally, export `<NAME>_LINT_RULES`, where `<NAME>` is the plugin name in upper case
    (`demo` gives `DEMO_LINT_RULES`). The value is a list of full ids, unambiguous bare keys, or
    `tag:<tag>` selectors. The CLI `--select` and `--profile` options replace that variable for one call.
@@ -24,11 +37,12 @@ Prerequisites: Deno 2.9, a project with a `deno.json`, and a copy of the `exampl
 
 ## Verify
 
-Run `deno task unslop rules list` from the example project. The rules your configuration enables show
-as `active`, and the preset members you did not enable show as `parked` or `off`.
+Run `unslop rules list` from the example project, with the CLI installed as described in the
+[user guide](./user-guide.md#1-install). The rules your configuration enables show as `active`, and
+the preset members you did not enable show as `parked` or `off`.
 
-Run `deno lint` on the sample file. A finding prints the rule id and the source location. If no finding
-appears, the rule is not selected: check the preset expansion with `unslop presets show
+Run `deno lint` on the sample file. A finding prints the rule id and the source location. If no
+finding appears, the rule is not selected: check the preset expansion with `unslop presets show
 unslop:recommended`, or pass `--select=<rule id>` for one run.
 
 ## Next
