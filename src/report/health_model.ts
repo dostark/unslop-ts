@@ -615,7 +615,7 @@ const HealthCycleEdgeSchema = z.object({
 }).strict();
 
 /** One cycle finding as the strict report schema reads it. */
-export const HealthCycleFindingSchema: z.ZodType<ICycleFinding, ICycleFinding> = z.object({
+const HealthCycleFindingSchema: z.ZodType<ICycleFinding, ICycleFinding> = z.object({
   id: z.string().regex(/^cyc-[0-9a-f]{16}$/),
   kind: z.enum(["runtime", "type-only", "mixed"]),
   files: z.array(z.string().min(1)).min(1),

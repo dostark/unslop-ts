@@ -126,7 +126,7 @@ export interface ICouplingSignal {
 export const DEFAULT_MIN_CYCLE_FILES = 2;
 
 /** The node cap of a stored canonical path. The member list is never capped. */
-export const DEFAULT_MAX_PATH_NODES = 64;
+const DEFAULT_MAX_PATH_NODES = 64;
 
 /** One adjacency built from an edge selection. */
 interface IAdjacency {
@@ -320,7 +320,7 @@ function shorterOrLexicographicallySmaller(left: readonly string[], right: reado
 }
 
 /** The stable id of a member set: `cyc-` plus 16 hex characters of the synchronous hash. */
-export function stableCycleId(files: readonly string[]): string {
+function stableCycleId(files: readonly string[]): string {
   const hash = fnv1a64([...files].sort().join(CYCLE_ID_SEPARATOR));
   return `${CYCLE_ID_PREFIX}${hash.slice(0, CYCLE_ID_HASH_LENGTH)}`;
 }

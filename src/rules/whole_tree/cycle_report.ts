@@ -11,7 +11,7 @@ import { type ISarifLog, sarifCycleReport } from "../../report/sarif.ts";
 import type { ICycleAnalysis, ICycleFinding } from "./import_cycles.ts";
 
 /** One selected, bounded set of cycle rows. */
-export interface ICycleView {
+interface ICycleView {
   readonly cycles: readonly ICycleFinding[];
   readonly truncated: boolean;
 }
@@ -40,16 +40,16 @@ export interface ICycleSarifReport {
 }
 
 /** The schema version of the JSON cycle report. */
-export const CYCLE_REPORT_VERSION = 1;
+const CYCLE_REPORT_VERSION = 1;
 
 /** The largest cycle row count any report prints, whatever `--top` asks. */
 export const MAX_CYCLES_REPORTED = 1000;
 
 /** The largest report any renderer writes, in UTF-8 bytes. */
-export const MAX_REPORT_BYTES = 8 * 1024 * 1024;
+const MAX_REPORT_BYTES = 8 * 1024 * 1024;
 
 /** The rows one report may print: `--top` first, then the hard row cap. */
-export function selectCycleView(rows: readonly ICycleFinding[], top: number): ICycleView {
+function selectCycleView(rows: readonly ICycleFinding[], top: number): ICycleView {
   const limit = Math.min(top, MAX_CYCLES_REPORTED);
   return { cycles: rows.slice(0, limit), truncated: rows.length > limit };
 }
@@ -74,7 +74,7 @@ function fitToBytes<T extends string | object>(
 }
 
 /** The summary lines of one cycle report, shared by every renderer. */
-export function cycleSummaryLines(analysis: ICycleAnalysis): string[] {
+function cycleSummaryLines(analysis: ICycleAnalysis): string[] {
   const { totals, graph } = analysis;
   const lines = [
     `${totals.runtime_sccs} runtime cycle(s) · ${totals.files} file(s) in runtime cycles · ` +
@@ -95,7 +95,7 @@ export function cycleSummaryLines(analysis: ICycleAnalysis): string[] {
 }
 
 /** The lines of one cycle finding. */
-export function cycleFindingLines(finding: ICycleFinding): string[] {
+function cycleFindingLines(finding: ICycleFinding): string[] {
   const lines = [
     `${finding.kind} ${finding.id} · ${finding.size} file(s) · ${finding.edge_count} edge(s)`,
     `  members: ${finding.files.join(", ")}`,

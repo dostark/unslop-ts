@@ -39,7 +39,7 @@ export interface IGraphLimitations {
 }
 
 /** The unresolved reference list is bounded so a broken repository cannot grow the report. */
-export const MAX_UNRESOLVED_REFS = 100;
+const MAX_UNRESOLVED_REFS = 100;
 
 /** The projection of one snapshot: edges, fan counts and the limits of the evidence. */
 export interface IHealthGraph {
