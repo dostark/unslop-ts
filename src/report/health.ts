@@ -18,6 +18,7 @@ import type { TJscpdRunner } from "../rules/whole_tree/duplicate_code.ts";
 import {
   analyzeCycles,
   couplingSignalOf,
+  DEFAULT_MIN_CYCLE_FILES,
   type ICycleAnalysis,
   type ICycleOptions,
   runtimeCyclesOf,
@@ -63,6 +64,13 @@ import { TOOL_VERSION } from "./version.ts";
 
 /** The directories the report never walks. */
 const SKIPPED_DIRECTORIES: ReadonlySet<string> = new Set([".git", "node_modules", "dist"]);
+
+/** The cycle options of the health report: every kind, two files or more, and no self-import. */
+const DEFAULT_CYCLE_OPTIONS: ICycleOptions = {
+  minFiles: DEFAULT_MIN_CYCLE_FILES,
+  includeSelf: false,
+  includeTypeOnly: true,
+};
 
 /** The source extensions the report parses. */
 const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -190,6 +198,7 @@ function vitalSignsOf(
   total: number,
   graph: IHealthGraph,
   codeFiles: number,
+  analysis: ICycleAnalysis,
 ): IHealthVitalSigns {
   const band = (count: number) => ({ count, percent: percentOf(count, total) });
   const cycles = runtimeCyclesOf(graph.edges);
@@ -208,6 +217,12 @@ function vitalSignsOf(
       files: cycles.files,
       code_files: codeFiles,
       per_thousand: codeFiles === 0 ? 0 : (cycles.sccs / codeFiles) * 1000,
+      runtime_sccs: analysis.totals.runtime_sccs,
+      type_only_sccs: analysis.totals.type_only_sccs,
+      mixed_sccs: analysis.totals.mixed_sccs,
+      edges: analysis.totals.edges,
+      largest_files: analysis.totals.largest_files,
+      file_share: codeFiles === 0 ? 0 : cycles.files / codeFiles,
     },
     coupling: couplingSignalOf(graph.edges, codeFiles),
   };
@@ -563,6 +578,16 @@ async function parseSnapshot(input: IScanInput): Promise<ISnapshot> {
   };
 }
 
+/** The full cycle analysis of one measured graph, with the evidence the report names. */
+function cycleAnalysisOf(graph: IHealthGraph, codeFiles: number): ICycleAnalysis {
+  return analyzeCycles(graph.edges, {
+    complete: graph.complete,
+    code_files: codeFiles,
+    unresolved: graph.limitations.unresolved,
+    unresolved_refs: graph.limitations.unresolved_refs,
+  }, DEFAULT_CYCLE_OPTIONS);
+}
+
 /** The import cycle analysis of one repository, over the snapshot and graph that the health report reads. */
 export async function collectCycleAnalysis(
   input: IScanInput,
@@ -814,7 +839,8 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
   const deadFiles = await deadFilesOf(input.rootPath, new Set(parsed.keys()));
   const coverageSummary = await coverageSummaryOf(input, coverage, parsed);
   const hotspotReport = await hotspotReportOf(input, parsed, facts);
-  const vitalSigns = vitalSignsOf(bands, functions, graph, parsed.size);
+  const cycleAnalysis = cycleAnalysisOf(graph, parsed.size);
+  const vitalSigns = vitalSignsOf(bands, functions, graph, parsed.size, cycleAnalysis);
   const scoreReport = await scoreReportOf(
     input,
     parsed,
@@ -859,6 +885,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
       },
     },
     vital_signs: vitalSigns,
+    cycle_findings: cycleAnalysis.cycles,
     errors,
     limits: {
       source_bytes: MAX_SOURCE_BYTES,

@@ -7,7 +7,7 @@
  */
 
 import { fixtureGit as gitIn } from "./helpers/git_fixture.ts";
-import { assert, assertEquals, assertNotMatch, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertMatch, assertNotMatch, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { crapOf, DIRECT_COVERAGE_PERCENT } from "../src/report/crap.ts";
 import { HealthReportSchema, type IHealthReport } from "../src/report/mod.ts";
@@ -870,4 +870,104 @@ Deno.test("health-large-files: the list follows the include globs and the scope 
     const json = parseReport((await health(dir, ["--format=json"])).stdout);
     assertEquals(json.large_files.map((entry) => entry.path), ["packages/x/src/large.ts"]);
   }, rule);
+});
+
+const CYCLE_FILES: Readonly<Record<string, string>> = {
+  "packages/x/src/a.ts": 'import { b } from "./b.ts";\nexport const a = b;\n',
+  "packages/x/src/b.ts": 'import { a } from "./a.ts";\nexport const b = 1;\n',
+  "packages/x/src/t1.ts": 'import type { T2 } from "./t2.ts";\nexport type T1 = T2;\n',
+  "packages/x/src/t2.ts": 'import type { T1 } from "./t1.ts";\nexport type T2 = T1;\n',
+};
+
+const MIXED_CYCLE_FILES: Readonly<Record<string, string>> = {
+  "packages/x/src/a.ts": 'import { b } from "./b.ts";\nexport const a = b;\n',
+  "packages/x/src/b.ts":
+    'import { a } from "./a.ts";\nimport type { C } from "./c.ts";\nexport const b = 1;\nexport type B = C;\n',
+  "packages/x/src/c.ts": 'import type { A } from "./a.ts";\nexport type C = A;\nexport type A = number;\n',
+};
+
+Deno.test("health-cycle-findings: the JSON report names every cycle with its members, kind, path and id", async () => {
+  await withHealthProject(CYCLE_FILES, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    const findings = report.cycle_findings ?? [];
+    assertEquals(findings.length, 2);
+    const runtime = findings.find((finding) => finding.kind === "runtime");
+    assert(runtime !== undefined);
+    assertEquals(runtime.files, ["packages/x/src/a.ts", "packages/x/src/b.ts"]);
+    assertEquals(runtime.path, ["packages/x/src/a.ts", "packages/x/src/b.ts", "packages/x/src/a.ts"]);
+    assertMatch(runtime.id, /^cyc-/);
+    assert(findings.some((finding) => finding.kind === "type-only"));
+  });
+});
+
+Deno.test("health-cycle-metrics: vital signs carry the classification, the edges, the largest cycle and the file share", async () => {
+  await withHealthProject(CYCLE_FILES, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    const cycles = report.vital_signs.cycles;
+    assertEquals(cycles.sccs, 1);
+    assertEquals(cycles.runtime_sccs, 1);
+    assertEquals(cycles.type_only_sccs, 1);
+    assertEquals(cycles.mixed_sccs, 0);
+    assertEquals(cycles.files, 2);
+    assertEquals(cycles.edges, 2);
+    assertEquals(cycles.largest_files, 2);
+    assertEquals(cycles.file_share, cycles.files / cycles.code_files);
+    assertEquals(cycles.per_thousand, (1 / cycles.code_files) * 1000);
+  });
+});
+
+Deno.test("health-cycle-score-unchanged: a mixed SCC keeps the old sccs count and the cycle score signal", async () => {
+  await withHealthProject(MIXED_CYCLE_FILES, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    const cycles = report.vital_signs.cycles;
+    assertEquals(cycles.sccs, 1);
+    assertEquals(cycles.runtime_sccs, 0);
+    assertEquals(cycles.mixed_sccs, 1);
+    const signal = report.health_score.signals.find((entry) => entry.signal === "cycles");
+    assertEquals(signal?.status, "measured");
+    assertEquals(signal?.raw, cycles.per_thousand);
+    assertEquals(signal?.numerator, 1);
+    assertEquals(report.cycle_findings?.map((finding) => finding.kind), ["mixed"]);
+  });
+});
+
+Deno.test("health-cycle-type-mixed: type-only and mixed findings never enter the runtime sccs count", async () => {
+  const files = {
+    ...CYCLE_FILES,
+    "packages/x/src/m1.ts": 'import type { M2 } from "./m2.ts";\nexport type M1 = M2;\n',
+    "packages/x/src/m2.ts": 'import type { M1 } from "./m1.ts";\nexport type M2 = M1;\n',
+  };
+  await withHealthProject(files, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    const kinds = (report.cycle_findings ?? []).map((finding) => finding.kind).sort();
+    assertEquals(kinds, ["runtime", "type-only", "type-only"]);
+    assertEquals(report.vital_signs.cycles.sccs, 1);
+    assertEquals(report.vital_signs.cycles.runtime_sccs, 1);
+    assertEquals(report.vital_signs.cycles.type_only_sccs, 2);
+    assertEquals(report.vital_signs.cycles.mixed_sccs, 0);
+  });
+});
+
+Deno.test("health-cycle-incomplete: an unresolved import marks the cycle signal unavailable", async () => {
+  const files = {
+    ...CYCLE_FILES,
+    "packages/x/src/a.ts": 'import { b } from "./b.ts";\nimport "./missing.ts";\nexport const a = b;\n',
+  };
+  await withHealthProject(files, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    assertEquals(report.summary.graph.complete, false);
+    const signal = report.health_score.signals.find((entry) => entry.signal === "cycles");
+    assertEquals(signal?.status, "unavailable");
+    assertEquals(signal?.reason, "graph-incomplete");
+  });
+});
+
+Deno.test("health-cycle-legacy-report: a report without cycle_findings still parses under the strict schema", async () => {
+  await withHealthProject(CYCLE_FILES, async (dir) => {
+    const report = parseReport((await health(dir, ["--format=json"])).stdout);
+    const { cycle_findings: _omitted, ...legacy } = report;
+    const parsed = HealthReportSchema.safeParse(legacy);
+    assertEquals(parsed.success, true, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+    assertEquals(report.schema_version, 2);
+  });
 });

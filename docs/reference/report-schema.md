@@ -48,6 +48,13 @@ The command accepts `--root`, `--descriptor`, `--plugin`, `--format=text|json`, 
   and the TypeScript compiler tree report, including named local declarations and named expressions. `class_analysis` records
   total and typed class counts and every unjoined site. Anonymous classes retain `syntactic` values, and unavailable method
   analysis is explicit in text and JSON. The health score and its formula do not change.
+- **Cycle findings:** the report adds `cycle_findings`, the full strongly connected components of the import
+  graph with their sorted member files, internal edges, one canonical shortest path, a stable `cyc-` id and a
+  `kind` of `runtime`, `type-only` or `mixed`. The key is optional, so a stored report without it stays valid under
+  schema 2. `vital_signs.cycles` keeps `sccs`, `files`, `code_files` and `per_thousand`, which preserve the
+  fallow-compatible meaning and the score, and adds `runtime_sccs`, `type_only_sccs`, `mixed_sccs`, `edges`,
+  `largest_files` and `file_share`. A mixed SCC stays in the runtime `sccs` count and the cycle score signal while
+  the classification counts it as mixed. An incomplete graph marks the cycle signal unavailable.
 - **Large files:** when the catalog enables the `max-file-lines` rule, the report adds `large_files`, the files above the
   soft limit `softMax` or the hard limit `max`, largest first, each with its `limit` level. Only the files that the rule
   would lint appear, by its scope, `include` and `exclude`. The text view prints them as advice. The lint rule reports only

@@ -71,3 +71,4 @@ export {
   type IMagicLiteralInput,
   MagicLiteralOptionsSchema,
 } from "./options.ts";
+export type { ICycleAnalysis, ICycleEdgeRef, ICycleFinding, TCycleKind } from "./import_cycles.ts";

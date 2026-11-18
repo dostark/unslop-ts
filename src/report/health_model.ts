@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import type { ClassThresholdName } from "../metrics/class_thresholds.ts";
+import type { ICycleFinding } from "../rules/whole_tree/import_cycles.ts";
 import type { DerivedMetric } from "./class_statistics.ts";
 import type { IUnjoinedClass } from "./class_pass.ts";
 import type { DesignMetricName, DesignStrategy } from "./design_strategies.ts";
@@ -140,10 +141,20 @@ export interface IHealthVitalSigns {
     };
   };
   readonly cycles: {
+    /** The runtime SCC count, which is the fallow-compatible health meaning. */
     readonly sccs: number;
     readonly files: number;
     readonly code_files: number;
     readonly per_thousand: number;
+    /** The classification counts; a mixed SCC keeps the runtime `sccs` count and adds one here. */
+    readonly runtime_sccs: number;
+    readonly type_only_sccs: number;
+    readonly mixed_sccs: number;
+    /** The unique internal runtime edges. */
+    readonly edges: number;
+    readonly largest_files: number;
+    /** The share of measured files that sit in runtime cycles. */
+    readonly file_share: number;
   };
   readonly coupling: {
     readonly high_files: number;
@@ -295,6 +306,8 @@ export interface IHealthReport {
   readonly health_score: IHealthScore;
   readonly summary: IHealthSummary;
   readonly vital_signs: IHealthVitalSigns;
+  /** The full cycle findings, an unslop extension that the fallow-compatible keys do not read. */
+  readonly cycle_findings?: readonly ICycleFinding[];
   readonly errors: readonly IHealthError[];
   readonly limits: IHealthLimits;
   /** The class design section, an unslop extension that the fallow-compatible keys do not read. */
@@ -365,6 +378,12 @@ export const HealthVitalSignsSchema: z.ZodType<IHealthVitalSigns, IHealthVitalSi
     files: nonNegativeInteger,
     code_files: nonNegativeInteger,
     per_thousand: finite,
+    runtime_sccs: nonNegativeInteger,
+    type_only_sccs: nonNegativeInteger,
+    mixed_sccs: nonNegativeInteger,
+    edges: nonNegativeInteger,
+    largest_files: nonNegativeInteger,
+    file_share: finite,
   }).strict(),
   coupling: z.object({
     high_files: nonNegativeInteger,
@@ -588,6 +607,25 @@ const HealthLargeFileSchema: z.ZodType<IHealthLargeFile, IHealthLargeFile> = z.o
   limit: z.enum(["soft", "hard"]),
 }).strict();
 
+const HealthCycleEdgeSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  kind: z.enum(["runtime", "type"]),
+  form: z.enum(["side-effect", "import", "re-export", "dynamic"]),
+}).strict();
+
+/** One cycle finding as the strict report schema reads it. */
+export const HealthCycleFindingSchema: z.ZodType<ICycleFinding, ICycleFinding> = z.object({
+  id: z.string().regex(/^cyc-[0-9a-f]{16}$/),
+  kind: z.enum(["runtime", "type-only", "mixed"]),
+  files: z.array(z.string().min(1)).min(1),
+  edges: z.array(HealthCycleEdgeSchema),
+  path: z.array(z.string()).min(1),
+  path_truncated: z.boolean(),
+  size: nonNegativeInteger,
+  edge_count: nonNegativeInteger,
+}).strict();
+
 /** The complete health report this checkpoint writes. */
 export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.object({
   schema_version: z.literal(HEALTH_SCHEMA_VERSION),
@@ -600,6 +638,7 @@ export const HealthReportSchema: z.ZodType<IHealthReport, IHealthReport> = z.obj
   health_score: HealthScoreSchema,
   summary: HealthSummarySchema,
   vital_signs: HealthVitalSignsSchema,
+  cycle_findings: z.array(HealthCycleFindingSchema).optional(),
   errors: z.array(HealthErrorSchema),
   limits: HealthLimitsSchema,
   class_scores: z.array(HealthClassScoreSchema),

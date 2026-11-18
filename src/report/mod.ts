@@ -77,6 +77,7 @@ export {
   measureDuplication,
 } from "./duplication.ts";
 export { gradeOf, healthScoreOf, type IScoreInput, scoreSignalsOf, scoreValueOf } from "./health_score.ts";
+export type { ICycleEdgeRef, ICycleFinding, TCycleKind } from "../rules/whole_tree/import_cycles.ts";
 export { type ILcovCoverage, type ILcovFileCoverage, parseLcov } from "./lcov.ts";
 export {
   HEALTH_FORMULA_VERSION,

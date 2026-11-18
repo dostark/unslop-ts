@@ -445,8 +445,10 @@ function renderText(report: IHealthReport, top: number, minScore: number | null,
     `  File scores ${summary.file_scores_population} files`,
     `  Unit size   low ${band("low")} · medium ${band("medium")} · ` +
     `high ${band("high")} · very high ${band("very_high")}`,
-    `  Structure   ${vital_signs.cycles.sccs} runtime cycles · ${vital_signs.coupling.high_files} ` +
-    `high-coupling files · ${summary.dead_exports.unused}/${summary.dead_exports.total} dead exports · ` +
+    `  Structure   ${vital_signs.cycles.sccs} runtime cycles · ${vital_signs.cycles.type_only_sccs} type-only · ` +
+    `${vital_signs.cycles.mixed_sccs} mixed · largest ${vital_signs.cycles.largest_files} files · ` +
+    `${vital_signs.coupling.high_files} high-coupling files · ` +
+    `${summary.dead_exports.unused}/${summary.dead_exports.total} dead exports · ` +
     `${summary.dead_files.available ? summary.dead_files.count : "unavailable"} dead files`,
     ...heading("SCORE SIGNALS"),
     "  9 supported score signals; unused dependencies and prop drilling are informational and outside the formula.",
