@@ -25,8 +25,8 @@ the `wholeTree.importCycles` section:
 { "minFiles": 2, "includeSelf": false, "includeTypeOnly": true }
 ```
 
-`minFiles`, `includeSelf`, and `includeTypeOnly` are optional and default to the values shown. The check does not
-need a scan group and it starts no child process.
+`minFiles`, `includeSelf`, and `includeTypeOnly` are optional and default to the values shown. `baseline` names a
+committed baseline file, or is absent. The check does not need a scan group and it starts no child process.
 
 Run it on a project the compiled descriptor names:
 
@@ -42,6 +42,7 @@ deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project desc
 | `--include-type-only`        | both   | `true`  | Report type-only and mixed cycles as advisory findings.         |
 | `--top=<n>`                  | CLI    | `50`    | Display rows only. The totals always count the full population. |
 | `--trace=<path>`             | CLI    | off     | Show only the cycles that contain the file.                     |
+| `--update-baseline`          | CLI    | off     | Rewrite the baseline file; needs `--allow-write`.               |
 | `--fail`                     | CLI    | off     | Exit 1 when a runtime cycle exists.                             |
 
 A command-line flag wins over the catalog setting. A bad value exits `2` before any report.
@@ -68,6 +69,14 @@ set `truncated: true` and the text report says so in one line. No renderer print
 
 **Tracing.** `--trace=<path>` keeps the cycles that contain one file and leaves the totals unchanged. A path
 outside the project root is a usage error, and a file outside every cycle is an empty result with exit code 0.
+
+**Baseline.** Set `baseline` to a repository path and `--update-baseline` writes the measured runtime cycles with
+their stable ids and sorted member files. The file holds `{ version, allowed_unresolved, cycles }` and carries no
+timestamp and no tool version, so a regeneration is a reviewable diff. The write resolves under the project root,
+rejects a `..` escape and a symlink that leaves the root, caps the file at 1 MiB and 10,000 cycles, and replaces
+the file through a sibling temporary file. It keeps the reviewed allowlist from the previous file. A malformed
+baseline is a failure; a path outside the root is a usage error. `--update-baseline` needs `--allow-write`, and
+every other run stays read-only.
 
 **Limits.** The graph resolves relative imports and the `imports` maps of the project configs, like the health
 report does. A computed dynamic import, a `tsconfig` path alias, and a package export resolve to no edge, and the

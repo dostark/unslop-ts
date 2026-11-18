@@ -62,6 +62,16 @@ import {
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
 import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
 import { cycleJsonReport, cycleSarifReport, cycleTextReport } from "../rules/whole_tree/cycle_report.ts";
+import {
+  buildCycleBaseline,
+  CycleBaselineError,
+  CycleBaselineMissingError,
+  type IAllowedUnresolved,
+  loadCycleBaseline,
+  resolveInsideRoot,
+  saveCycleBaseline,
+} from "../rules/whole_tree/cycle_baseline.ts";
+import type { ICycleAnalysis } from "../rules/whole_tree/import_cycles.ts";
 import { collectCycleAnalysis } from "../report/health.ts";
 import { DEFAULT_TOP_CYCLES } from "../report/constants.ts";
 import {
@@ -97,7 +107,9 @@ const REPORT_FORMATS: readonly TReportFormat[] = [TEXT_FORMAT, JSON_FORMAT, SARI
 const FAIL_FLAG = "--fail";
 const INCLUDE_SELF_FLAG = "--include-self";
 const INCLUDE_TYPE_ONLY_FLAG = "--include-type-only";
+const UPDATE_BASELINE_FLAG = "--update-baseline";
 const DRIVE_LETTER = /^[A-Za-z]:/;
+const FAILURE_EXIT = 1;
 
 /** A report format a whole-tree check can write. */
 type TReportFormat = typeof TEXT_FORMAT | typeof JSON_FORMAT | typeof SARIF_FORMAT;
@@ -494,6 +506,57 @@ function tracePathOf(args: readonly string[]): string | null {
   return path;
 }
 
+/** One prepared baseline update: the checked path and the reviewed allowlist that survives the write. */
+interface ICycleBaselineUpdate {
+  readonly relative: string;
+  readonly allowed: readonly IAllowedUnresolved[];
+}
+
+/** Reports a baseline rejection with its exit code. */
+function failBaseline(error: Error): never {
+  if (error instanceof CycleBaselineError) {
+    console.error(error.message);
+    Deno.exit(error.exitCode);
+  }
+  throw error;
+}
+
+/** Checks the baseline path and reads its allowlist before the analysis runs. */
+async function prepareCycleBaselineUpdate(
+  settings: IImportCyclesSettings,
+  rootPath: string,
+): Promise<ICycleBaselineUpdate> {
+  if (settings.baseline === null) {
+    exitWithUsage("--update-baseline needs a `baseline` path in the import-cycles settings.");
+  }
+  try {
+    await resolveInsideRoot(rootPath, settings.baseline);
+    const previous = await loadCycleBaseline(rootPath, settings.baseline);
+    return { relative: settings.baseline, allowed: previous.allowed_unresolved };
+  } catch (error) {
+    if (error instanceof CycleBaselineMissingError) return { relative: settings.baseline, allowed: [] };
+    return failBaseline(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+/** Writes the baseline from the measured runtime cycles and the reviewed allowlist. */
+async function writeCycleBaseline(
+  input: ILoadedInput,
+  update: ICycleBaselineUpdate,
+  analysis: ICycleAnalysis,
+): Promise<void> {
+  try {
+    const path = await saveCycleBaseline(input.rootPath, update.relative, buildCycleBaseline(analysis, update.allowed));
+    console.error(`Wrote the import-cycle baseline to ${relative(input.rootPath, path)}.`);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotCapable) {
+      console.error("--update-baseline needs the --allow-write permission.");
+      Deno.exit(FAILURE_EXIT);
+    }
+    failBaseline(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
 async function runImportCycles(
   settings: IImportCyclesSettings,
   input: ILoadedInput,
@@ -506,11 +569,15 @@ async function runImportCycles(
     includeSelf: settings.includeSelf || args.includes(INCLUDE_SELF_FLAG),
     includeTypeOnly: settings.includeTypeOnly || args.includes(INCLUDE_TYPE_ONLY_FLAG),
   };
+  const update = args.includes(UPDATE_BASELINE_FLAG)
+    ? await prepareCycleBaselineUpdate(settings, input.rootPath)
+    : null;
   const scan = cycleScanOf(input.catalog);
   const analysis = await collectCycleAnalysis(
     { rootPath: input.rootPath, ignoreGlobs: scan.ignoreGlobs, scopes: scan.scopes },
     options,
   );
+  if (update !== null) return await writeCycleBaseline(input, update, analysis);
   const rows = trace === null ? analysis.cycles : analysis.cycles.filter((cycle) => cycle.files.includes(trace));
   const top = positiveIntFlag(args, "top", DEFAULT_TOP_CYCLES);
   if (format === SARIF_FORMAT) {
