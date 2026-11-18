@@ -87,3 +87,46 @@ Deno.test("cycle-unresolved-list: the graph names an unresolvable relative impor
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("cycle-path: the canonical path is the shortest cycle and tie-breaks lexicographically", () => {
+  const edges = [
+    edge("src/a.ts", "src/b.ts"),
+    edge("src/b.ts", "src/c.ts"),
+    edge("src/c.ts", "src/a.ts"),
+    edge("src/a.ts", "src/d.ts"),
+    edge("src/d.ts", "src/e.ts"),
+    edge("src/e.ts", "src/a.ts"),
+  ];
+  const analysis = analyzeCycles(edges, EMPTY_GRAPH, OPTIONS);
+  assertEquals(analysis.cycles[0].path, ["src/a.ts", "src/b.ts", "src/c.ts", "src/a.ts"]);
+  assertEquals(analysis.cycles[0].path_truncated, false);
+});
+
+Deno.test("cycle-id: the id ignores edge order and member order", () => {
+  const forward = [edge("src/a.ts", "src/b.ts"), edge("src/b.ts", "src/a.ts")];
+  const backward = [edge("src/b.ts", "src/a.ts"), edge("src/a.ts", "src/b.ts")];
+  const first = analyzeCycles(forward, EMPTY_GRAPH, OPTIONS).cycles[0].id;
+  const second = analyzeCycles(backward, EMPTY_GRAPH, OPTIONS).cycles[0].id;
+  assertEquals(first, second);
+  assertEquals(/^cyc-[0-9a-f]{16}$/.test(first), true);
+  const other = analyzeCycles([edge("src/a.ts", "src/c.ts"), edge("src/c.ts", "src/a.ts")], EMPTY_GRAPH, OPTIONS);
+  assertEquals(other.cycles[0].id === first, false);
+});
+
+Deno.test("cycle-self: a self-import is excluded by default and reported with includeSelf", () => {
+  const edges = [edge("src/self.ts", "src/self.ts")];
+  assertEquals(analyzeCycles(edges, EMPTY_GRAPH, OPTIONS).cycles.length, 0);
+  const withSelf = analyzeCycles(edges, EMPTY_GRAPH, { ...OPTIONS, includeSelf: true });
+  assertEquals(withSelf.cycles.length, 1);
+  assertEquals(withSelf.cycles[0].files, ["src/self.ts"]);
+  assertEquals(withSelf.cycles[0].kind, "runtime");
+});
+
+Deno.test("cycle-truncated: a long cycle keeps every member and truncates only the path", () => {
+  const files = Array.from({ length: 70 }, (_, index) => `src/f${String(index).padStart(2, "0")}.ts`);
+  const edges = files.map((file, index) => edge(file, files[(index + 1) % files.length]));
+  const analysis = analyzeCycles(edges, EMPTY_GRAPH, OPTIONS);
+  assertEquals(analysis.cycles[0].files.length, 70);
+  assertEquals(analysis.cycles[0].path.length, 64);
+  assertEquals(analysis.cycles[0].path_truncated, true);
+});
