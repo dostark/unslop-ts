@@ -139,8 +139,17 @@ Deno.test("cycle-baseline-security: a path that leaves the root, a symlink and a
     const outside = await Deno.makeTempDir({ prefix: "cycle_outside_" });
     try {
       await Deno.writeTextFile(join(outside, "cycles.json"), JSON.stringify(baselineOf()));
-      await Deno.symlink(join(outside, "cycles.json"), join(root, "escape.json"));
-      await assertRejects(() => loadCycleBaseline(root, "escape.json"), "inside the project root");
+      // The compatibility harness grants scoped permissions, and a symlink needs unscoped read and write.
+      let linked = false;
+      try {
+        await Deno.symlink(join(outside, "cycles.json"), join(root, "escape.json"));
+        linked = true;
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotCapable)) throw error;
+      }
+      if (linked) {
+        await assertRejects(() => loadCycleBaseline(root, "escape.json"), "inside the project root");
+      }
     } finally {
       await Deno.remove(outside, { recursive: true });
     }
