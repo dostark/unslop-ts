@@ -52,7 +52,8 @@ const BaselineSchema: z.ZodType<IDuplicateBaseline, IDuplicateBaseline> = z.obje
   groups: z.record(z.string(), z.array(EntrySchema)),
 }).strict();
 
-function fnv1a64(text: string): string {
+/** The 64-bit FNV-1a hash of a string, as 16 hex characters. */
+export function fnv1a64(text: string): string {
   let hash = FNV_OFFSET;
   for (const byte of new TextEncoder().encode(text)) {
     hash = ((hash ^ BigInt(byte)) * FNV_PRIME) & FNV_MASK;

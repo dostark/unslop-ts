@@ -21,6 +21,12 @@ export interface IGraphEdge {
   readonly form: "side-effect" | "import" | "re-export" | "dynamic";
 }
 
+/** One unresolved reference: the file and the specifier it could not resolve. */
+export interface IUnresolvedRef {
+  readonly from: string;
+  readonly specifier: string;
+}
+
 /** The specifiers the graph could not turn into internal edges. */
 export interface IGraphLimitations {
   readonly external: number;
@@ -28,7 +34,12 @@ export interface IGraphLimitations {
   readonly resources: number;
   readonly unresolved: number;
   readonly nonliteral_dynamic: number;
+  /** The first `MAX_UNRESOLVED_REFS` unresolved references, for the cycle gate's diagnostic. */
+  readonly unresolved_refs: readonly IUnresolvedRef[];
 }
+
+/** The unresolved reference list is bounded so a broken repository cannot grow the report. */
+export const MAX_UNRESOLVED_REFS = 100;
 
 /** The projection of one snapshot: edges, fan counts and the limits of the evidence. */
 export interface IHealthGraph {
@@ -128,7 +139,13 @@ function classifySpecifier(
   excluded: ReadonlySet<string>,
   resources: ReadonlySet<string>,
   aliases: Readonly<Record<string, string>>,
-  limitations: { external: number; excluded_source: number; resources: number; unresolved: number },
+  limitations: {
+    external: number;
+    excluded_source: number;
+    resources: number;
+    unresolved: number;
+    unresolved_refs: IUnresolvedRef[];
+  },
 ): string | null {
   if (EXTERNAL_PREFIXES.some((prefix) => specifier.startsWith(prefix))) {
     limitations.external++;
@@ -146,6 +163,9 @@ function classifySpecifier(
     }
     if (specifier.startsWith(".") || aliasEntryOf(specifier, aliases) !== null) {
       limitations.unresolved++;
+      if (limitations.unresolved_refs.length < MAX_UNRESOLVED_REFS) {
+        limitations.unresolved_refs.push({ from: fromPath, specifier });
+      }
     } else {
       limitations.external++;
     }
@@ -209,7 +229,14 @@ export function buildHealthGraph(
   resources: ReadonlySet<string> = new Set(),
 ): IHealthGraph {
   const known = new Set(files.keys());
-  const limitations = { external: 0, excluded_source: 0, resources: 0, unresolved: 0, nonliteral_dynamic: 0 };
+  const limitations = {
+    external: 0,
+    excluded_source: 0,
+    resources: 0,
+    unresolved: 0,
+    nonliteral_dynamic: 0,
+    unresolved_refs: [] as IUnresolvedRef[],
+  };
   const edges: IGraphEdge[] = [];
   for (const [path, file] of files) {
     const specifiers = specifiersOf(asNode(file.tree.program), limitations);
@@ -232,6 +259,7 @@ export function buildHealthGraph(
     resources: limitations.resources,
     unresolved: limitations.unresolved,
     nonliteral_dynamic: limitations.nonliteral_dynamic,
+    unresolved_refs: limitations.unresolved_refs,
   };
   return {
     edges,
