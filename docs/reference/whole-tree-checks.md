@@ -42,6 +42,9 @@ deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project desc
 | `--include-type-only`        | both   | `true`  | Report type-only and mixed cycles as advisory findings.         |
 | `--top=<n>`                  | CLI    | `50`    | Display rows only. The totals always count the full population. |
 | `--trace=<path>`             | CLI    | off     | Show only the cycles that contain the file.                     |
+| `--baseline=<path>`          | CLI    | setting | The committed baseline; a flag wins over the catalog setting.   |
+| `--fail-on-new`              | CLI    | `true`  | Exit 1 on a runtime cycle the baseline does not list.           |
+| `--fail-on-stale`            | CLI    | `false` | Exit 1 on a baseline entry that no longer exists.               |
 | `--update-baseline`          | CLI    | off     | Rewrite the baseline file; needs `--allow-write`.               |
 | `--fail`                     | CLI    | off     | Exit 1 when a runtime cycle exists.                             |
 
@@ -77,6 +80,22 @@ rejects a `..` escape and a symlink that leaves the root, caps the file at 1 MiB
 the file through a sibling temporary file. It keeps the reviewed allowlist from the previous file. A malformed
 baseline is a failure; a path outside the root is a usage error. `--update-baseline` needs `--allow-write`, and
 every other run stays read-only.
+
+**Gate.** With a baseline, each measured runtime cycle is matched by its stable id and its member set. A cycle the
+baseline does not list is `new`; a cycle that shares a file with an unmatched entry is `changed`, because a changed
+member set is a new risk; a baseline entry that no longer exists is `stale`. New and changed cycles fail the run by
+default, and `failOnNew: false` makes them advisory. A stale entry is advisory unless `failOnStale` or
+`--fail-on-stale` turns it into a failure.
+
+The gate also fails on an incomplete graph: an unresolved reference that `allowed_unresolved` does not list, by
+specifier and source file, fails the run and is named. An allowlisted reference passes, and the list may shrink but
+not grow without a reviewed edit to the committed file. A baseline that lists more than the measured unresolved
+count still passes only when every measured reference appears on the list. `gateRoots` limits the gate to cycles
+whose files all sit under a listed prefix, so a test-only cycle stays advisory while it is still reported.
+
+Exit codes: `0` passes; `1` means a new or changed runtime cycle, an incompleteness the allowlist does not cover, a
+malformed baseline or a missing `--allow-write`; `2` means a usage error, an out-of-root path or an unsupported
+flag.
 
 **Limits.** The graph resolves relative imports and the `imports` maps of the project configs, like the health
 report does. A computed dynamic import, a `tsconfig` path alias, and a package export resolve to no edge, and the

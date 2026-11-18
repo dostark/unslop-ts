@@ -64,9 +64,11 @@ import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
 import { cycleJsonReport, cycleSarifReport, cycleTextReport } from "../rules/whole_tree/cycle_report.ts";
 import {
   buildCycleBaseline,
+  compareToBaseline,
   CycleBaselineError,
   CycleBaselineMissingError,
   type IAllowedUnresolved,
+  type ICycleGate,
   loadCycleBaseline,
   resolveInsideRoot,
   saveCycleBaseline,
@@ -108,6 +110,8 @@ const FAIL_FLAG = "--fail";
 const INCLUDE_SELF_FLAG = "--include-self";
 const INCLUDE_TYPE_ONLY_FLAG = "--include-type-only";
 const UPDATE_BASELINE_FLAG = "--update-baseline";
+const FAIL_ON_NEW_FLAG = "--fail-on-new";
+const FAIL_ON_STALE_FLAG = "--fail-on-stale";
 const DRIVE_LETTER = /^[A-Za-z]:/;
 const FAILURE_EXIT = 1;
 
@@ -506,6 +510,11 @@ function tracePathOf(args: readonly string[]): string | null {
   return path;
 }
 
+/** The baseline path the run reads: a command-line flag wins over the catalog setting. */
+function baselinePathOf(settings: IImportCyclesSettings, args: readonly string[]): string | null {
+  return flagValue(args, "baseline") ?? settings.baseline;
+}
+
 /** One prepared baseline update: the checked path and the reviewed allowlist that survives the write. */
 interface ICycleBaselineUpdate {
   readonly relative: string;
@@ -523,18 +532,18 @@ function failBaseline(error: Error): never {
 
 /** Checks the baseline path and reads its allowlist before the analysis runs. */
 async function prepareCycleBaselineUpdate(
-  settings: IImportCyclesSettings,
+  baselinePath: string | null,
   rootPath: string,
 ): Promise<ICycleBaselineUpdate> {
-  if (settings.baseline === null) {
+  if (baselinePath === null) {
     exitWithUsage("--update-baseline needs a `baseline` path in the import-cycles settings.");
   }
   try {
-    await resolveInsideRoot(rootPath, settings.baseline);
-    const previous = await loadCycleBaseline(rootPath, settings.baseline);
-    return { relative: settings.baseline, allowed: previous.allowed_unresolved };
+    await resolveInsideRoot(rootPath, baselinePath);
+    const previous = await loadCycleBaseline(rootPath, baselinePath);
+    return { relative: baselinePath, allowed: previous.allowed_unresolved };
   } catch (error) {
-    if (error instanceof CycleBaselineMissingError) return { relative: settings.baseline, allowed: [] };
+    if (error instanceof CycleBaselineMissingError) return { relative: baselinePath, allowed: [] };
     return failBaseline(error instanceof Error ? error : new Error(String(error)));
   }
 }
@@ -544,9 +553,14 @@ async function writeCycleBaseline(
   input: ILoadedInput,
   update: ICycleBaselineUpdate,
   analysis: ICycleAnalysis,
+  settings: IImportCyclesSettings,
 ): Promise<void> {
   try {
-    const path = await saveCycleBaseline(input.rootPath, update.relative, buildCycleBaseline(analysis, update.allowed));
+    const path = await saveCycleBaseline(
+      input.rootPath,
+      update.relative,
+      buildCycleBaseline(analysis, update.allowed, settings.gateRoots),
+    );
     console.error(`Wrote the import-cycle baseline to ${relative(input.rootPath, path)}.`);
   } catch (error) {
     if (error instanceof Deno.errors.NotCapable) {
@@ -555,6 +569,67 @@ async function writeCycleBaseline(
     }
     failBaseline(error instanceof Error ? error : new Error(String(error)));
   }
+}
+
+/** The gate result as JSON: counts and the failing groups, without the full finding objects. */
+function gateSummaryOf(gate: ICycleGate): JsonValue {
+  return asJsonValue({
+    matched: gate.matched,
+    added: gate.added.map((cycle) => ({ id: cycle.id, files: cycle.files })),
+    changed: gate.changed,
+    stale: gate.stale.map((cycle) => ({ id: cycle.id, files: cycle.files })),
+    unlisted_unresolved: gate.unlisted_unresolved,
+    passed: gate.passed,
+  });
+}
+
+/** Loads the baseline and compares the measured cycles with it. */
+async function cycleGateOf(
+  baselinePath: string,
+  rootPath: string,
+  analysis: ICycleAnalysis,
+  settings: IImportCyclesSettings,
+  args: readonly string[],
+): Promise<ICycleGate> {
+  try {
+    const baseline = await loadCycleBaseline(rootPath, baselinePath);
+    return compareToBaseline(analysis, baseline, {
+      gateRoots: settings.gateRoots,
+      failOnNew: settings.failOnNew || args.includes(FAIL_ON_NEW_FLAG),
+      failOnStale: settings.failOnStale || args.includes(FAIL_ON_STALE_FLAG),
+    });
+  } catch (error) {
+    if (error instanceof CycleBaselineMissingError) {
+      console.error(error.message);
+      Deno.exit(FAILURE_EXIT);
+    }
+    return failBaseline(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+/** Prints the gate result and the failing groups. */
+function printCycleGate(gate: ICycleGate): void {
+  console.error(
+    `\nImport-cycle gate: ${gate.matched} matched · ${gate.added.length} new · ` +
+      `${gate.changed.length} changed · ${gate.stale.length} stale`,
+  );
+  for (const cycle of gate.added) {
+    console.error(`  NEW runtime ${cycle.id} · ${cycle.files.join(", ")}`);
+  }
+  for (const cycle of gate.changed) {
+    console.error(
+      `  CHANGED runtime ${cycle.id} · was ${cycle.expected.join(", ")} · now ${cycle.actual.join(", ")}`,
+    );
+  }
+  for (const cycle of gate.stale) {
+    console.error(`  STALE ${cycle.id} · no longer measured; run --update-baseline to drop it`);
+  }
+  for (const reference of gate.unlisted_unresolved) {
+    console.error(
+      `  UNRESOLVED ${reference.from} imports '${reference.specifier}'; add it to allowed_unresolved with a reason`,
+    );
+  }
+  console.error(gate.passed ? "✅ import-cycle gate passed" : "❌ import-cycle gate failed");
 }
 
 async function runImportCycles(
@@ -569,24 +644,29 @@ async function runImportCycles(
     includeSelf: settings.includeSelf || args.includes(INCLUDE_SELF_FLAG),
     includeTypeOnly: settings.includeTypeOnly || args.includes(INCLUDE_TYPE_ONLY_FLAG),
   };
+  const baselinePath = baselinePathOf(settings, args);
   const update = args.includes(UPDATE_BASELINE_FLAG)
-    ? await prepareCycleBaselineUpdate(settings, input.rootPath)
+    ? await prepareCycleBaselineUpdate(baselinePath, input.rootPath)
     : null;
   const scan = cycleScanOf(input.catalog);
   const analysis = await collectCycleAnalysis(
     { rootPath: input.rootPath, ignoreGlobs: scan.ignoreGlobs, scopes: scan.scopes },
     options,
   );
-  if (update !== null) return await writeCycleBaseline(input, update, analysis);
+  if (update !== null) return await writeCycleBaseline(input, update, analysis, settings);
+  const gate = baselinePath === null ? null : await cycleGateOf(baselinePath, input.rootPath, analysis, settings, args);
   const rows = trace === null ? analysis.cycles : analysis.cycles.filter((cycle) => cycle.files.includes(trace));
   const top = positiveIntFlag(args, "top", DEFAULT_TOP_CYCLES);
   if (format === SARIF_FORMAT) {
     console.log(JSON.stringify(cycleSarifReport(rows, top, input.rootPath).sarif, null, 2));
   } else if (format === JSON_FORMAT) {
-    console.log(JSON.stringify(cycleJsonReport(analysis, rows, top), null, 2));
+    const document = cycleJsonReport(analysis, rows, top);
+    console.log(JSON.stringify(gate === null ? document : { ...document, baseline: gateSummaryOf(gate) }, null, 2));
   } else {
     console.log(cycleTextReport(analysis, rows, top, trace).text);
   }
+  if (gate !== null) printCycleGate(gate);
+  if (gate !== null && !gate.passed) Deno.exit(FAILURE_EXIT);
   if (args.includes(FAIL_FLAG) && analysis.totals.runtime_sccs > 0) {
     console.error(`\n❌ ${analysis.totals.runtime_sccs} runtime cycle(s) found — break the cycle.`);
     Deno.exit(1);

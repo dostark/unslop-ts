@@ -10,7 +10,7 @@
 import { basename, dirname, join } from "@std/path";
 import { z } from "zod";
 import type { JsonValue } from "../../engine/catalog.ts";
-import type { ICycleAnalysis, ICycleFinding } from "./import_cycles.ts";
+import type { ICycleAnalysis, ICycleFinding, IUnresolvedRef } from "./import_cycles.ts";
 
 /** The cycle scope an entry kind names. Only a runtime cycle fails the gate. */
 export type TBaselineCycleKind = "runtime";
@@ -28,6 +28,30 @@ export interface IAllowedUnresolved {
   readonly specifier: string;
   readonly from: string;
   readonly reason: string;
+}
+
+/** A measured cycle whose region no longer matches one baseline entry. */
+export interface IChangedCycle {
+  readonly id: string;
+  readonly expected: readonly string[];
+  readonly actual: readonly string[];
+}
+
+/** The comparison of one analysis with the committed baseline. */
+export interface ICycleGate {
+  readonly matched: number;
+  readonly added: readonly ICycleFinding[];
+  readonly changed: readonly IChangedCycle[];
+  readonly stale: readonly ICycleBaselineEntry[];
+  readonly unlisted_unresolved: readonly IUnresolvedRef[];
+  readonly passed: boolean;
+}
+
+/** Which roots gate, and whether a new or a stale entry fails the run. */
+export interface ICycleGateOptions {
+  readonly gateRoots: readonly string[];
+  readonly failOnNew: boolean;
+  readonly failOnStale: boolean;
 }
 
 /** The committed import-cycle baseline. It carries no timestamp and no tool version. */
@@ -149,13 +173,30 @@ export function serializeCycleBaseline(baseline: ICycleBaseline): string {
   return `${JSON.stringify(document, null, 2)}\n`;
 }
 
-/** Builds the baseline from the runtime cycles of one analysis and the reviewed allowlist. */
+/** True when every member of a cycle lies under a gate root, or when no root is configured. */
+function isGateable(finding: ICycleFinding, gateRoots: readonly string[]): boolean {
+  if (gateRoots.length === 0) return true;
+  return finding.files.every((file) => gateRoots.some((root) => file.startsWith(root)));
+}
+
+/** True when two member lists name the same files. */
+function sameMembers(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((file, index) => file === right[index]);
+}
+
+/** True when a measured cycle and a baseline entry share at least one file, which marks the same region. */
+function sharesFile(left: readonly string[], right: readonly string[]): boolean {
+  return left.some((file) => right.includes(file));
+}
+
+/** Builds the baseline from the gateable runtime cycles of one analysis and the reviewed allowlist. */
 export function buildCycleBaseline(
   analysis: ICycleAnalysis,
   allowed: readonly IAllowedUnresolved[] = [],
+  gateRoots: readonly string[] = [],
 ): ICycleBaseline {
   const cycles = analysis.cycles
-    .filter((cycle) => cycle.kind === "runtime")
+    .filter((cycle) => cycle.kind === "runtime" && isGateable(cycle, gateRoots))
     .map((cycle: ICycleFinding) => ({
       id: cycle.id,
       kind: "runtime" as const,
@@ -250,4 +291,51 @@ export async function saveCycleBaseline(
     throw error;
   }
   return path;
+}
+
+/** Compares the gated runtime cycles with the baseline: matched, changed, new and stale. */
+export function compareToBaseline(
+  analysis: ICycleAnalysis,
+  baseline: ICycleBaseline,
+  options: ICycleGateOptions,
+): ICycleGate {
+  const gated = analysis.cycles.filter((cycle) => cycle.kind === "runtime" && isGateable(cycle, options.gateRoots));
+  const remaining = new Map(baseline.cycles.map((cycle) => [cycle.id, cycle]));
+  const added: ICycleFinding[] = [];
+  const changed: IChangedCycle[] = [];
+  let matched = 0;
+  for (const finding of gated) {
+    const entry = remaining.get(finding.id);
+    if (entry !== undefined) {
+      remaining.delete(finding.id);
+      if (sameMembers(entry.files, finding.files)) matched++;
+      else changed.push({ id: finding.id, expected: entry.files, actual: finding.files });
+      continue;
+    }
+    const replaced = [...remaining.values()].find((candidate) => sharesFile(candidate.files, finding.files));
+    if (replaced === undefined) {
+      added.push(finding);
+      continue;
+    }
+    remaining.delete(replaced.id);
+    changed.push({ id: finding.id, expected: replaced.files, actual: finding.files });
+  }
+  const stale = [...remaining.values()].sort((left, right) => left.id.localeCompare(right.id));
+  const allowedKeys = new Set(baseline.allowed_unresolved.map((entry) => `${entry.from}\u0000${entry.specifier}`));
+  const unlisted_unresolved = analysis.graph.unresolved_refs.filter((reference) =>
+    !allowedKeys.has(`${reference.from}\u0000${reference.specifier}`)
+  );
+  const uncatalogued = analysis.graph.unresolved > analysis.graph.unresolved_refs.length;
+  const incomplete = unlisted_unresolved.length > 0 || uncatalogued ||
+    analysis.graph.unresolved > baseline.allowed_unresolved.length;
+  const cyclesPassed = !options.failOnNew || (added.length === 0 && changed.length === 0);
+  const stalePassed = !options.failOnStale || stale.length === 0;
+  return {
+    matched,
+    added,
+    changed,
+    stale,
+    unlisted_unresolved,
+    passed: cyclesPassed && stalePassed && !incomplete,
+  };
 }

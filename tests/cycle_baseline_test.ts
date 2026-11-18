@@ -177,19 +177,24 @@ Deno.test("cycle-baseline-update: the serialized baseline is sorted, timestamp-f
   });
 });
 
+/** Writes a project with one runtime cycle and a catalog that names the baseline. */
+async function writeCycleProject(dir: string, baseline: string | null = "cycle_baseline.json"): Promise<void> {
+  await Deno.mkdir(join(dir, "src"), { recursive: true });
+  await Deno.writeTextFile(
+    join(dir, "catalog.json"),
+    JSON.stringify({
+      version: "1",
+      scopes: { test: ["**/tests/**"], fixture: [] },
+      wholeTree: { importCycles: { baseline } },
+    }),
+  );
+  await Deno.writeTextFile(join(dir, "src/a.ts"), RUNTIME_A);
+  await Deno.writeTextFile(join(dir, "src/b.ts"), RUNTIME_B);
+}
+
 Deno.test("cycle-baseline-update: the CLI writes the baseline and refuses without --allow-write", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(join(dir, "src"));
-    await Deno.writeTextFile(
-      join(dir, "catalog.json"),
-      JSON.stringify({
-        version: "1",
-        scopes: { test: ["**/tests/**"], fixture: [] },
-        wholeTree: { importCycles: { baseline: "cycle_baseline.json" } },
-      }),
-    );
-    await Deno.writeTextFile(join(dir, "src/a.ts"), RUNTIME_A);
-    await Deno.writeTextFile(join(dir, "src/b.ts"), RUNTIME_B);
+    await writeCycleProject(dir);
 
     const refused = await runCli(dir, ["--update-baseline"], ["run", "--allow-read", "--allow-env", CLI]);
     assertEquals(refused.code, FAILURE_EXIT);
@@ -259,3 +264,99 @@ async function runCli(
     stderr: new TextDecoder().decode(result.stderr),
   };
 }
+
+Deno.test("cycle-baseline-match: the committed baseline passes and --baseline wins over the setting", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir, null);
+    const written = await runCli(dir, ["--update-baseline", "--baseline=alt_baseline.json"], ["run", "-A", CLI]);
+    assertEquals(written.code, 0);
+    const matched = await runCli(dir, ["--baseline=alt_baseline.json"], ["run", "-A", CLI]);
+    assertEquals(matched.code, 0);
+    assertStringIncludes(matched.stderr, "1 matched · 0 new · 0 changed · 0 stale");
+    assertStringIncludes(matched.stderr, "import-cycle gate passed");
+
+    const json = await runCli(dir, ["--baseline=alt_baseline.json", "--format=json"], ["run", "-A", CLI]);
+    const report = JSON.parse(json.stdout) as {
+      baseline: { matched: number; added: readonly object[]; passed: boolean };
+    };
+    assertEquals(report.baseline.matched, 1);
+    assertEquals(report.baseline.added, []);
+    assertEquals(report.baseline.passed, true);
+  });
+});
+
+Deno.test("cycle-baseline-new: a new runtime cycle exits 1 and is named", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    await Deno.writeTextFile(join(dir, "src/c.ts"), 'import { d } from "./d.ts";\nexport const c = d;\n');
+    await Deno.writeTextFile(join(dir, "src/d.ts"), 'import { c } from "./c.ts";\nexport const d = 1;\n');
+    const result = await runCli(dir, [], ["run", "-A", CLI]);
+    assertEquals(result.code, FAILURE_EXIT);
+    assertStringIncludes(result.stderr, "1 new");
+    assertStringIncludes(result.stderr, "NEW runtime");
+    assertStringIncludes(result.stderr, "src/c.ts, src/d.ts");
+    assertStringIncludes(result.stderr, "import-cycle gate failed");
+  });
+});
+
+Deno.test("cycle-baseline-changed: a grown member set exits 1 with a changed-cycle message", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    await Deno.writeTextFile(
+      join(dir, "src/a.ts"),
+      'import { b } from "./b.ts";\nimport { c } from "./c.ts";\nexport const a = b + c;\n',
+    );
+    await Deno.writeTextFile(join(dir, "src/c.ts"), 'import { a } from "./a.ts";\nexport const c = 1;\n');
+    const result = await runCli(dir, [], ["run", "-A", CLI]);
+    assertEquals(result.code, FAILURE_EXIT);
+    assertStringIncludes(result.stderr, "1 changed");
+    assertStringIncludes(result.stderr, "CHANGED runtime");
+    assertStringIncludes(result.stderr, "was src/a.ts, src/b.ts");
+    assertStringIncludes(result.stderr, "now src/a.ts, src/b.ts, src/c.ts");
+  });
+});
+
+Deno.test("cycle-baseline-stale: a removed cycle is advisory and fails with --fail-on-stale", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    await Deno.writeTextFile(join(dir, "src/b.ts"), "export const b = 1;\n");
+    const advisory = await runCli(dir, [], ["run", "-A", CLI]);
+    assertEquals(advisory.code, 0);
+    assertStringIncludes(advisory.stderr, "1 stale");
+    assertStringIncludes(advisory.stderr, "STALE");
+    assertStringIncludes(advisory.stderr, "import-cycle gate passed");
+
+    const strict = await runCli(dir, ["--fail-on-stale"], ["run", "-A", CLI]);
+    assertEquals(strict.code, FAILURE_EXIT);
+    assertStringIncludes(strict.stderr, "import-cycle gate failed");
+  });
+});
+
+Deno.test("cycle-baseline-incomplete-graph: an unlisted specifier fails and an allowlisted one passes", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    await Deno.writeTextFile(
+      join(dir, "src/a.ts"),
+      'import { b } from "./b.ts";\nimport "./missing.ts";\nexport const a = b;\n',
+    );
+    const failed = await runCli(dir, [], ["run", "-A", CLI]);
+    assertEquals(failed.code, FAILURE_EXIT);
+    assertStringIncludes(failed.stderr, "UNRESOLVED src/a.ts imports './missing.ts'");
+
+    const path = join(dir, "cycle_baseline.json");
+    const baseline = JSON.parse(await Deno.readTextFile(path)) as {
+      allowed_unresolved: { specifier: string; from: string; reason: string }[];
+    };
+    baseline.allowed_unresolved = [
+      { specifier: "./missing.ts", from: "src/a.ts", reason: "Optional runtime module." },
+    ];
+    await Deno.writeTextFile(path, JSON.stringify(baseline));
+    const allowed = await runCli(dir, [], ["run", "-A", CLI]);
+    assertEquals(allowed.code, 0);
+    assertStringIncludes(allowed.stderr, "import-cycle gate passed");
+  });
+});
