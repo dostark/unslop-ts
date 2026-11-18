@@ -360,3 +360,38 @@ Deno.test("cycle-baseline-incomplete-graph: an unlisted specifier fails and an a
     assertStringIncludes(allowed.stderr, "import-cycle gate passed");
   });
 });
+
+Deno.test("cycle-baseline-gate-roots: a cycle that reaches production gates, a test-only cycle stays advisory", async () => {
+  const { compareToBaseline } = await import("../src/rules/whole_tree/cycle_baseline.ts");
+  const finding = (id: string, files: readonly string[]): ICycleFinding => ({
+    id,
+    kind: "runtime",
+    files: [...files],
+    edges: [],
+    path: [...files, files[0]],
+    path_truncated: false,
+    size: files.length,
+    edge_count: files.length,
+  });
+  const production = finding("cyc-1023456789abcdef", ["packages/a/src/a.ts", "tests/helpers/b.ts"]);
+  const testOnly = finding("cyc-2023456789abcdef", ["tests/helpers/c.ts", "tests/helpers/d.ts"]);
+  const analysis: ICycleAnalysis = {
+    cycles: [production, testOnly],
+    totals: { runtime_sccs: 2, type_only_sccs: 0, mixed_sccs: 0, files: 4, edges: 4, largest_files: 2 },
+    graph: { complete: true, code_files: 4, runtime_edges: 4, type_edges: 0, unresolved: 0, unresolved_refs: [] },
+  };
+  const baseline: ICycleBaseline = {
+    version: CYCLE_BASELINE_VERSION,
+    allowed_unresolved: [],
+    cycles: [{ id: production.id, kind: "runtime", files: production.files }],
+  };
+  const options = { gateRoots: ["packages/", "apps/"], failOnNew: true, failOnStale: true };
+  const gate = compareToBaseline(analysis, baseline, options);
+  assertEquals(gate.added, []);
+  assertEquals(gate.matched, 1);
+  assertEquals(gate.passed, true);
+
+  const withoutBaselineEntry = compareToBaseline(analysis, { ...baseline, cycles: [] }, options);
+  assertEquals(withoutBaselineEntry.added.map((cycle) => cycle.id), [production.id]);
+  assertEquals(withoutBaselineEntry.passed, false);
+});

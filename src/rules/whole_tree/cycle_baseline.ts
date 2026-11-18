@@ -173,10 +173,10 @@ export function serializeCycleBaseline(baseline: ICycleBaseline): string {
   return `${JSON.stringify(document, null, 2)}\n`;
 }
 
-/** True when every member of a cycle lies under a gate root, or when no root is configured. */
+/** True when a cycle reaches a gate root, or when no root is configured. A test-only cycle stays advisory. */
 function isGateable(finding: ICycleFinding, gateRoots: readonly string[]): boolean {
   if (gateRoots.length === 0) return true;
-  return finding.files.every((file) => gateRoots.some((root) => file.startsWith(root)));
+  return finding.files.some((file) => gateRoots.some((root) => file.startsWith(root)));
 }
 
 /** True when two member lists name the same files. */

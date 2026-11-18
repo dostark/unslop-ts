@@ -91,7 +91,7 @@ The gate also fails on an incomplete graph: an unresolved reference that `allowe
 specifier and source file, fails the run and is named. An allowlisted reference passes, and the list may shrink but
 not grow without a reviewed edit to the committed file. A baseline that lists more than the measured unresolved
 count still passes only when every measured reference appears on the list. `gateRoots` limits the gate to cycles
-whose files all sit under a listed prefix, so a test-only cycle stays advisory while it is still reported.
+that include a file under a listed prefix, so a test-only cycle stays advisory while it is still reported.
 
 Exit codes: `0` passes; `1` means a new or changed runtime cycle, an incompleteness the allowlist does not cover, a
 malformed baseline or a missing `--allow-write`; `2` means a usage error, an out-of-root path or an unsupported
