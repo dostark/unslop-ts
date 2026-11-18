@@ -7,9 +7,11 @@
  * @related-files [src/cli/whole_tree.ts, src/rules/whole_tree/checks.ts, src/rules/whole_tree/options.ts]
  */
 
-import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { join } from "@std/path";
 import { compileConfig, ConfigError, type JsonValue } from "../mod.ts";
+import type { ICycleAnalysis, ICycleFinding } from "../src/rules/whole_tree/import_cycles.ts";
+import { cycleJsonReport, MAX_CYCLES_REPORTED } from "../src/rules/whole_tree/cycle_report.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
 import { runDeno } from "./helpers/demo_project.ts";
 
@@ -192,4 +194,136 @@ Deno.test("import-cycles-options: an invalid settings value exits 2 before any r
     assertStringIncludes(result.stderr, "wholeTree.importCycles.minFiles");
     assertEquals(result.stdout, "");
   });
+});
+
+Deno.test("import-cycles-trace: --trace keeps only the cycles that contain the file", async () => {
+  await inProject({}, async (dir) => {
+    const runtime = await run(dir, "--format=json", "--trace=src/a.ts");
+    assertEquals(runtime.code, 0);
+    const report = JSON.parse(runtime.stdout) as { cycles: readonly { kind: string; files: readonly string[] }[] };
+    assertEquals(report.cycles.map((cycle) => cycle.kind), ["runtime"]);
+    assertEquals(report.cycles[0].files, ["src/a.ts", "src/b.ts"]);
+
+    const typed = await run(dir, "--format=json", "--trace=src/t1.ts");
+    const typedReport = JSON.parse(typed.stdout) as { cycles: readonly { kind: string }[] };
+    assertEquals(typedReport.cycles.map((cycle) => cycle.kind), ["type-only"]);
+
+    const escaped = await run(dir, "--trace=../escape.ts");
+    assertEquals(escaped.code, USAGE_EXIT);
+    assertStringIncludes(escaped.stderr, "inside the project root");
+  });
+});
+
+Deno.test("import-cycles-trace-miss: a file outside every cycle gives an empty result and exit 0", async () => {
+  await inProject({}, async (dir) => {
+    await Deno.writeTextFile(join(dir, "src/lonely.ts"), "export const lonely = 1;\n");
+    const json = await run(dir, "--format=json", "--trace=src/lonely.ts");
+    assertEquals(json.code, 0);
+    const report = JSON.parse(json.stdout) as { cycles: readonly object[]; totals: { runtime_sccs: number } };
+    assertEquals(report.cycles, []);
+    assertEquals(report.totals.runtime_sccs, 1);
+
+    const text = await run(dir, "--trace=src/lonely.ts");
+    assertEquals(text.code, 0);
+    assertStringIncludes(text.stdout, "No cycle contains src/lonely.ts");
+  });
+});
+
+Deno.test("import-cycles-sarif: one result per cycle carries the stable rule id and member locations", async () => {
+  await inProject({}, async (dir) => {
+    const result = await run(dir, "--format=sarif");
+    assertEquals(result.code, 0);
+    const sarif = JSON.parse(result.stdout) as {
+      version: string;
+      runs: readonly {
+        tool: { driver: { rules: readonly { id: string }[] } };
+        results: readonly {
+          ruleId: string;
+          message: { text: string };
+          locations: readonly { physicalLocation: { artifactLocation: { uri: string } } }[];
+          properties: { cycleId: string; kind: string };
+        }[];
+        properties: { truncated: boolean };
+      }[];
+    };
+    assertEquals(sarif.version, "2.1.0");
+    const sarifRun = sarif.runs[0];
+    assertEquals(sarifRun.tool.driver.rules.map((rule) => rule.id), ["unslop/import-cycle"]);
+    assertEquals(sarifRun.results.length, 2);
+    assertEquals(sarifRun.properties.truncated, false);
+    assertEquals(sarifRun.results[0].ruleId, "unslop/import-cycle");
+    assertEquals(sarifRun.results[0].properties.kind, "runtime");
+    assertStringIncludes(sarifRun.results[0].properties.cycleId, "cyc-");
+    assertStringIncludes(sarifRun.results[0].message.text, "runtime cycle");
+    assertEquals(
+      sarifRun.results[0].locations.map((location) => location.physicalLocation.artifactLocation.uri),
+      ["src/a.ts", "src/b.ts"],
+    );
+  });
+});
+
+Deno.test("import-cycles-top: --top changes the listed rows and keeps every total", async () => {
+  await inProject({}, async (dir) => {
+    const result = await run(dir, "--top=1");
+    assertEquals(result.code, 0);
+    assertStringIncludes(result.stdout, "1 shown of 2 cycle(s)");
+    assertStringIncludes(result.stdout, "1 runtime cycle(s)");
+    assertStringIncludes(result.stdout, "1 type-only cycle(s)");
+  });
+});
+
+/** A synthetic analysis with `count` two-file runtime cycles, for the report bounds. */
+function analysisOf(count: number): ICycleAnalysis {
+  const cycles: ICycleFinding[] = [];
+  for (let index = 0; index < count; index++) {
+    const first = `src/f${index}a.ts`;
+    const second = `src/f${index}b.ts`;
+    cycles.push({
+      id: `cyc-${String(index).padStart(16, "0")}`,
+      kind: "runtime",
+      files: [first, second],
+      edges: [
+        { from: first, to: second, kind: "runtime", form: "import" },
+        { from: second, to: first, kind: "runtime", form: "import" },
+      ],
+      path: [first, second, first],
+      path_truncated: false,
+      size: 2,
+      edge_count: 2,
+    });
+  }
+  return {
+    cycles,
+    totals: {
+      runtime_sccs: count,
+      type_only_sccs: 0,
+      mixed_sccs: 0,
+      files: count * 2,
+      edges: count * 2,
+      largest_files: 2,
+    },
+    graph: {
+      complete: true,
+      code_files: count * 2,
+      runtime_edges: count * 2,
+      type_edges: 0,
+      unresolved: 0,
+      unresolved_refs: [],
+    },
+  };
+}
+
+Deno.test("import-cycles-bounded: the report caps the rows and honours the byte bound without source text", () => {
+  const analysis = analysisOf(MAX_CYCLES_REPORTED + 5);
+  const capped = cycleJsonReport(analysis, analysis.cycles, MAX_CYCLES_REPORTED + 5);
+  assertEquals(capped.cycles.length, MAX_CYCLES_REPORTED);
+  assertEquals(capped.truncated, true);
+  assertEquals(capped.totals.runtime_sccs, MAX_CYCLES_REPORTED + 5);
+
+  const tight = cycleJsonReport(analysis, analysis.cycles, analysis.cycles.length, 400);
+  assert(tight.cycles.length < MAX_CYCLES_REPORTED);
+  assertEquals(tight.truncated, true);
+  const text = JSON.stringify(tight);
+  assert(!text.includes("export const"));
+  assert(text.length <= 400);
 });

@@ -9,6 +9,7 @@
 
 import { extname, toFileUrl } from "@std/path";
 import type { ICompiledConfig, IResolvedRule } from "../config/descriptor.ts";
+import type { ICycleFinding, TCycleKind } from "../rules/whole_tree/import_cycles.ts";
 import type { IFinding, IRunReport } from "./model.ts";
 import { TOOL_VERSION } from "./version.ts";
 
@@ -171,6 +172,105 @@ export function sarifReport(report: IRunReport): Record<string, unknown> {
         message: { text: report.failure },
       }],
     }],
+  };
+  return { $schema: SARIF_SCHEMA, version: "2.1.0", runs: [run] };
+}
+
+/** The SARIF level of one cycle kind. Runtime cycles fail; the other kinds are advisory. */
+type SarifLevel = "error" | "warning" | "note";
+
+/** The stable SARIF rule id of an import cycle. */
+const CYCLE_RULE_ID = "unslop/import-cycle";
+
+/** The SARIF rule descriptor of the import-cycle check. */
+function cycleDescriptor(): ISarifDescriptor {
+  return {
+    id: CYCLE_RULE_ID,
+    name: CYCLE_RULE_ID,
+    shortDescription: { text: "A set of files that import each other in a cycle." },
+    fullDescription: {
+      text:
+        "A set of files that import each other in a cycle. A runtime cycle fails the gate; a type-only and a mixed cycle are advisory.",
+    },
+    help: { text: "#import-cycles" },
+    properties: { tags: ["imports"], category: "imports" },
+  };
+}
+
+/** The SARIF level of one cycle: runtime fails, mixed warns, and type-only is a note. */
+function cycleLevel(kind: TCycleKind): SarifLevel {
+  if (kind === "runtime") return "error";
+  return kind === "mixed" ? "warning" : "note";
+}
+
+/** The one-line SARIF message of one cycle, with no source text. */
+function cycleMessage(cycle: ICycleFinding): string {
+  return `${cycle.kind} cycle ${cycle.id} with ${cycle.size} file(s); break at ${cycle.path.join(" -> ")}`;
+}
+
+/** One SARIF result per cycle, located at every member file. */
+function cycleResult(cycle: ICycleFinding): object {
+  return {
+    ruleId: CYCLE_RULE_ID,
+    ruleIndex: 0,
+    level: cycleLevel(cycle.kind),
+    message: { text: cycleMessage(cycle) },
+    locations: cycle.files.map((file) => ({
+      physicalLocation: { artifactLocation: { uri: encodePath(file), uriBaseId: SRCROOT } },
+    })),
+    partialFingerprints: { "unslop-cycle/v1": cycle.id },
+    properties: { cycleId: cycle.id, kind: cycle.kind, size: cycle.size, path: [...cycle.path] },
+  };
+}
+
+/** The unique member files of a cycle set, as SARIF artifacts. */
+function cycleArtifactsOf(cycles: readonly ICycleFinding[]): object[] {
+  const seen = new Set<string>();
+  const artifacts: object[] = [];
+  for (const cycle of cycles) {
+    for (const file of cycle.files) {
+      if (seen.has(file)) continue;
+      seen.add(file);
+      artifacts.push({
+        location: { uri: encodePath(file), uriBaseId: SRCROOT },
+        sourceLanguage: sourceLanguage(file),
+      });
+    }
+  }
+  return artifacts;
+}
+
+/** A SARIF log envelope. A run stays dynamic because the schema allows many optional members. */
+export interface ISarifLog {
+  readonly $schema: string;
+  readonly version: string;
+  readonly runs: readonly object[];
+}
+
+/** Renders an import cycle analysis as SARIF 2.1.0, with one result per cycle. */
+export function sarifCycleReport(
+  cycles: readonly ICycleFinding[],
+  projectRoot: string,
+  truncated: boolean,
+): ISarifLog {
+  const run = {
+    tool: {
+      driver: {
+        name: "unslop-ts",
+        version: TOOL_VERSION,
+        informationUri: TOOL_URI,
+        rules: [cycleDescriptor()],
+      },
+    },
+    originalUriBaseIds: {
+      [SRCROOT]: {
+        uri: toFileUrl(projectRoot.endsWith("/") ? projectRoot : `${projectRoot}/`).href,
+      },
+    },
+    columnKind: "unicodeCodePoints",
+    artifacts: cycleArtifactsOf(cycles),
+    results: cycles.map(cycleResult),
+    properties: { truncated },
   };
   return { $schema: SARIF_SCHEMA, version: "2.1.0", runs: [run] };
 }

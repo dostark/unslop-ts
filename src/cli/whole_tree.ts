@@ -25,6 +25,7 @@ import { fromFileUrl, relative } from "@std/path";
 import { CliError } from "./error.ts";
 import { loadConfigDescriptor, readAndCompile } from "./project_loader.ts";
 import { asJsonRecord, asJsonValue, CatalogError, type ICatalogScopes, type JsonValue } from "../engine/catalog.ts";
+import { normalize } from "../engine/posix_path.ts";
 import { selectionEnvNameForRule } from "../engine/rule_gate.ts";
 import { checkRepository as checkConstantRestatement } from "../rules/whole_tree/constant_restatement.ts";
 import {
@@ -60,7 +61,7 @@ import {
 } from "../rules/whole_tree/duplicate_views.ts";
 import { checkMagicLiterals } from "../rules/whole_tree/magic_check.ts";
 import { formatMagicViolation } from "../rules/whole_tree/magic_literals.ts";
-import type { ICycleAnalysis, ICycleFinding } from "../rules/whole_tree/import_cycles.ts";
+import { cycleJsonReport, cycleSarifReport, cycleTextReport } from "../rules/whole_tree/cycle_report.ts";
 import { collectCycleAnalysis } from "../report/health.ts";
 import { DEFAULT_TOP_CYCLES } from "../report/constants.ts";
 import {
@@ -91,19 +92,24 @@ const USAGE_EXIT = 2;
 const GROUP_FLAG = "--group=";
 const TEXT_FORMAT = "text";
 const JSON_FORMAT = "json";
-const REPORT_FORMATS: readonly TReportFormat[] = [TEXT_FORMAT, JSON_FORMAT];
+const SARIF_FORMAT = "sarif";
+const REPORT_FORMATS: readonly TReportFormat[] = [TEXT_FORMAT, JSON_FORMAT, SARIF_FORMAT];
 const FAIL_FLAG = "--fail";
 const INCLUDE_SELF_FLAG = "--include-self";
 const INCLUDE_TYPE_ONLY_FLAG = "--include-type-only";
+const DRIVE_LETTER = /^[A-Za-z]:/;
 
 /** A report format a whole-tree check can write. */
-type TReportFormat = typeof TEXT_FORMAT | typeof JSON_FORMAT;
+type TReportFormat = typeof TEXT_FORMAT | typeof JSON_FORMAT | typeof SARIF_FORMAT;
 
 /** The report format the command line asks for, or the text default. */
-function parseReportFormat(args: readonly string[]): TReportFormat {
+function parseReportFormat(
+  args: readonly string[],
+  allowed: readonly TReportFormat[] = REPORT_FORMATS,
+): TReportFormat {
   const format = flagValue(args, "format") ?? TEXT_FORMAT;
-  const known = REPORT_FORMATS.find((candidate) => candidate === format);
-  if (known === undefined) exitWithUsage(`--format must be ${REPORT_FORMATS.join(" or ")}.`);
+  const known = allowed.find((candidate) => candidate === format);
+  if (known === undefined) exitWithUsage(`--format must be ${allowed.join(" or ")}.`);
   return known;
 }
 
@@ -404,7 +410,7 @@ interface IDuplicateRun {
 }
 
 function parseDuplicateRun(settings: IDuplicateCodeSettings, args: readonly string[]): IDuplicateRun {
-  const format = parseReportFormat(args);
+  const format = parseReportFormat(args, [TEXT_FORMAT, JSON_FORMAT]);
   const updating = args.includes("--update-baseline");
   const surveying = flagValue(args, "max-gap-lines") !== undefined;
   if (updating && settings.baseline === null) {
@@ -450,8 +456,6 @@ async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly
   Deno.exit(1);
 }
 
-const REPORT_VERSION = 1;
-
 /** The catalog fields that select the files a scan reads. */
 interface ICycleScan {
   readonly scopes: ICatalogScopes;
@@ -479,73 +483,15 @@ function cycleScanOf(catalog: JsonValue): ICycleScan {
   };
 }
 
-/** The summary lines of one cycle report, shared by the text and the JSON view. */
-function cycleSummaryLines(analysis: ICycleAnalysis): string[] {
-  const { totals, graph } = analysis;
-  const lines = [
-    `${totals.runtime_sccs} runtime cycle(s) · ${totals.files} file(s) in runtime cycles · ` +
-    `${totals.type_only_sccs} type-only cycle(s) · ${totals.mixed_sccs} mixed cycle(s)`,
-    `${graph.runtime_edges} runtime edge(s) · ${graph.type_edges} type edge(s) · ${graph.code_files} code file(s)`,
-  ];
-  if (graph.complete) {
-    lines.push("Graph complete within the scan scope.");
-    return lines;
+/** The repository-relative path that `--trace` names, or null when the command line omits it. */
+function tracePathOf(args: readonly string[]): string | null {
+  const raw = flagValue(args, "trace");
+  if (raw === undefined) return null;
+  const path = normalize(raw);
+  if (path === "." || path === ".." || path.startsWith("../") || path.startsWith("/") || DRIVE_LETTER.test(path)) {
+    return exitWithUsage("--trace must be a file path inside the project root.");
   }
-  lines.push(
-    `Graph incomplete · ${graph.unresolved} unresolved reference(s); the gate cannot certify a cycle-free run.`,
-  );
-  for (const reference of graph.unresolved_refs) {
-    lines.push(`  ${reference.from} imports '${reference.specifier}'`);
-  }
-  return lines;
-}
-
-/** The lines of one cycle finding. */
-function findingLines(finding: ICycleFinding): string[] {
-  const lines = [
-    `${finding.kind} ${finding.id} · ${finding.size} file(s) · ${finding.edge_count} edge(s)`,
-    `  members: ${finding.files.join(", ")}`,
-    `  path: ${finding.path.join(" -> ")}${finding.path_truncated ? " (truncated)" : ""}`,
-  ];
-  if (finding.edges.length > 0) {
-    lines.push("  edges:");
-    for (const edge of finding.edges) lines.push(`    ${edge.from} -> ${edge.to} (${edge.kind}, ${edge.form})`);
-  }
-  return lines;
-}
-
-/** The text view of one cycle report. */
-function printCycleReport(analysis: ICycleAnalysis, top: number): void {
-  console.log("UNSLOP IMPORT CYCLES");
-  console.log("====================");
-  for (const line of cycleSummaryLines(analysis)) console.log(line);
-  if (analysis.cycles.length === 0) {
-    console.log("\n✅ No import cycles found.");
-    return;
-  }
-  const shown = analysis.cycles.slice(0, top);
-  console.log(`\n${shown.length} shown of ${analysis.cycles.length} cycle(s):`);
-  for (const finding of shown) console.log([...findingLines(finding), ""].join("\n"));
-}
-
-/** The JSON view of one cycle report. */
-interface ICycleJsonReport {
-  readonly version: number;
-  readonly truncated: boolean;
-  readonly totals: ICycleAnalysis["totals"];
-  readonly graph: ICycleAnalysis["graph"];
-  readonly cycles: readonly ICycleFinding[];
-}
-
-/** The JSON view of one cycle report; `truncated` says whether `--top` hid a row. */
-function cycleJsonReport(analysis: ICycleAnalysis, top: number): ICycleJsonReport {
-  return {
-    version: REPORT_VERSION,
-    truncated: analysis.cycles.length > top,
-    totals: analysis.totals,
-    graph: analysis.graph,
-    cycles: analysis.cycles.slice(0, top),
-  };
+  return path;
 }
 
 async function runImportCycles(
@@ -554,6 +500,7 @@ async function runImportCycles(
   args: readonly string[],
 ): Promise<void> {
   const format = parseReportFormat(args);
+  const trace = tracePathOf(args);
   const options = {
     minFiles: positiveIntFlag(args, "min-files", settings.minFiles),
     includeSelf: settings.includeSelf || args.includes(INCLUDE_SELF_FLAG),
@@ -564,9 +511,15 @@ async function runImportCycles(
     { rootPath: input.rootPath, ignoreGlobs: scan.ignoreGlobs, scopes: scan.scopes },
     options,
   );
+  const rows = trace === null ? analysis.cycles : analysis.cycles.filter((cycle) => cycle.files.includes(trace));
   const top = positiveIntFlag(args, "top", DEFAULT_TOP_CYCLES);
-  if (format === JSON_FORMAT) console.log(JSON.stringify(cycleJsonReport(analysis, top), null, 2));
-  else printCycleReport(analysis, top);
+  if (format === SARIF_FORMAT) {
+    console.log(JSON.stringify(cycleSarifReport(rows, top, input.rootPath).sarif, null, 2));
+  } else if (format === JSON_FORMAT) {
+    console.log(JSON.stringify(cycleJsonReport(analysis, rows, top), null, 2));
+  } else {
+    console.log(cycleTextReport(analysis, rows, top, trace).text);
+  }
   if (args.includes(FAIL_FLAG) && analysis.totals.runtime_sccs > 0) {
     console.error(`\n❌ ${analysis.totals.runtime_sccs} runtime cycle(s) found — break the cycle.`);
     Deno.exit(1);

@@ -34,14 +34,15 @@ Run it on a project the compiled descriptor names:
 deno run -A <path-to-unslop-ts>/src/cli/whole_tree.ts --descriptor=<project descriptor> --rule=import-cycles
 ```
 
-| Flag                  | Source | Default | Effect                                                          |
-| --------------------- | ------ | ------- | --------------------------------------------------------------- |
-| `--format=text\|json` | both   | `text`  | Report renderer.                                                |
-| `--min-files=<n>`     | both   | `2`     | The smallest SCC that counts as a cycle.                        |
-| `--include-self`      | both   | `false` | Report a one-file self-import.                                  |
-| `--include-type-only` | both   | `true`  | Report type-only and mixed cycles as advisory findings.         |
-| `--top=<n>`           | CLI    | `50`    | Display rows only. The totals always count the full population. |
-| `--fail`              | CLI    | off     | Exit 1 when a runtime cycle exists.                             |
+| Flag                         | Source | Default | Effect                                                          |
+| ---------------------------- | ------ | ------- | --------------------------------------------------------------- |
+| `--format=text\|json\|sarif` | both   | `text`  | Report renderer.                                                |
+| `--min-files=<n>`            | both   | `2`     | The smallest SCC that counts as a cycle.                        |
+| `--include-self`             | both   | `false` | Report a one-file self-import.                                  |
+| `--include-type-only`        | both   | `true`  | Report type-only and mixed cycles as advisory findings.         |
+| `--top=<n>`                  | CLI    | `50`    | Display rows only. The totals always count the full population. |
+| `--trace=<path>`             | CLI    | off     | Show only the cycles that contain the file.                     |
+| `--fail`                     | CLI    | off     | Exit 1 when a runtime cycle exists.                             |
 
 A command-line flag wins over the catalog setting. A bad value exits `2` before any report.
 
@@ -55,6 +56,18 @@ its shortest path, and every internal edge. The JSON report carries the same dat
 `totals`, `graph`, and `cycles`. `graph.complete` is false when an unresolved specifier or a parse failure can hide
 an edge; the report then names each unresolved reference, bounded to the first 100. Each cycle has a stable
 `cyc-` id that hashes the sorted member paths, so a line move keeps the id and a change of membership changes it.
+
+`--format=sarif` writes SARIF 2.1.0 with one `unslop/import-cycle` result per cycle. A runtime cycle is an
+`error`, a mixed cycle a `warning`, and a type-only cycle a `note`. Each result locates every member file and
+carries the cycle id in `properties.cycleId` and in `partialFingerprints["unslop-cycle/v1"]`, so a code-scanning
+view groups the runs of one cycle.
+
+**Bounds.** The report prints at most `--top` rows (50 by default) and never more than 1000 rows, and any renderer
+stops before 8 MiB. The totals always count the full population. When a bound applies, the JSON and the SARIF run
+set `truncated: true` and the text report says so in one line. No renderer prints source text.
+
+**Tracing.** `--trace=<path>` keeps the cycles that contain one file and leaves the totals unchanged. A path
+outside the project root is a usage error, and a file outside every cycle is an empty result with exit code 0.
 
 **Limits.** The graph resolves relative imports and the `imports` maps of the project configs, like the health
 report does. A computed dynamic import, a `tsconfig` path alias, and a package export resolve to no edge, and the

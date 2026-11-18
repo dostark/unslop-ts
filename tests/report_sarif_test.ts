@@ -13,7 +13,7 @@ import * as addFormatsModule from "ajv-formats";
 import schema from "./fixtures/sarif-2.1.0-schema.json" with { type: "json" };
 import { compileConfig } from "../mod.ts";
 import { collectRunReport, type IHostDiagnostic, type ILintRunResult, type IRunReport } from "../src/report/mod.ts";
-import { sarifReport, sarifRules } from "../src/report/sarif.ts";
+import { sarifCycleReport, sarifReport, sarifRules } from "../src/report/sarif.ts";
 import { testDescriptor } from "./helpers/descriptor.ts";
 import type { ISourceSnapshot } from "../src/report/context.ts";
 
@@ -178,6 +178,48 @@ Deno.test("sarif_fingerprints_are_stable_across_runs", () => {
   const run = (list.runs as Record<string, unknown>[])[0];
   assertEquals("results" in run, false);
   assertEquals("invocations" in run, false);
+});
+
+Deno.test("sarif_cycle_report_validates_and_carries_the_cycle_id", () => {
+  const cycle = {
+    id: "cyc-0123456789abcdef",
+    kind: "runtime" as const,
+    files: ["src/a.ts", "src/b.ts"],
+    edges: [],
+    path: ["src/a.ts", "src/b.ts", "src/a.ts"],
+    path_truncated: false,
+    size: 2,
+    edge_count: 2,
+  };
+  const sarif = sarifCycleReport([cycle], "/demo", false);
+  assert(VALIDATOR(sarif), JSON.stringify(VALIDATOR.errors));
+  const run = (sarif.runs as Record<string, unknown>[])[0];
+  const rules = (run.tool as { driver: { rules: Record<string, unknown>[] } }).driver.rules;
+  assertEquals(rules.map((rule) => rule.id), ["unslop/import-cycle"]);
+  const results = run.results as Record<string, unknown>[];
+  assertEquals(results.length, 1);
+  assertEquals(results[0].ruleId, "unslop/import-cycle");
+  assertEquals(results[0].level, "error");
+  assertEquals(results[0].properties, {
+    cycleId: "cyc-0123456789abcdef",
+    kind: "runtime",
+    size: 2,
+    path: ["src/a.ts", "src/b.ts", "src/a.ts"],
+  });
+  const locations = results[0].locations as {
+    physicalLocation: { artifactLocation: { uri: string; uriBaseId: string } };
+  }[];
+  assertEquals(locations.map((location) => location.physicalLocation.artifactLocation.uri), [
+    "src/a.ts",
+    "src/b.ts",
+  ]);
+  assertEquals(locations[0].physicalLocation.artifactLocation.uriBaseId, "%SRCROOT%");
+
+  const advisory = sarifCycleReport([{ ...cycle, kind: "type-only" }], "/demo", true);
+  assert(VALIDATOR(advisory), JSON.stringify(VALIDATOR.errors));
+  const advisoryRun = (advisory.runs as Record<string, unknown>[])[0];
+  assertEquals((advisoryRun.results as Record<string, unknown>[])[0].level, "note");
+  assertEquals((advisoryRun.properties as Record<string, unknown>).truncated, true);
 });
 
 Deno.test("sarif_base_uri_is_a_directory_uri", () => {
