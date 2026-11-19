@@ -283,7 +283,29 @@ export async function saveCycleBaseline(
 ): Promise<string> {
   const path = await resolveInsideRoot(repoRoot, relative);
   const temporary = `${path}.tmp`;
-  await Deno.writeTextFile(temporary, serializeCycleBaseline(baseline));
+  const bytes = new TextEncoder().encode(serializeCycleBaseline(baseline));
+  let handle: Deno.FsFile;
+  try {
+    handle = await Deno.open(temporary, { createNew: true, write: true });
+  } catch (error) {
+    if (error instanceof Deno.errors.AlreadyExists) {
+      throw new CycleBaselineError(`The temporary baseline '${temporary}' already exists; remove it.`, 1);
+    }
+    throw error;
+  }
+  try {
+    let offset = 0;
+    while (offset < bytes.length) offset += await handle.write(bytes.subarray(offset));
+  } catch (error) {
+    try {
+      handle.close();
+    } catch {
+      // The handle is already closed.
+    }
+    await Deno.remove(temporary).catch(() => {});
+    throw error;
+  }
+  handle.close();
   try {
     await Deno.rename(temporary, path);
   } catch (error) {

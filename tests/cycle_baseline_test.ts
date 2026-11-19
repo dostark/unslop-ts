@@ -13,7 +13,9 @@ import type { JsonValue } from "../mod.ts";
 import type { ICycleAnalysis, ICycleFinding } from "../src/rules/whole_tree/import_cycles.ts";
 import {
   buildCycleBaseline,
+  compareToBaseline,
   CYCLE_BASELINE_VERSION,
+  CycleBaselineError,
   type ICycleBaseline,
   loadCycleBaseline,
   MAX_CYCLE_BASELINE_BYTES,
@@ -158,6 +160,42 @@ Deno.test("cycle-baseline-security: a path that leaves the root, a symlink and a
     await assertRejects(() => loadCycleBaseline(root, "broken.json"), "JSON");
     await Deno.writeTextFile(join(root, "big.json"), " ".repeat(MAX_CYCLE_BASELINE_BYTES + 1));
     await assertRejects(() => loadCycleBaseline(root, "big.json"), "bytes");
+  });
+});
+
+Deno.test("cycle-baseline-temp-symlink: a temporary symlink cannot redirect the write", async () => {
+  await withTempDir(async (root) => {
+    const outside = await Deno.makeTempDir({ prefix: "cycle_outside_tmp_" });
+    try {
+      const victim = join(outside, "victim.txt");
+      await Deno.writeTextFile(victim, "original\n");
+      // The compatibility harness grants scoped permissions, and a symlink needs unscoped read and write.
+      let linked = false;
+      try {
+        await Deno.symlink(victim, join(root, "cycle_baseline.json.tmp"));
+        linked = true;
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotCapable)) throw error;
+      }
+      if (!linked) return;
+      await assertRejects(
+        () => saveCycleBaseline(root, "cycle_baseline.json", baselineOf()),
+        CycleBaselineError,
+        "temporary",
+      );
+      assertEquals(await Deno.readTextFile(victim), "original\n");
+      assertEquals(await Deno.lstat(join(root, "cycle_baseline.json")).catch(() => null), null);
+    } finally {
+      await Deno.remove(outside, { recursive: true });
+    }
+  });
+});
+
+Deno.test("cycle-baseline-temp-cleanup: a failed rename leaves no temporary file", async () => {
+  await withTempDir(async (root) => {
+    await Deno.mkdir(join(root, "cycle_baseline.json"));
+    await assertRejects(() => saveCycleBaseline(root, "cycle_baseline.json", baselineOf()));
+    assertEquals(await Deno.lstat(join(root, "cycle_baseline.json.tmp")).catch(() => null), null);
   });
 });
 
@@ -370,8 +408,7 @@ Deno.test("cycle-baseline-incomplete-graph: an unlisted specifier fails and an a
   });
 });
 
-Deno.test("cycle-baseline-gate-roots: a cycle that reaches production gates, a test-only cycle stays advisory", async () => {
-  const { compareToBaseline } = await import("../src/rules/whole_tree/cycle_baseline.ts");
+Deno.test("cycle-baseline-gate-roots: a cycle that reaches production gates, a test-only cycle stays advisory", () => {
   const finding = (id: string, files: readonly string[]): ICycleFinding => ({
     id,
     kind: "runtime",
