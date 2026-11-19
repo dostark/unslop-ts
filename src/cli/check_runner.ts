@@ -76,7 +76,10 @@ import {
 /** The input of one whole-tree check run. */
 export interface ICheckRunInput {
   readonly catalog: JsonValue;
+  /** The project root: the cycle gate and its baseline resolve against it. */
   readonly rootPath: string;
+  /** The directory a file scan walks. Defaults to `rootPath`; the whole-tree CLI sets the process directory. */
+  readonly scanRootPath?: string;
   readonly args: readonly string[];
 }
 
@@ -103,6 +106,7 @@ interface IRunState {
   summary: string;
   writes: string[];
   rootPath: string;
+  scanRootPath: string;
 }
 
 /** A stop that aborts the current run after its code is recorded. */
@@ -119,6 +123,7 @@ function emptyState(): IRunState {
     summary: "no findings",
     writes: [],
     rootPath: "",
+    scanRootPath: "",
   };
 }
 
@@ -221,7 +226,7 @@ function positiveIntFlag(args: readonly string[], name: string, fallback: number
 }
 
 async function runConstantRestatement(settings: IConstantRestatementSettings): Promise<void> {
-  const findings = await checkConstantRestatement(state.rootPath, settings);
+  const findings = await checkConstantRestatement(state.scanRootPath, settings);
   if (findings.length === 0) {
     out("✅ No constant restatements found in tests.");
     finish(true, 0, "no constant restatements");
@@ -332,7 +337,7 @@ async function runUnusedExports(
   parity: boolean,
   options: IParityOptions,
 ): Promise<void> {
-  const report = await checkUnusedExports(state.rootPath, includeExempt, settings, parity, options);
+  const report = await checkUnusedExports(state.scanRootPath, includeExempt, settings, parity, options);
   if (report.findings.length === 0) {
     out(includeExempt ? "✅ No unwired exports found." : "✅ No unwired exports found in the broad report.");
     finish(true, 0, "no unwired exports");
@@ -371,8 +376,8 @@ function selectUnusedFilesScan(
 async function runUnusedFiles(fail: boolean, settings: IUnusedFilesSettings, args: readonly string[]): Promise<void> {
   const manifest = selectUnusedFilesScan(args, settings);
   const report = manifest
-    ? await checkManifestFiles(state.rootPath, manifest)
-    : await checkUnusedFiles(state.rootPath, settings);
+    ? await checkManifestFiles(state.scanRootPath, manifest)
+    : await checkUnusedFiles(state.scanRootPath, settings);
   if (report.findings.length === 0) {
     out(`✅ No unreachable files found in ${report.scannedFileCount} scanned file(s).`);
     finish(true, 0, "no unreachable files");
@@ -537,10 +542,10 @@ async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly
   const selected = selectDuplicateSettings(settings, args);
   // An update has no baseline to check against, and a merge survey changes the clone ids, so both skip the gate.
   const gated = run.updating || run.surveying ? { ...selected, baseline: null } : selected;
-  const report = await checkDuplicateCode(state.rootPath, gated);
+  const report = await checkDuplicateCode(state.scanRootPath, gated);
   printDuplicateReport(report, run);
   if (run.updating) {
-    const written = await saveBaseline(state.rootPath, selected, report);
+    const written = await saveBaseline(state.scanRootPath, selected, report);
     state.writes.push(written);
     err(`\nWrote the duplicate-code baseline to ${written}.`);
   }
@@ -799,7 +804,7 @@ const OPTIONAL_SECTIONS: ReadonlyArray<readonly [TOptionalViolationKind, string,
 ];
 
 function printOptionalViolations(violations: readonly IOptionalViolation[]): void {
-  const root = state.rootPath;
+  const root = state.scanRootPath;
   for (const [kind, header, showCallers] of OPTIONAL_SECTIONS) {
     const group = violations.filter((violation) => violation.kind === kind);
     if (group.length === 0) continue;
@@ -827,7 +832,7 @@ async function applyOptionalFix(violations: readonly IOptionalViolation[]): Prom
     const source = sources.get(violation.funcFile)!;
     sources.set(violation.funcFile, source.slice(0, violation.qTokenPos) + source.slice(violation.qTokenPos + 1));
   }
-  for (const file of sources.keys()) state.writes.push(relative(state.rootPath, file));
+  for (const file of sources.keys()) state.writes.push(relative(state.scanRootPath, file));
   for (const [file, source] of sources) await Deno.writeTextFile(file, source);
   err(`✅ Auto-fixed ${redundant.length} REDUNDANT_OPTIONAL violation(s) across ${sources.size} file(s)`);
 }
@@ -903,11 +908,11 @@ async function runOptionalParams(
     await runOptionalParamsStaged(includeTests, settings);
     return;
   }
-  const violations = await checkOptionalParams(state.rootPath, includeTests, settings);
+  const violations = await checkOptionalParams(state.scanRootPath, includeTests, settings);
   if (verbose && violations.length > 0) {
     for (const violation of violations) {
       err(
-        `\n📋 ${relative(state.rootPath, violation.funcFile)}:${violation.funcLine} — ${violation.optionalParam}`,
+        `\n📋 ${relative(state.scanRootPath, violation.funcFile)}:${violation.funcLine} — ${violation.optionalParam}`,
       );
     }
     err("");
@@ -939,7 +944,7 @@ async function runOptionalParams(
 async function runMagicLiterals(catalog: JsonValue, includeTests: boolean): Promise<void> {
   let violations;
   try {
-    violations = await checkMagicLiterals(state.rootPath, catalog, includeTests);
+    violations = await checkMagicLiterals(state.scanRootPath, catalog, includeTests);
   } catch (error) {
     if (error instanceof CatalogError) return usage(error.message);
     throw error;
@@ -970,7 +975,7 @@ const DUPLICATE_SUBJECT: Readonly<Record<DuplicateRuleKey, string>> = {
 async function runDuplicates(rule: DuplicateRuleKey, catalog: JsonValue): Promise<void> {
   let report;
   try {
-    report = await checkDuplicates(state.rootPath, catalog, rule);
+    report = await checkDuplicates(state.scanRootPath, catalog, rule);
   } catch (error) {
     if (error instanceof CatalogError) return usage(error.message);
     throw error;
@@ -1078,7 +1083,7 @@ async function runSettingsRule(
 
 /** Runs one whole-tree rule over the input and returns a result. A usage fault is code 2, not an exit. */
 export async function runWholeTreeCheck(rule: string, input: ICheckRunInput): Promise<ICheckRunResult> {
-  state = { ...emptyState(), rootPath: input.rootPath };
+  state = { ...emptyState(), rootPath: input.rootPath, scanRootPath: input.scanRootPath ?? input.rootPath };
   try {
     if (!RULES.includes(rule)) usage("Missing or unknown --rule.");
     if (isDuplicateRule(rule)) await runDuplicates(rule, input.catalog);

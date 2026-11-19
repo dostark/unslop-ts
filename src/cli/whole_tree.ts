@@ -93,6 +93,7 @@ async function main(): Promise<void> {
   const result = await runWholeTreeCheck(rule, {
     catalog: input.catalog,
     rootPath: input.rootPath,
+    scanRootPath: await Deno.realPath("."),
     args: Deno.args,
   });
   print(result.stdout);

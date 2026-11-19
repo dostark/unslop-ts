@@ -10,8 +10,10 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import type { JsonValue } from "../mod.ts";
+import { asJsonValue } from "../src/engine/catalog.ts";
 import { runWholeTreeCheck } from "../src/cli/check_runner.ts";
 import { runDeno } from "./helpers/demo_project.ts";
+import { OPTIONAL_PARAMS_SETTINGS } from "./helpers/whole_tree_settings.ts";
 
 const CLI = new URL("../src/cli/whole_tree.ts", import.meta.url).href;
 
@@ -113,4 +115,38 @@ Deno.test("check-runner-side-effect: --update-baseline reports the file it wrote
     const baseline = JSON.parse(await Deno.readTextFile(join(dir, "cycle_baseline.json"))) as ICycleBaselineFixture;
     assertEquals(baseline.cycles.length, 1);
   });
+});
+
+Deno.test("check-runner-scan-root: a scan root different from the project root is walked", async () => {
+  const projectRoot = await Deno.makeTempDir({ prefix: "runner_root_" });
+  const scanRoot = await Deno.makeTempDir({ prefix: "runner_scan_" });
+  try {
+    await Deno.mkdir(join(scanRoot, "src"));
+    await Deno.writeTextFile(
+      join(scanRoot, "src/fixture.ts"),
+      "export function sample(value?: string) { return value; }\n",
+    );
+    const catalog = asJsonValue({
+      version: "1",
+      scopes: { test: [], fixture: [] },
+      wholeTree: { optionalParams: OPTIONAL_PARAMS_SETTINGS },
+    });
+    const scanned = await runWholeTreeCheck("optional-params", {
+      catalog,
+      rootPath: projectRoot,
+      scanRootPath: scanRoot,
+      args: [],
+    });
+    assertEquals(scanned.findings, 1);
+    assertStringIncludes(scanned.stderr, "BARE_OPTIONAL");
+    const unscanned = await runWholeTreeCheck("optional-params", {
+      catalog,
+      rootPath: projectRoot,
+      args: [],
+    });
+    assertEquals(unscanned.findings, 0);
+  } finally {
+    await Deno.remove(projectRoot, { recursive: true });
+    await Deno.remove(scanRoot, { recursive: true });
+  }
 });
