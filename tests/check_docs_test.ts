@@ -57,3 +57,20 @@ Deno.test("check-docs-usage: the usage block and the reference agree on the rout
   const reference = await read(REFERENCE);
   for (const flag of flags) assertStringIncludes(reference, flag);
 });
+
+Deno.test("check-docs-remediation: the reference and the guide name the hardened contracts", async () => {
+  const reference = await read(REFERENCE);
+  const guide = await read(GUIDE);
+  for (
+    const token of [
+      "failed error-level row",
+      "warning-level finding",
+      "no runnable checks selected",
+      "Accepted for compatibility",
+      "advisory check",
+    ]
+  ) {
+    assertStringIncludes(reference, token);
+  }
+  for (const token of ["advisory check", "failed row"]) assertStringIncludes(guide, token);
+});

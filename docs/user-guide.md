@@ -176,9 +176,11 @@ deno task unslop check --category=imports --level=error
 
 `--format=json` writes an envelope with `version`, `descriptor`, `passed` and one row per active rule; each row
 carries `id`, `level`, `ran`, `passed`, `findings`, `summary` and `report`, where `report` is the check's own
-document or `null`. `--format=sarif` works only for a single `--rule=import-cycles` run. A script rule appears as
-`hosted` with its command and is never executed; a plugin rule stays on `unslop report`. Every flag, the permission
-surface and the exit policy are in [Command line](reference/cli.md#run-checks).
+document or `null`. `--strict` promotes a warning-level finding, including an advisory check that reports findings without failing. A
+check that throws is reported as a failed row and the other checks still run. `--format=sarif` works only for a
+single `--rule=import-cycles` run. A script rule appears as `hosted` with its command and is never executed; a plugin
+rule stays on `unslop report`. Every flag, the permission surface and the exit policy are in
+[Command line](reference/cli.md#run-checks).
 
 ## 6. Read and act on a finding
 

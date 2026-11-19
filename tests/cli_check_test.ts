@@ -9,9 +9,11 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import type { JsonValue } from "../src/engine/catalog.ts";
-import { type ICliProjectOptions, runCli, withCliProject } from "./helpers/cli_project.ts";
+import { asJsonValue, type JsonValue } from "../src/engine/catalog.ts";
+import { CLI_PATH, type ICliProjectOptions, runCli, withCliProject } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
+import { loadConfigDescriptor, readConfigAndCompile } from "../src/cli/project_loader.ts";
+import { OPTIONAL_PARAMS_SETTINGS } from "./helpers/whole_tree_settings.ts";
 
 const CYCLE_A = 'import { b } from "./b.ts";\nexport const a = b;\n';
 const CYCLE_B = 'import { a } from "./a.ts";\nexport const b = 1;\n';
@@ -189,6 +191,13 @@ interface ICheckEnvelope {
 
 interface ICycleReportShape {
   readonly cycles?: readonly JsonValue[];
+}
+
+async function writeBareOptional(dir: string): Promise<void> {
+  await Deno.writeTextFile(
+    join(dir, "src/optional.ts"),
+    "export function sample(value?: string) { return value; }\n",
+  );
 }
 
 const DUPLICATE_TYPE_FILES = {
@@ -383,5 +392,151 @@ Deno.test("check-filter-parked-refused: --include-parked exits 2 with the plugin
     const result = await runCli(dir, ["check", "--include-parked"]);
     assertEquals(result.code, 2);
     assertStringIncludes(result.stderr, "plugin-only");
+  });
+});
+
+Deno.test("check-all-rule-error: one broken check is a failed row and the run continues", async () => {
+  await withCycleProject(async (dir) => {
+    await Deno.remove(join(dir, "src/constants.ts"));
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 1, result.stderr);
+    assertStringIncludes(result.stdout, "constant-restatement [error] failed");
+    assertStringIncludes(result.stdout, "duplicate-type [error] passed");
+  });
+});
+
+Deno.test("check-all-failure-detail: the error row carries its message", async () => {
+  await withCycleProject(async (dir) => {
+    await Deno.remove(join(dir, "src/constants.ts"));
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 1, result.stderr);
+    assertStringIncludes(result.stdout, "constant-restatement:");
+    assertStringIncludes(result.stdout, "constants.ts");
+  });
+});
+
+Deno.test("check-route-strict-advisory: --strict promotes an advisory finding", async () => {
+  await withCycleProject(async (dir) => {
+    await writeBareOptional(dir);
+    const plain = await runCli(dir, ["check", "--rule=optional-params"]);
+    assertEquals(plain.code, 0, plain.stderr);
+    const strict = await runCli(dir, ["check", "--rule=optional-params", "--strict"]);
+    assertEquals(strict.code, 1, strict.stderr);
+  }, { "import-cycles": IMPORT_CYCLES_WARN, "optional-params": asJsonValue(["warn", OPTIONAL_PARAMS_SETTINGS]) });
+});
+
+Deno.test("check-all-strict-advisory: the aggregate promotes an advisory finding", async () => {
+  await withCycleProject(async (dir) => {
+    await Deno.remove(join(dir, "src/a.ts"));
+    await Deno.remove(join(dir, "src/b.ts"));
+    await writeBareOptional(dir);
+    const plain = await runCli(dir, ["check"]);
+    assertEquals(plain.code, 0, plain.stderr);
+    const strict = await runCli(dir, ["check", "--strict"]);
+    assertEquals(strict.code, 1, strict.stderr);
+    assertStringIncludes(strict.stdout, "optional-params [warn] failed");
+  }, { "import-cycles": IMPORT_CYCLES_WARN, "optional-params": asJsonValue(["warn", OPTIONAL_PARAMS_SETTINGS]) });
+});
+
+Deno.test("check-filter-config-once: a filtered run reads the project config once", async () => {
+  await withCycleProject(async (dir) => {
+    const descriptor = await loadConfigDescriptor(dir, "examples/unslop.project.ts", null);
+    let reads = 0;
+    const result = await readConfigAndCompile(descriptor, (url) => {
+      reads += 1;
+      return Deno.readTextFile(url);
+    });
+    assertEquals(reads, 1);
+    assertEquals(result.config.profiles.comments, ["tag:comments"]);
+    assert(result.compiled.rules["demo/max-params"] !== undefined);
+  });
+});
+
+Deno.test("check-task-gate-failure: a new cycle fails the route's gate", async () => {
+  await withCycleProject(async (dir) => {
+    await Deno.writeTextFile(
+      join(dir, "baseline.json"),
+      JSON.stringify({ version: 1, allowed_unresolved: [], cycles: [] }),
+    );
+    const result = await runCli(dir, [
+      "check",
+      "--rule=import-cycles",
+      "--baseline=baseline.json",
+      "--fail-on-new",
+      "--strict",
+    ]);
+    assertEquals(result.code, 1, result.stderr);
+    assertStringIncludes(result.stderr, "import-cycle gate failed");
+  }, { "import-cycles": ["warn", { baseline: "baseline.json" }] });
+});
+
+Deno.test("check-filter-exclude-repeatable: repeated excludes drop every named rule", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, [
+      "check",
+      "--exclude=duplicate-type",
+      "--exclude=duplicate-constant",
+    ]);
+    assertEquals(result.code, 0, result.stderr);
+    assertEquals(result.stdout.indexOf("duplicate-type"), -1);
+    assertEquals(result.stdout.indexOf("duplicate-constant"), -1);
+    assertStringIncludes(result.stdout, "constant-restatement");
+  });
+});
+
+Deno.test("check-filter-combination: --select and --profile are refused together", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--select=import-cycles", "--profile=comments"]);
+    assertEquals(result.code, 2);
+    assertStringIncludes(result.stderr, "cannot be combined");
+  });
+});
+
+Deno.test("check-route-baseline-write: --update-baseline writes the baseline", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runDeno(
+      [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-env",
+        CLI_PATH,
+        "check",
+        "--rule=import-cycles",
+        "--baseline=baseline.json",
+        "--update-baseline",
+      ],
+      dir,
+    );
+    assertEquals(result.code, 0, result.stderr);
+    const baseline = JSON.parse(await Deno.readTextFile(join(dir, "baseline.json"))) as {
+      cycles: readonly JsonValue[];
+    };
+    assertEquals(baseline.cycles.length, 1);
+  }, { "import-cycles": ["warn", { baseline: "baseline.json" }] });
+});
+
+Deno.test("check-all-failure-detail: the aggregate prints the failing check's detail", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "import-cycles:");
+    assertStringIncludes(result.stdout, "cyc-");
+  });
+});
+
+Deno.test("check-route-catalog-warning: --catalog states that the compiled catalog is the input", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--rule=import-cycles", "--catalog=catalog.json"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stderr, "accepted for compatibility");
+  });
+});
+
+Deno.test("check-filter-empty: a selection with no runnable check is named", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--select=demo/no-explicit-unknown"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "no runnable checks selected");
   });
 });

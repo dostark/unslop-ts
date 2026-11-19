@@ -228,13 +228,27 @@ export interface IConfigSource {
   readonly value: JsonValue;
 }
 
+/** The parsed version 2 file and the compiled rules from one read. */
+export interface IConfigAndCompilation {
+  readonly compiled: ICompiledConfig;
+  readonly config: IConfigV2;
+}
+
+/** Reads one project config file. A test can inject a counting reader. */
+export type ConfigFileReader = (url: URL) => Promise<string>;
+
+const DEFAULT_CONFIG_READER: ConfigFileReader = (url) => Deno.readTextFile(url);
+
 /** Reads and parses the version 2 file as raw JSON, so an edit can preserve the author's fields. */
-export async function readConfigSource(descriptor: IProjectDescriptor): Promise<IConfigSource> {
+export async function readConfigSource(
+  descriptor: IProjectDescriptor,
+  readTextFile: ConfigFileReader = DEFAULT_CONFIG_READER,
+): Promise<IConfigSource> {
   assertJsonConfig(descriptor.configUrl);
   const label = configLabel(descriptor);
   let text: string;
   try {
-    text = await Deno.readTextFile(descriptor.configUrl);
+    text = await readTextFile(descriptor.configUrl);
   } catch {
     throw new CliError(FAILURE_EXIT, `${label}: cannot read the configuration.`);
   }
@@ -246,9 +260,7 @@ export async function readConfigSource(descriptor: IProjectDescriptor): Promise<
   }
 }
 
-/** Reads and structurally parses the version 2 file without compiling it. */
-export async function readConfigObject(descriptor: IProjectDescriptor): Promise<IConfigV2> {
-  const source = await readConfigSource(descriptor);
+function parseConfigSource(source: IConfigSource, descriptor: IProjectDescriptor): IConfigV2 {
   const result = ConfigV2Schema.safeParse(source.value);
   if (!result.success) {
     const label = configLabel(descriptor);
@@ -257,6 +269,26 @@ export async function readConfigObject(descriptor: IProjectDescriptor): Promise<
     throw new CliError(FAILURE_EXIT, `${label}: ${path}: ${issue?.message ?? "invalid configuration"}`);
   }
   return result.data;
+}
+
+/** Reads and structurally parses the version 2 file without compiling it. */
+export async function readConfigObject(descriptor: IProjectDescriptor): Promise<IConfigV2> {
+  return parseConfigSource(await readConfigSource(descriptor), descriptor);
+}
+
+/** Reads the version 2 file once and returns both its parsed form and the compiled rules. */
+export async function readConfigAndCompile(
+  descriptor: IProjectDescriptor,
+  readTextFile: ConfigFileReader = DEFAULT_CONFIG_READER,
+): Promise<IConfigAndCompilation> {
+  const source = await readConfigSource(descriptor, readTextFile);
+  const config = parseConfigSource(source, descriptor);
+  try {
+    return { compiled: compileConfig(source.value, descriptor), config };
+  } catch (error) {
+    if (error instanceof ConfigError) throw new CliError(FAILURE_EXIT, `${configLabel(descriptor)}: ${error.message}`);
+    throw error;
+  }
 }
 
 /** Reads the version 2 file from disk and compiles it against the descriptor. */

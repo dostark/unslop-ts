@@ -37,27 +37,29 @@ equivalent write-enabled CLI alias.
 The aggregate lists an active `script` rule as `hosted` beside its command and never runs it. A `plugin` rule keeps
 `unslop report`, and naming one on `check` is a usage error. A check that cannot run is named with its reason
 (`needs a child runner` for `duplicate-code` in the aggregate; `no settings` when a future model leaves a section
-absent), never silently omitted. A skipped or hosted row does not fail the run.
+absent), never silently omitted. A skipped or hosted row does not fail the run. A check that throws or returns a
+usage result is a failed error-level row with its message; the rest of the batch still runs.
 
-| Flag                    | Effect                                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--rule=<id>`           | Run one configured whole-tree rule instead of the aggregate.                                                   |
-| `--format=text\|json`   | Write the text report or the JSON envelope. The aggregate refuses `sarif`.                                     |
-| `--format=sarif`        | Single rule only, and only for `import-cycles`. Any other SARIF run exits `2`.                                 |
-| `--strict`              | Promote a failed warn-level rule to exit `1`. The run-level promotion is separate from a check's own `--fail`. |
-| `--fail`                | The check's own flag, forwarded unchanged. It changes what the check reports, not the rule-level exit policy.  |
-| `--select=<tokens>`     | Select rules by id or tag with the same vocabulary as `rules list`. Cannot combine with `--profile`.           |
-| `--profile=<name>`      | Select the named profile.                                                                                      |
-| `--category=<category>` | Keep one rule category.                                                                                        |
-| `--level=error\|warn`   | Keep one effective rule level.                                                                                 |
-| `--exclude=<token>`     | Drop a rule id, bare key or `tag:<tag>`; repeatable.                                                           |
-| `--include-parked`      | Refused: parked state belongs to plugin rules, which use `unslop report`.                                      |
-| `--descriptor=<entry>`  | Load the project descriptor without importing the plugin.                                                      |
-| `--plugin=<entry>`      | Load the project from a local plugin entry.                                                                    |
-| `--catalog=<path>`      | Accepted for compatibility and ignored; the compiled project catalog is the input.                             |
+| Flag                    | Effect                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `--rule=<id>`           | Run one configured whole-tree rule instead of the aggregate.                                                  |
+| `--format=text\|json`   | Write the text report or the JSON envelope. The aggregate refuses `sarif`.                                    |
+| `--format=sarif`        | Single rule only, and only for `import-cycles`. Any other SARIF run exits `2`.                                |
+| `--strict`              | Promote a warning-level finding to exit `1`, including a check that reports findings without failing.         |
+| `--fail`                | The check's own flag, forwarded unchanged. It can make a finding fail; `--strict` then promotes that failure. |
+| `--select=<tokens>`     | Select rules by id or tag with the same vocabulary as `rules list`. Cannot combine with `--profile`.          |
+| `--profile=<name>`      | Select the named profile.                                                                                     |
+| `--category=<category>` | Keep one rule category.                                                                                       |
+| `--level=error\|warn`   | Keep one effective rule level.                                                                                |
+| `--exclude=<token>`     | Drop a rule id, bare key or `tag:<tag>`; repeatable.                                                          |
+| `--include-parked`      | Refused: parked state belongs to plugin rules, which use `unslop report`.                                     |
+| `--descriptor=<entry>`  | Load the project descriptor without importing the plugin.                                                     |
+| `--plugin=<entry>`      | Load the project from a local plugin entry.                                                                   |
+| `--catalog=<path>`      | Accepted for compatibility and ignored with a warning; the compiled project catalog is the input.             |
 
 The filters compose in this order: drop `off` rules, apply the selection, apply the category and level, apply the
-exclusions. An unknown id, tag, category or level exits `2` with the known values.
+exclusions. An unknown id, tag, category or level exits `2` with the known values. A selection that matches no
+runnable whole-tree check prints `no runnable checks selected` and exits `0`.
 
 The JSON envelope is:
 
@@ -90,7 +92,8 @@ The JSON envelope is:
 ```
 
 `report` is the check's own document, or `null` when the check has no JSON. `passed` is false when any run rule
-failed, including a warning-level rule; the exit code applies the level.
+failed, or when `--strict` promotes a warning row with findings; the exit code applies the level. A side-effect run
+also prints the written path to stderr.
 
 Permissions: the whole-tree checks are read-only and need `--allow-read --allow-env`. `duplicate-code` starts jscpd
 through `npx`, so a named single-rule run also needs `--allow-run=node` and a Node.js runtime or a warm npm cache.
@@ -98,8 +101,8 @@ through `npx`, so a named single-rule run also needs `--allow-run=node` and a No
 `optional-params --fix` write files and need `--allow-write`.
 
 Exit codes: `0` when every run rule passes, or only warning-level rules fail; `1` when an error-level rule fails,
-or a warning-level rule fails under `--strict`; `2` for a usage error, an unsupported format, a refused rule, or a
-filter token the command does not know.
+or a warning-level rule has findings under `--strict` (including an advisory check); `2` for a usage error, an
+unsupported format, a refused rule, or a filter token the command does not know.
 
 ```sh
 deno task unslop check --rule=import-cycles

@@ -92,7 +92,6 @@ export interface ICheckRunResult {
   readonly stderr: string;
   readonly json: JsonValue | null;
   readonly summary: string;
-  readonly writes: readonly string[];
 }
 
 /** One run's captured output and verdict. The CLI runs one check at a time. */
@@ -104,7 +103,6 @@ interface IRunState {
   findings: number;
   json: JsonValue | null;
   summary: string;
-  writes: string[];
   rootPath: string;
   scanRootPath: string;
 }
@@ -121,7 +119,6 @@ function emptyState(): IRunState {
     findings: 0,
     json: null,
     summary: "no findings",
-    writes: [],
     rootPath: "",
     scanRootPath: "",
   };
@@ -546,7 +543,6 @@ async function runDuplicateCode(settings: IDuplicateCodeSettings, args: readonly
   printDuplicateReport(report, run);
   if (run.updating) {
     const written = await saveBaseline(state.scanRootPath, selected, report);
-    state.writes.push(written);
     err(`\nWrote the duplicate-code baseline to ${written}.`);
   }
   const failed = failedGroupNames(report, run.updating);
@@ -647,7 +643,6 @@ async function writeCycleBaseline(
       buildCycleBaseline(analysis, update.allowed, settings.gateRoots),
     );
     const written = relative(input.rootPath, path);
-    state.writes.push(written);
     err(`Wrote the import-cycle baseline to ${written}.`);
     finish(true, analysis.totals.runtime_sccs, `wrote ${written}`);
   } catch (error) {
@@ -832,7 +827,6 @@ async function applyOptionalFix(violations: readonly IOptionalViolation[]): Prom
     const source = sources.get(violation.funcFile)!;
     sources.set(violation.funcFile, source.slice(0, violation.qTokenPos) + source.slice(violation.qTokenPos + 1));
   }
-  for (const file of sources.keys()) state.writes.push(relative(state.scanRootPath, file));
   for (const [file, source] of sources) await Deno.writeTextFile(file, source);
   err(`✅ Auto-fixed ${redundant.length} REDUNDANT_OPTIONAL violation(s) across ${sources.size} file(s)`);
 }
@@ -1100,7 +1094,6 @@ export async function runWholeTreeCheck(rule: string, input: ICheckRunInput): Pr
     stderr: state.stderr.map((line) => `${line}\n`).join(""),
     json: state.json,
     summary: state.summary,
-    writes: [...state.writes],
   };
 }
 

@@ -111,7 +111,6 @@ Deno.test("check-runner-side-effect: --update-baseline reports the file it wrote
       args: ["--update-baseline"],
     });
     assertEquals(result.code, 0);
-    assertEquals(result.writes, ["cycle_baseline.json"]);
     const baseline = JSON.parse(await Deno.readTextFile(join(dir, "cycle_baseline.json"))) as ICycleBaselineFixture;
     assertEquals(baseline.cycles.length, 1);
   });

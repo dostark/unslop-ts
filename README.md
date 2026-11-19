@@ -84,8 +84,9 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 `unslop check` runs the configured whole-tree checks from the compiled catalog. With no `--rule` it runs every
 active check and prints one row per rule plus a summary; `--rule=<id>` runs one. `--select`, `--profile`,
 `--category`, `--level` and `--exclude` narrow the aggregate. `--strict` promotes a failed warning-level rule to a
-non-zero exit; a check's own `--fail` stays a check flag. `--format=json` keeps each check's own document under
-`report`, and SARIF is a single-rule format for `import-cycles`.
+non-zero exit, including an advisory check's findings; a check's own `--fail` can make its findings fail first. A
+broken check is a failed row and the rest of the batch still runs. `--format=json` keeps each check's own document
+under `report`, and SARIF is a single-rule format for `import-cycles`.
 
 ```sh
 deno task unslop check
