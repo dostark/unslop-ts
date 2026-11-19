@@ -128,6 +128,10 @@ Deno.test("cycle-self: a self-import is excluded by default and reported with in
   assertEquals(withSelf.cycles.length, 1);
   assertEquals(withSelf.cycles[0].files, ["src/self.ts"]);
   assertEquals(withSelf.cycles[0].kind, "runtime");
+  assertEquals(withSelf.cycles[0].edges, [
+    { from: "src/self.ts", to: "src/self.ts", kind: "runtime", form: "import" },
+  ]);
+  assertEquals(withSelf.cycles[0].edge_count, 1);
 });
 
 Deno.test("cycle-truncated: a long cycle keeps every member and truncates only the path", () => {

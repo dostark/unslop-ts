@@ -86,10 +86,13 @@ import { createMeasurementContext, functionUnits } from "@dostark/unslop-ts/metr
 
 ## Whole-tree: `@dostark/unslop-ts/whole-tree`
 
-The nine whole-tree checks as library functions, for a host script that calls them in-process.
+The whole-tree entry exports the in-process implementations of the duplicate and unused checks, the magic-literal
+detector, and the cycle report types. The package root exports `WHOLE_TREE_CHECKS` and `parseWholeTreeSettings`. Every
+check also runs through the whole-tree CLI, and the cycle check runs only through that CLI.
 
 ```ts
-import { parseWholeTreeSettings, WHOLE_TREE_CHECKS } from "@dostark/unslop-ts/whole-tree";
+import { parseWholeTreeSettings, WHOLE_TREE_CHECKS } from "@dostark/unslop-ts";
+import type { ICycleFinding } from "@dostark/unslop-ts/whole-tree";
 ```
 
 `WHOLE_TREE_CHECKS` maps each check id to its metadata, option schema, controls, and host command.

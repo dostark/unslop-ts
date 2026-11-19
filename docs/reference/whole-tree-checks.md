@@ -61,7 +61,8 @@ its shortest path, and every internal edge. The JSON report carries the same dat
 parse, or a computed dynamic import can hide an edge. The report names each cause: the unresolved references (bounded
 to the first 100), the parse failures (bounded to the first 20), and the computed dynamic import count. The gate fails
 on any of them. Each cycle has a stable `cyc-` id that hashes the sorted member paths, so a line move keeps the id and
-a change of membership changes it.
+a change of membership changes it. A self-import reported with `--include-self` carries its self edge, so its
+`edge_count` is 1.
 
 `--format=sarif` writes SARIF 2.1.0 with one `unslop/import-cycle` result per cycle. A runtime cycle is an
 `error`, a mixed cycle a `warning`, and a type-only cycle a `note`. Each result locates every member file and

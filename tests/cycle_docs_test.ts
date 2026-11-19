@@ -54,3 +54,15 @@ Deno.test("cycle-methodology: the methodology defines every metric, the classifi
   ) assertStringIncludes(METHODOLOGY, term);
   assertStringIncludes(METHODOLOGY, "## Import cycles {#import-cycles}");
 });
+
+const API = await Deno.readTextFile(new URL("../docs/reference/api.md", import.meta.url));
+const REFERENCE = await Deno.readTextFile(new URL("../docs/reference/whole-tree-checks.md", import.meta.url));
+
+Deno.test("cycle-docs-api: the API page describes the barrel accurately and the reference states the self-edge contract", () => {
+  assert(!API.includes("nine whole-tree checks as library functions"), "the API page still promises nine functions");
+  assertStringIncludes(API, "WHOLE_TREE_CHECKS");
+  assertStringIncludes(API, "parseWholeTreeSettings");
+  assertStringIncludes(API, "cycle report types");
+  assertStringIncludes(REFERENCE, "self edge");
+  assertStringIncludes(REFERENCE, "`edge_count` is 1");
+});

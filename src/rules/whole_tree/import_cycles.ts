@@ -342,12 +342,17 @@ function stableCycleId(files: readonly string[]): string {
 }
 
 /** The internal edges of one SCC, sorted and deduplicated. */
-function internalEdges(members: readonly string[], edges: readonly ICycleEdge[]): ICycleEdgeRef[] {
+function internalEdges(
+  members: readonly string[],
+  edges: readonly ICycleEdge[],
+  includeSelf: boolean,
+): ICycleEdgeRef[] {
   const allowed = new Set(members);
   const seen = new Set<string>();
   const refs: ICycleEdgeRef[] = [];
   for (const edge of edges) {
-    if (!allowed.has(edge.from) || !allowed.has(edge.to) || edge.from === edge.to) continue;
+    if (!allowed.has(edge.from) || !allowed.has(edge.to)) continue;
+    if (!includeSelf && edge.from === edge.to) continue;
     const key = `${edge.from}\u0000${edge.to}\u0000${edge.kind}\u0000${edge.form ?? "import"}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -380,7 +385,7 @@ export function analyzeCycles(
     if (!selfOnly && members.length < options.minFiles) continue;
     const kind = kindOf(members, runtime, types);
     if (kind !== "runtime" && !options.includeTypeOnly) continue;
-    const refs = internalEdges(members, edges);
+    const refs = internalEdges(members, edges, options.includeSelf);
     const { path, truncated } = canonicalCycle(members[0], members, union, DEFAULT_MAX_PATH_NODES);
     findings.push({
       id: stableCycleId(members),
