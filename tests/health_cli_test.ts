@@ -971,3 +971,14 @@ Deno.test("health-cycle-legacy-report: a report without cycle_findings still par
     assertEquals(report.schema_version, 2);
   });
 });
+
+Deno.test("health-cycle-text: the structure line carries runtime, type-only, mixed and largest counts", async () => {
+  await withHealthProject(CYCLE_FILES, async (dir) => {
+    const result = await health(dir, []);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "1 runtime cycles");
+    assertStringIncludes(result.stdout, "1 type-only");
+    assertStringIncludes(result.stdout, "0 mixed");
+    assertStringIncludes(result.stdout, "largest 2 files");
+  });
+});

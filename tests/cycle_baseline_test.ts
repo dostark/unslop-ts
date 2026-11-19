@@ -569,3 +569,25 @@ Deno.test("cycle-baseline-allowlist-path: an allowlist source outside the root i
   });
   assertThrows(() => parseCycleBaseline(JSON.stringify(escaped)), "inside the project root");
 });
+
+Deno.test("cycle-baseline-update-preserves-allowlist: an update keeps a reviewed allowlist entry", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    const path = join(dir, "cycle_baseline.json");
+    const baseline = JSON.parse(await Deno.readTextFile(path)) as {
+      allowed_unresolved: { specifier: string; from: string; reason: string }[];
+    };
+    baseline.allowed_unresolved = [
+      { specifier: "./missing.ts", from: "src/a.ts", reason: "Optional runtime module." },
+    ];
+    await Deno.writeTextFile(path, JSON.stringify(baseline));
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    const updated = JSON.parse(await Deno.readTextFile(path)) as {
+      allowed_unresolved: { specifier: string; from: string; reason: string }[];
+    };
+    assertEquals(updated.allowed_unresolved, [
+      { specifier: "./missing.ts", from: "src/a.ts", reason: "Optional runtime module." },
+    ]);
+  });
+});

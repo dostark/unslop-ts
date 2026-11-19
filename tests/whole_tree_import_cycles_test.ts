@@ -330,3 +330,64 @@ Deno.test("import-cycles-bounded: the report caps the rows and honours the byte 
   assert(!text.includes("export const"));
   assert(text.length <= 400);
 });
+
+Deno.test("import-cycles-trace-sarif: a trace narrows the SARIF results", async () => {
+  await inProject({}, async (dir) => {
+    const result = await run(dir, "--format=sarif", "--trace=src/t1.ts");
+    assertEquals(result.code, 0);
+    const sarif = JSON.parse(result.stdout) as {
+      runs: readonly { results: readonly { ruleId: string; level: string }[] }[];
+    };
+    assertEquals(sarif.runs[0].results.length, 1);
+    assertEquals(sarif.runs[0].results[0].ruleId, "unslop/import-cycle");
+    assertEquals(sarif.runs[0].results[0].level, "note");
+  });
+});
+
+Deno.test("import-cycles-default-bounds: the default byte bound truncates only an oversized report", () => {
+  const longPath = (index: number): string => `src/${"x".repeat(2000)}${index}.ts`;
+  const rowsFor = (count: number): ICycleFinding[] =>
+    Array.from({ length: count }, (_, index) => {
+      const first = longPath(index * 2);
+      const second = longPath(index * 2 + 1);
+      return {
+        id: `cyc-${String(index).padStart(16, "0")}`,
+        kind: "runtime",
+        files: [first, second],
+        edges: [],
+        path: [first, second, first],
+        path_truncated: false,
+        size: 2,
+        edge_count: 2,
+      };
+    });
+  const analysisFor = (rows: readonly ICycleFinding[]): ICycleAnalysis => ({
+    cycles: rows,
+    totals: {
+      runtime_sccs: rows.length,
+      type_only_sccs: 0,
+      mixed_sccs: 0,
+      files: rows.length * 2,
+      edges: 0,
+      largest_files: 2,
+    },
+    graph: {
+      complete: true,
+      code_files: rows.length * 2,
+      runtime_edges: 0,
+      type_edges: 0,
+      unresolved: 0,
+      unresolved_refs: [],
+      parse_errors: [],
+      parse_error_count: 0,
+      nonliteral_dynamic: 0,
+    },
+  });
+  const smallRows = rowsFor(300);
+  const small = cycleJsonReport(analysisFor(smallRows), smallRows, smallRows.length);
+  assertEquals(small.truncated, false);
+  const bigRows = rowsFor(2400);
+  const big = cycleJsonReport(analysisFor(bigRows), bigRows, bigRows.length);
+  assertEquals(big.truncated, true);
+  assert(big.cycles.length < bigRows.length);
+});
