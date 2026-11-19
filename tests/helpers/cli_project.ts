@@ -15,6 +15,8 @@ import { runDeno } from "./demo_project.ts";
 export interface ICliProjectOptions {
   /** Rule settings that replace or extend the fixture's own. */
   readonly rules?: Readonly<Record<string, JsonValue>>;
+  /** Named selector profiles that extend the fixture's own. */
+  readonly profiles?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The absolute path of the CLI entry that the tests spawn. */
@@ -131,7 +133,11 @@ export async function withCliProject(
     );
     await Deno.writeTextFile(join(dir, "examples", "unslop.project.ts"), DESCRIPTOR_SOURCE);
     await Deno.writeTextFile(join(dir, "examples", "lint_plugin.ts"), PLUGIN_SOURCE);
-    const config = { ...CONFIG, rules: { ...CONFIG.rules, ...options.rules } };
+    const config = {
+      ...CONFIG,
+      profiles: { ...CONFIG.profiles, ...options.profiles },
+      rules: { ...CONFIG.rules, ...options.rules },
+    };
     await Deno.writeTextFile(join(dir, CONFIG_PATH), JSON.stringify(config, null, 2));
     await body(dir);
   } finally {

@@ -10,7 +10,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import type { JsonValue } from "../src/engine/catalog.ts";
-import { runCli, withCliProject } from "./helpers/cli_project.ts";
+import { type ICliProjectOptions, runCli, withCliProject } from "./helpers/cli_project.ts";
 import { runDeno } from "./helpers/demo_project.ts";
 
 const CYCLE_A = 'import { b } from "./b.ts";\nexport const a = b;\n';
@@ -28,6 +28,7 @@ const CATALOG: JsonValue = {
 async function withCycleProject(
   body: (dir: string) => Promise<void>,
   rules: Readonly<Record<string, JsonValue>> = { "import-cycles": IMPORT_CYCLES_WARN },
+  options: Omit<ICliProjectOptions, "rules"> = {},
 ): Promise<void> {
   await withCliProject(async (dir) => {
     await Deno.mkdir(join(dir, "src"));
@@ -38,7 +39,7 @@ async function withCycleProject(
     await Deno.writeTextFile(join(dir, "tests/placeholder_test.ts"), "export const ok = true;\n");
     await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(CATALOG));
     await body(dir);
-  }, { rules });
+  }, { rules, ...options });
 }
 
 Deno.test("check-route-text: the route prints the whole-tree report for a configured rule", async () => {
@@ -290,5 +291,97 @@ Deno.test("check-all-sarif-refused: the aggregate with --format=sarif exits 2", 
     const result = await runCli(dir, ["check", "--format=sarif"]);
     assertEquals(result.code, 2);
     assertStringIncludes(result.stderr, "aggregate check does not produce SARIF");
+  });
+});
+
+Deno.test("check-filter-select: --select runs only the named rules and tags", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--select=tag:imports,import-cycles"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "import-cycles [warn]");
+    assertEquals(result.stdout.indexOf("duplicate-type"), -1);
+  });
+});
+
+Deno.test("check-filter-profile: a named profile narrows the set", async () => {
+  await withCycleProject(
+    async (dir) => {
+      const result = await runCli(dir, ["check", "--profile=imports"]);
+      assertEquals(result.code, 0, result.stderr);
+      assertStringIncludes(result.stdout, "import-cycles [warn]");
+      assertEquals(result.stdout.indexOf("duplicate-type"), -1);
+    },
+    { "import-cycles": IMPORT_CYCLES_WARN },
+    { profiles: { imports: ["tag:imports"] } },
+  );
+});
+
+Deno.test("check-filter-category: the category narrows the set and composes with a level", async () => {
+  await withCycleProject(async (dir) => {
+    const imports = await runCli(dir, ["check", "--category=imports"]);
+    assertEquals(imports.code, 0, imports.stderr);
+    assertStringIncludes(imports.stdout, "import-cycles [warn]");
+    assertEquals(imports.stdout.indexOf("duplicate-type"), -1);
+    const crossed = await runCli(dir, ["check", "--category=imports", "--level=error"]);
+    assertEquals(crossed.code, 0, crossed.stderr);
+    assertEquals(crossed.stdout.indexOf("import-cycles"), -1);
+  });
+});
+
+Deno.test("check-filter-level: --level=error drops warning-level rules", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--level=error"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertEquals(result.stdout.indexOf("import-cycles"), -1);
+    assertStringIncludes(result.stdout, "duplicate-type [error]");
+  });
+});
+
+Deno.test("check-filter-off-rule: an off rule never enters a selected run", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--select=project-check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertEquals(result.stdout.indexOf("project-check"), -1);
+  }, {
+    "project-check": { level: "off", reason: "Retired for this project." },
+  });
+});
+
+Deno.test("check-filter-exclude: excluding the failing rule flips the exit code", async () => {
+  await withCycleProject(async (dir) => {
+    for (const [name, source] of Object.entries(DUPLICATE_TYPE_FILES)) {
+      await Deno.writeTextFile(join(dir, name), source);
+    }
+    const failing = await runCli(dir, ["check"]);
+    assertEquals(failing.code, 1, failing.stderr);
+    const excluded = await runCli(dir, ["check", "--exclude=duplicate-type"]);
+    assertEquals(excluded.code, 0, excluded.stderr);
+    assertEquals(excluded.stdout.indexOf("duplicate-type"), -1);
+  });
+});
+
+Deno.test("check-filter-unknown: an unknown token exits 2", async () => {
+  await withCycleProject(async (dir) => {
+    for (
+      const args of [
+        ["check", "--select=tag:nope"],
+        ["check", "--category=nope"],
+        ["check", "--level=nope"],
+        ["check", "--exclude=nope"],
+      ]
+    ) {
+      const result = await runCli(dir, args);
+      assertEquals(result.code, 2, `${args.join(" ")}\n${result.stderr}`);
+    }
+    const category = await runCli(dir, ["check", "--category=nope"]);
+    assertStringIncludes(category.stderr, "known:");
+  });
+});
+
+Deno.test("check-filter-parked-refused: --include-parked exits 2 with the plugin-only message", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--include-parked"]);
+    assertEquals(result.code, 2);
+    assertStringIncludes(result.stderr, "plugin-only");
   });
 });

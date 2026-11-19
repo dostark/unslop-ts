@@ -17,8 +17,14 @@ import type { ICompiledConfig, IProjectDescriptor, IResolvedRule } from "../../c
 import { type ICheckRunInput, type ICheckRunResult, runWholeTreeCheck } from "../check_runner.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { print, printError } from "../output.ts";
-import { loadConfigDescriptor, readAndCompile } from "../project_loader.ts";
-import { resolveRuleId, ruleEffectiveLevel, type RuleStatus, ruleStatus } from "../selection.ts";
+import { loadConfigDescriptor, readAndCompile, readConfigObject } from "../project_loader.ts";
+import { resolveRuleId, resolveSelection, ruleEffectiveLevel, type RuleStatus, ruleStatus } from "../selection.ts";
+import {
+  type IResolvedSelection,
+  resolveSelectorTokens,
+  SelectorError,
+  selectorSource,
+} from "../../config/selectors.ts";
 
 const TEXT_FORMAT = "text";
 const JSON_FORMAT = "json";
@@ -29,6 +35,12 @@ const FORMAT_OPTION = "format";
 const DESCRIPTOR_OPTION = "descriptor";
 const PLUGIN_OPTION = "plugin";
 const CATALOG_OPTION = "catalog";
+const SELECT_OPTION = "select";
+const PROFILE_OPTION = "profile";
+const CATEGORY_OPTION = "category";
+const LEVEL_OPTION = "level";
+const EXCLUDE_OPTION = "exclude";
+const INCLUDE_PARKED_FLAG = "include-parked";
 const SUMMARY_VERSION = 1;
 
 /** The formats the route accepts. Only `import-cycles` writes SARIF in this phase. */
@@ -75,13 +87,32 @@ const CHECK_FLAGS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** One parsed check invocation: the route inputs and the flags the runner owns. */
+/** The aggregate filters the command line asks for. */
+interface ICheckFilters {
+  readonly select: string | null;
+  readonly profile: string | null;
+  readonly category: string | null;
+  readonly level: RuleSeverity | null;
+  readonly exclude: readonly string[];
+}
+
+/** The filters resolved against the compiled rules. */
+interface IResolvedFilters {
+  readonly selection: IResolvedSelection | null;
+  readonly category: string | null;
+  readonly level: RuleSeverity | null;
+  readonly excludedIds: ReadonlySet<string>;
+  readonly excludedTags: ReadonlySet<string>;
+}
+
+/** One parsed check invocation: the route inputs, the filters and the flags the runner owns. */
 interface IParsedCheck {
   readonly rule: string | null;
   readonly format: TCheckFormat;
   readonly descriptor: string | null;
   readonly plugin: string | null;
   readonly strict: boolean;
+  readonly filters: ICheckFilters;
   readonly forwarded: readonly string[];
 }
 
@@ -136,26 +167,98 @@ function parseFormat(value: string | undefined): TCheckFormat {
   return value as TCheckFormat;
 }
 
+function parseLevel(value: string | null): RuleSeverity | null {
+  if (value === null) return null;
+  if (value === "error" || value === "warn") return value;
+  usage(`unknown level '${value}'; use error or warn`);
+}
+
+/** The mutable fields the argument loop fills. */
+interface ICheckParseState {
+  ruleToken: string | null;
+  formatValue: string | undefined;
+  descriptor: string | null;
+  plugin: string | null;
+  strict: boolean;
+  select: string | null;
+  profile: string | null;
+  category: string | null;
+  levelValue: string | null;
+  exclude: string[];
+  forwarded: string[];
+}
+
+function emptyParseState(): ICheckParseState {
+  return {
+    ruleToken: null,
+    formatValue: undefined,
+    descriptor: null,
+    plugin: null,
+    strict: false,
+    select: null,
+    profile: null,
+    category: null,
+    levelValue: null,
+    exclude: [],
+    forwarded: [],
+  };
+}
+
+/** Handles a route or input flag; returns false when the argument belongs to a check. */
+function applyRouteArg(state: ICheckParseState, arg: string): boolean {
+  const name = flagName(arg);
+  if (name === RULE_OPTION) state.ruleToken = optionValue(arg);
+  else if (name === FORMAT_OPTION) state.formatValue = optionValue(arg);
+  else if (name === DESCRIPTOR_OPTION) state.descriptor = optionValue(arg);
+  else if (name === PLUGIN_OPTION) state.plugin = optionValue(arg);
+  else if (name === CATALOG_OPTION) optionValue(arg);
+  else if (name === STRICT_FLAG && !arg.includes("=")) state.strict = true;
+  else return false;
+  return true;
+}
+
+/** Handles an aggregate filter flag; returns false when the argument is another flag. */
+function applyFilterArg(state: ICheckParseState, arg: string): boolean {
+  const name = flagName(arg);
+  if (name === SELECT_OPTION) state.select = optionValue(arg);
+  else if (name === PROFILE_OPTION) state.profile = optionValue(arg);
+  else if (name === CATEGORY_OPTION) state.category = optionValue(arg);
+  else if (name === LEVEL_OPTION) state.levelValue = optionValue(arg);
+  else if (name === EXCLUDE_OPTION) state.exclude.push(optionValue(arg));
+  else if (name === INCLUDE_PARKED_FLAG) {
+    usage("--include-parked is plugin-only; whole-tree rules have no parked state.");
+  } else return false;
+  return true;
+}
+
 function parseCheck(args: readonly string[]): IParsedCheck {
-  let ruleToken: string | null = null;
-  let formatValue: string | undefined;
-  let descriptor: string | null = null;
-  let plugin: string | null = null;
-  let strict = false;
-  const forwarded: string[] = [];
+  const state = emptyParseState();
   for (const arg of args) {
     if (!arg.startsWith("--")) usage(`check takes no positional argument: '${arg}'`);
-    const name = flagName(arg);
-    if (name === RULE_OPTION) ruleToken = optionValue(arg);
-    else if (name === FORMAT_OPTION) formatValue = optionValue(arg);
-    else if (name === DESCRIPTOR_OPTION) descriptor = optionValue(arg);
-    else if (name === PLUGIN_OPTION) plugin = optionValue(arg);
-    else if (name === CATALOG_OPTION) optionValue(arg);
-    else if (name === STRICT_FLAG && !arg.includes("=")) strict = true;
-    else forwarded.push(arg);
+    if (applyRouteArg(state, arg)) continue;
+    if (applyFilterArg(state, arg)) continue;
+    state.forwarded.push(arg);
   }
-  if (ruleToken === null && forwarded.length > 0) usage("check flags need --rule=<id>");
-  return { rule: ruleToken, format: parseFormat(formatValue), descriptor, plugin, strict, forwarded };
+  const filters = {
+    select: state.select,
+    profile: state.profile,
+    category: state.category,
+    level: parseLevel(state.levelValue),
+    exclude: state.exclude,
+  };
+  const filtered = state.select !== null || state.profile !== null || state.category !== null ||
+    state.levelValue !== null || state.exclude.length > 0;
+  if (state.ruleToken !== null && filtered) usage("filters apply to the aggregate run, not to --rule.");
+  if (state.ruleToken === null && state.forwarded.length > 0) usage("check flags need --rule=<id>");
+  return {
+    rule: state.ruleToken,
+    format: parseFormat(state.formatValue),
+    descriptor: state.descriptor,
+    plugin: state.plugin,
+    strict: state.strict,
+    filters,
+    forwarded: state.forwarded,
+  };
 }
 
 function assertForwarded(rule: IResolvedRule, forwarded: readonly string[]): void {
@@ -201,6 +304,54 @@ function resolveRule(compiled: ICompiledConfig, token: string): string {
 function warnOffRule(rule: IResolvedRule, status: RuleStatus): void {
   if (status !== "off") return;
   printError(`warning: rule '${rule.id}' is off in this project; running it because it was named explicitly.\n`);
+}
+
+/** Resolves the selection, category, level and exclusions against the compiled rules. */
+async function resolveFilters(
+  filters: ICheckFilters,
+  compiled: ICompiledConfig,
+  descriptor: IProjectDescriptor,
+): Promise<IResolvedFilters> {
+  let selection: IResolvedSelection | null = null;
+  if (filters.select !== null || filters.profile !== null) {
+    const config = await readConfigObject(descriptor);
+    selection = resolveSelection(compiled, config, descriptor.pluginName, filters.select, filters.profile);
+  }
+  if (filters.category !== null) {
+    const categories = new Set<string>();
+    for (const rule of Object.values(compiled.rules)) categories.add(rule.meta.category);
+    if (!categories.has(filters.category)) {
+      usage(`unknown category '${filters.category}'; known: ${[...categories].sort().join(", ")}`);
+    }
+  }
+  let excludedIds: ReadonlySet<string> = new Set();
+  let excludedTags: ReadonlySet<string> = new Set();
+  if (filters.exclude.length > 0) {
+    try {
+      const excluded = resolveSelectorTokens(selectorSource(compiled.rules), filters.exclude.join(","));
+      excludedIds = excluded.ids;
+      excludedTags = excluded.tags;
+    } catch (error) {
+      if (error instanceof SelectorError) usage(error.message);
+      throw error;
+    }
+  }
+  return { selection, category: filters.category, level: filters.level, excludedIds, excludedTags };
+}
+
+function selectedBy(rule: IResolvedRule, selection: IResolvedSelection | null): boolean {
+  if (selection === null) return true;
+  return selection.ids.has(rule.id) || rule.tags.some((tag) => selection.tags.has(tag));
+}
+
+/** The composed filter: drop off rules, then selection, category, level and exclusions. */
+function keepRule(rule: IResolvedRule, filters: IResolvedFilters): boolean {
+  if (rule.configuredLevel === "off") return false;
+  if (!selectedBy(rule, filters.selection)) return false;
+  if (filters.category !== null && rule.meta.category !== filters.category) return false;
+  if (filters.level !== null && levelOf(rule) !== filters.level) return false;
+  if (filters.excludedIds.has(rule.id)) return false;
+  return !rule.tags.some((tag) => filters.excludedTags.has(tag));
 }
 
 function exitCodeOf(level: RuleSeverity, passed: boolean, strict: boolean): number {
@@ -298,10 +449,12 @@ async function aggregateOutcomes(
   compiled: ICompiledConfig,
   descriptor: IProjectDescriptor,
   json: boolean,
+  filters: IResolvedFilters,
 ): Promise<ICheckOutcome[]> {
   const active = Object.values(compiled.rules)
     .filter((rule) => ruleStatus(rule, null) === "active")
     .filter((rule) => rule.engine === "whole-tree" || rule.engine === "script")
+    .filter((rule) => keepRule(rule, filters))
     .sort((left, right) => left.id.localeCompare(right.id));
   const outcomes: ICheckOutcome[] = [];
   for (const rule of active) {
@@ -381,7 +534,8 @@ async function runAggregate(
   descriptor: IProjectDescriptor,
 ): Promise<number> {
   if (parsed.format === SARIF_FORMAT) usage("the aggregate check does not produce SARIF; name one rule.");
-  const outcomes = await aggregateOutcomes(compiled, descriptor, parsed.format === JSON_FORMAT);
+  const filters = await resolveFilters(parsed.filters, compiled, descriptor);
+  const outcomes = await aggregateOutcomes(compiled, descriptor, parsed.format === JSON_FORMAT, filters);
   if (parsed.format === JSON_FORMAT) printAggregateJson(outcomes, descriptor);
   else printAggregateText(outcomes);
   return aggregateExitCode(outcomes, parsed.strict);
