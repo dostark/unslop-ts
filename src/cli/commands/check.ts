@@ -1,19 +1,20 @@
 /**
  * @module CheckCommand
  * @path src/cli/commands/check.ts
- * @description The `check` route: resolves one configured rule and runs it through the shared whole-tree runner.
+ * @description The `check` route: runs one configured whole-tree rule, or every active check, through the shared runner.
  * @architectural-layer Tooling
  * @dependencies [@std/path]
  * @related-files [src/cli/check_runner.ts, src/cli/selection.ts, src/cli/unslop.ts]
  *
  * Usage:
- *   deno run --allow-read --allow-env src/cli/unslop.ts check --rule=<id> [--format=text|json|sarif]
+ *   deno run --allow-read --allow-env src/cli/unslop.ts check [--rule=<id>] [--format=text|json|sarif] [--strict]
  */
 
 import { fromFileUrl } from "@std/path";
-import { asJsonValue, type RuleSeverity } from "../../engine/catalog.ts";
-import type { ICompiledConfig, IResolvedRule } from "../../config/descriptor.ts";
-import { type ICheckRunResult, runWholeTreeCheck } from "../check_runner.ts";
+import { asJsonValue, type JsonValue, type RuleSeverity } from "../../engine/catalog.ts";
+import { WHOLE_TREE_SECTIONS } from "../../config/compile.ts";
+import type { ICompiledConfig, IProjectDescriptor, IResolvedRule } from "../../config/descriptor.ts";
+import { type ICheckRunInput, type ICheckRunResult, runWholeTreeCheck } from "../check_runner.ts";
 import { CliError, FAILURE_EXIT, USAGE_EXIT } from "../error.ts";
 import { print, printError } from "../output.ts";
 import { loadConfigDescriptor, readAndCompile } from "../project_loader.ts";
@@ -28,6 +29,7 @@ const FORMAT_OPTION = "format";
 const DESCRIPTOR_OPTION = "descriptor";
 const PLUGIN_OPTION = "plugin";
 const CATALOG_OPTION = "catalog";
+const SUMMARY_VERSION = 1;
 
 /** The formats the route accepts. Only `import-cycles` writes SARIF in this phase. */
 type TCheckFormat = typeof TEXT_FORMAT | typeof JSON_FORMAT | typeof SARIF_FORMAT;
@@ -35,6 +37,8 @@ type TCheckFormat = typeof TEXT_FORMAT | typeof JSON_FORMAT | typeof SARIF_FORMA
 const FORMATS: readonly string[] = [TEXT_FORMAT, JSON_FORMAT, SARIF_FORMAT];
 const SARIF_RULES: ReadonlySet<string> = new Set(["import-cycles"]);
 const JSON_RULES: ReadonlySet<string> = new Set(["import-cycles", "duplicate-code"]);
+/** The checks that start a child runner, so the aggregate never runs them. */
+const CHILD_RUNNER_RULES: ReadonlySet<string> = new Set(["duplicate-code"]);
 
 /** Every flag a rule's runner consumes. `--format` is common to every route run. */
 const CHECK_FLAGS: Readonly<Record<string, readonly string[]>> = {
@@ -73,7 +77,7 @@ const CHECK_FLAGS: Readonly<Record<string, readonly string[]>> = {
 
 /** One parsed check invocation: the route inputs and the flags the runner owns. */
 interface IParsedCheck {
-  readonly rule: string;
+  readonly rule: string | null;
   readonly format: TCheckFormat;
   readonly descriptor: string | null;
   readonly plugin: string | null;
@@ -81,10 +85,37 @@ interface IParsedCheck {
   readonly forwarded: readonly string[];
 }
 
+/** One rule's row in the aggregate report. */
+interface ICheckRow {
+  readonly id: string;
+  readonly level: RuleSeverity;
+  readonly ran: boolean;
+  readonly passed: boolean;
+  readonly findings: number;
+  readonly summary: string;
+  readonly report: JsonValue | null;
+}
+
+/** A run row plus the captured output that the text report shows on failure. */
+interface ICheckOutcome {
+  readonly row: ICheckRow;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly hosted: boolean;
+}
+
+/** The aggregate JSON document. */
+interface ICheckEnvelope {
+  readonly version: number;
+  readonly descriptor: string;
+  readonly passed: boolean;
+  readonly rules: readonly ICheckRow[];
+}
+
 function usage(message: string): never {
   throw new CliError(
     USAGE_EXIT,
-    `${message}\nUsage: unslop check --rule=<id> [--format=text|json|sarif] [--strict] [--descriptor=<entry>] [--plugin=<entry>]`,
+    `${message}\nUsage: unslop check [--rule=<id>] [--format=text|json|sarif] [--strict] [--descriptor=<entry>] [--plugin=<entry>]`,
   );
 }
 
@@ -116,16 +147,14 @@ function parseCheck(args: readonly string[]): IParsedCheck {
     if (!arg.startsWith("--")) usage(`check takes no positional argument: '${arg}'`);
     const name = flagName(arg);
     if (name === RULE_OPTION) ruleToken = optionValue(arg);
-    else if (name === FORMAT_OPTION) {
-      formatValue = optionValue(arg);
-      forwarded.push(arg);
-    } else if (name === DESCRIPTOR_OPTION) descriptor = optionValue(arg);
+    else if (name === FORMAT_OPTION) formatValue = optionValue(arg);
+    else if (name === DESCRIPTOR_OPTION) descriptor = optionValue(arg);
     else if (name === PLUGIN_OPTION) plugin = optionValue(arg);
     else if (name === CATALOG_OPTION) optionValue(arg);
     else if (name === STRICT_FLAG && !arg.includes("=")) strict = true;
     else forwarded.push(arg);
   }
-  if (ruleToken === null) usage("check needs --rule=<id>");
+  if (ruleToken === null && forwarded.length > 0) usage("check flags need --rule=<id>");
   return { rule: ruleToken, format: parseFormat(formatValue), descriptor, plugin, strict, forwarded };
 }
 
@@ -190,26 +219,205 @@ function reportResult(result: ICheckRunResult): number {
   return result.code;
 }
 
-/** Runs the `check` route and returns its exit code. */
-export async function runCheck(args: readonly string[]): Promise<number> {
-  const parsed = parseCheck(args);
-  const descriptor = await loadConfigDescriptor(Deno.cwd(), parsed.descriptor, parsed.plugin);
-  const compiled = await readAndCompile(descriptor);
-  const id = resolveRule(compiled, parsed.rule);
-  const rule = compiled.rules[id];
-  if (rule === undefined) usage(`rule '${id}' is not registered.`);
+/** True when the catalog carries the input a whole-tree check reads. */
+function hasSettings(rule: IResolvedRule, compiled: ICompiledConfig): boolean {
+  const section = WHOLE_TREE_SECTIONS[rule.id];
+  if (section === undefined) return compiled.catalog.rules[rule.id] !== undefined;
+  const wholeTree = compiled.catalog.wholeTree as Readonly<Record<string, JsonValue>> | undefined;
+  return wholeTree?.[section] !== undefined;
+}
+
+function runInputOf(compiled: ICompiledConfig, descriptor: IProjectDescriptor): Omit<ICheckRunInput, "args"> {
+  return {
+    catalog: asJsonValue(compiled.catalog),
+    rootPath: fromFileUrl(descriptor.rootUrl),
+  };
+}
+
+/** The reason an active rule cannot run in the aggregate, or null when it can. */
+function skipReasonOf(rule: IResolvedRule, compiled: ICompiledConfig): string | null {
+  if (!hasSettings(rule, compiled)) return "no settings";
+  if (CHILD_RUNNER_RULES.has(rule.id)) return "needs a child runner";
+  return null;
+}
+
+function levelOf(rule: IResolvedRule): RuleSeverity {
+  return ruleEffectiveLevel(rule, ruleStatus(rule, null));
+}
+
+function hostedRow(rule: IResolvedRule): ICheckRow {
+  const command = rule.command === null ? "its host command" : rule.command.join(" ");
+  return {
+    id: rule.id,
+    level: levelOf(rule),
+    ran: false,
+    passed: true,
+    findings: 0,
+    summary: `run ${command}`,
+    report: null,
+  };
+}
+
+function skippedRow(rule: IResolvedRule, reason: string): ICheckRow {
+  return { id: rule.id, level: levelOf(rule), ran: false, passed: true, findings: 0, summary: reason, report: null };
+}
+
+async function runAggregateRule(
+  rule: IResolvedRule,
+  compiled: ICompiledConfig,
+  descriptor: IProjectDescriptor,
+  json: boolean,
+): Promise<ICheckOutcome> {
+  const args = json && JSON_RULES.has(rule.id) ? ["--format=json"] : [];
+  const result = await runWholeTreeCheck(rule.id, { ...runInputOf(compiled, descriptor), args });
+  if (result.code === USAGE_EXIT) {
+    return {
+      row: skippedRow(rule, "cannot run"),
+      stdout: result.stdout,
+      stderr: result.stderr,
+      hosted: false,
+    };
+  }
+  return {
+    row: {
+      id: rule.id,
+      level: levelOf(rule),
+      ran: true,
+      passed: result.passed,
+      findings: result.findings,
+      summary: result.summary,
+      report: result.json,
+    },
+    stdout: result.stdout,
+    stderr: result.stderr,
+    hosted: false,
+  };
+}
+
+async function aggregateOutcomes(
+  compiled: ICompiledConfig,
+  descriptor: IProjectDescriptor,
+  json: boolean,
+): Promise<ICheckOutcome[]> {
+  const active = Object.values(compiled.rules)
+    .filter((rule) => ruleStatus(rule, null) === "active")
+    .filter((rule) => rule.engine === "whole-tree" || rule.engine === "script")
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const outcomes: ICheckOutcome[] = [];
+  for (const rule of active) {
+    if (rule.engine === "script") {
+      outcomes.push({ row: hostedRow(rule), stdout: "", stderr: "", hosted: true });
+      continue;
+    }
+    const reason = skipReasonOf(rule, compiled);
+    if (reason !== null) {
+      outcomes.push({ row: skippedRow(rule, reason), stdout: "", stderr: "", hosted: false });
+      continue;
+    }
+    outcomes.push(await runAggregateRule(rule, compiled, descriptor, json));
+  }
+  return outcomes;
+}
+
+function stateOf(outcome: ICheckOutcome): string {
+  if (outcome.hosted) return "hosted";
+  if (!outcome.row.ran) return "skipped";
+  return outcome.row.passed ? "passed" : "failed";
+}
+
+function iconOf(row: ICheckRow): string {
+  if (!row.ran) return "⏭️ ";
+  return row.passed ? "✅" : "❌";
+}
+
+/** Prints one row per rule, the detail of each failure, and the summary line. */
+function printAggregateText(outcomes: readonly ICheckOutcome[]): void {
+  for (const outcome of outcomes) {
+    const { row } = outcome;
+    print(`${iconOf(row)} ${row.id} [${row.level}] ${stateOf(outcome)} — ${row.summary}\n`);
+  }
+  for (const { row, stdout, stderr } of outcomes) {
+    if (!row.ran || row.passed) continue;
+    print(`\n${row.id}:\n`);
+    for (const line of `${stdout}${stderr}`.split("\n")) if (line !== "") print(`  ${line}\n`);
+  }
+  print(`\n${summaryLine(outcomes)}\n`);
+}
+
+function summaryLine(outcomes: readonly ICheckOutcome[]): string {
+  const count = (state: string): number => outcomes.filter((outcome) => stateOf(outcome) === state).length;
+  return `${count("passed")} passed · ${count("failed")} failed · ${count("skipped")} skipped · ${
+    count("hosted")
+  } hosted`;
+}
+
+function aggregateExitCode(outcomes: readonly ICheckOutcome[], strict: boolean): number {
+  let errorFailed = false;
+  let warnFailed = false;
+  for (const { row } of outcomes) {
+    if (!row.ran || row.passed) continue;
+    if (row.level === "error") errorFailed = true;
+    else warnFailed = true;
+  }
+  if (errorFailed) return FAILURE_EXIT;
+  return warnFailed && strict ? FAILURE_EXIT : 0;
+}
+
+function printAggregateJson(outcomes: readonly ICheckOutcome[], descriptor: IProjectDescriptor): void {
+  const rules = outcomes.map(({ row }) => row);
+  const envelope: ICheckEnvelope = {
+    version: SUMMARY_VERSION,
+    descriptor: descriptor.pluginName,
+    passed: rules.every((row) => row.passed),
+    rules,
+  };
+  print(`${JSON.stringify(envelope, null, 2)}\n`);
+}
+
+/** Runs every active whole-tree check and reports the rows, or the JSON envelope. */
+async function runAggregate(
+  parsed: IParsedCheck,
+  compiled: ICompiledConfig,
+  descriptor: IProjectDescriptor,
+): Promise<number> {
+  if (parsed.format === SARIF_FORMAT) usage("the aggregate check does not produce SARIF; name one rule.");
+  const outcomes = await aggregateOutcomes(compiled, descriptor, parsed.format === JSON_FORMAT);
+  if (parsed.format === JSON_FORMAT) printAggregateJson(outcomes, descriptor);
+  else printAggregateText(outcomes);
+  return aggregateExitCode(outcomes, parsed.strict);
+}
+
+async function runSingle(
+  parsed: IParsedCheck,
+  id: string,
+  rule: IResolvedRule,
+  compiled: ICompiledConfig,
+  descriptor: IProjectDescriptor,
+): Promise<number> {
   assertForwarded(rule, parsed.forwarded);
   refuseHosted(rule);
   assertFormat(rule, parsed.format);
   const status = ruleStatus(rule, null);
   warnOffRule(rule, status);
+  const formatArgs = parsed.format === TEXT_FORMAT ? [] : [`--format=${parsed.format}`];
   const result = await runWholeTreeCheck(id, {
-    catalog: asJsonValue(compiled.catalog),
-    rootPath: fromFileUrl(descriptor.rootUrl),
-    args: parsed.forwarded,
+    ...runInputOf(compiled, descriptor),
+    args: [...parsed.forwarded, ...formatArgs],
   });
   if (result.code === USAGE_EXIT) return reportResult(result);
   reportResult(result);
   const level: RuleSeverity = status === "off" ? "warn" : ruleEffectiveLevel(rule, status);
   return exitCodeOf(level, result.passed, parsed.strict);
+}
+
+/** Runs the `check` route and returns its exit code. */
+export async function runCheck(args: readonly string[]): Promise<number> {
+  const parsed = parseCheck(args);
+  const descriptor = await loadConfigDescriptor(Deno.cwd(), parsed.descriptor, parsed.plugin);
+  const compiled = await readAndCompile(descriptor);
+  if (parsed.rule === null) return await runAggregate(parsed, compiled, descriptor);
+  const id = resolveRule(compiled, parsed.rule);
+  const rule = compiled.rules[id];
+  if (rule === undefined) usage(`rule '${id}' is not registered.`);
+  return await runSingle(parsed, id, rule, compiled, descriptor);
 }

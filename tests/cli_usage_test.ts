@@ -17,5 +17,5 @@ Deno.test("cli_usage_uses_the_unslop_task_names", async () => {
   assertStringIncludes(result.stderr, "unslop <command>");
   assertStringIncludes(result.stderr, "unslop:write <command>");
   assertEquals(result.stderr.indexOf("deno task cli"), -1);
-  assertStringIncludes(result.stderr, "unslop check --rule=<id>");
+  assertStringIncludes(result.stderr, "unslop check [--rule=<id>]");
 });

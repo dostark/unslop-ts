@@ -34,7 +34,7 @@ const PLUGIN_ENGINE = "plugin";
 const SCRIPT_ENGINE = "script";
 
 /** The `wholeTree` section that holds each settings-based check. duplicate-type and duplicate-constant use catalog rules. */
-const WHOLE_TREE_SECTIONS: Readonly<Record<string, string>> = {
+export const WHOLE_TREE_SECTIONS: Readonly<Record<string, string>> = {
   "magic-literals": "magicLiterals",
   "optional-params": "optionalParams",
   "unused-exports": "unusedExports",

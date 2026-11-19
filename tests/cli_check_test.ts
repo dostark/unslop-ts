@@ -7,7 +7,7 @@
  * @related-files [src/cli/commands/check.ts, src/cli/check_runner.ts, tests/helpers/cli_project.ts]
  */
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import type { JsonValue } from "../src/engine/catalog.ts";
 import { runCli, withCliProject } from "./helpers/cli_project.ts";
@@ -33,6 +33,9 @@ async function withCycleProject(
     await Deno.mkdir(join(dir, "src"));
     await Deno.writeTextFile(join(dir, "src/a.ts"), CYCLE_A);
     await Deno.writeTextFile(join(dir, "src/b.ts"), CYCLE_B);
+    await Deno.writeTextFile(join(dir, "src/constants.ts"), 'export const HOSTS = ["a.test", "b.test"];\n');
+    await Deno.mkdir(join(dir, "tests"));
+    await Deno.writeTextFile(join(dir, "tests/placeholder_test.ts"), "export const ok = true;\n");
     await Deno.writeTextFile(join(dir, "catalog.json"), JSON.stringify(CATALOG));
     await body(dir);
   }, { rules });
@@ -98,8 +101,8 @@ Deno.test("check-route-off-rule: an off rule never runs, and a whole-tree level 
     assertEquals(off.code, 2);
     assertStringIncludes(off.stderr, "unslop report");
     const unnamed = await runCli(dir, ["check"]);
-    assertEquals(unnamed.code, 2);
-    assertStringIncludes(unnamed.stderr, "check needs --rule=<id>");
+    assertEquals(unnamed.code, 0, unnamed.stderr);
+    assertEquals(unnamed.stdout.indexOf("demo/require-module-header"), -1);
   });
   await withCycleProject(async (dir) => {
     const fixed = await runCli(dir, ["check", "--rule=import-cycles"]);
@@ -165,5 +168,127 @@ Deno.test("check-route-descriptor: --descriptor selects the project input", asyn
     ]);
     assertEquals(result.code, 0, result.stderr);
     assertStringIncludes(result.stdout, "1 runtime cycle(s)");
+  });
+});
+
+/** The fields of the aggregate envelope this test reads. */
+interface IEnvelopeRow {
+  readonly id: string;
+  readonly ran: boolean;
+  readonly passed: boolean;
+  readonly findings: number;
+  readonly report: JsonValue | null;
+}
+
+interface ICheckEnvelope {
+  readonly descriptor: string;
+  readonly passed: boolean;
+  readonly rules: readonly IEnvelopeRow[];
+}
+
+interface ICycleReportShape {
+  readonly cycles?: readonly JsonValue[];
+}
+
+const DUPLICATE_TYPE_FILES = {
+  "src/a_types.ts": "export interface IThing { a: string; b: number; }\n",
+  "src/b_types.ts": "export interface IThing { a: string; b: number; }\n",
+};
+
+Deno.test("check-all-text: the aggregate prints a row per rule and the summary", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "import-cycles [warn] failed");
+    assertStringIncludes(result.stdout, "duplicate-type [error] passed");
+    assertStringIncludes(result.stdout, "passed ·");
+    assertStringIncludes(result.stdout, "failed ·");
+  });
+});
+
+Deno.test("check-all-json: the envelope carries each report or null, and passed is false", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--format=json"]);
+    assertEquals(result.code, 0, result.stderr);
+    const envelope = JSON.parse(result.stdout) as ICheckEnvelope;
+    assertEquals(envelope.passed, false);
+    assertEquals(typeof envelope.descriptor, "string");
+    const cycleRow = envelope.rules.find((row) => row.id === "import-cycles");
+    assert(cycleRow !== undefined);
+    assertEquals(cycleRow.ran, true);
+    assertEquals(cycleRow.passed, false);
+    assertEquals(cycleRow.findings, 1);
+    const report = cycleRow.report as ICycleReportShape | null;
+    assert(report !== null);
+    assertEquals(report.cycles?.length, 1);
+    const duplicateRow = envelope.rules.find((row) => row.id === "duplicate-type");
+    assert(duplicateRow !== undefined);
+    assertEquals(duplicateRow.report, null);
+  });
+});
+
+Deno.test("check-all-exit: an error failure exits 1, a warning-only set exits 0, and --strict exits 1", async () => {
+  await withCycleProject(async (dir) => {
+    const warningOnly = await runCli(dir, ["check"]);
+    assertEquals(warningOnly.code, 0, warningOnly.stderr);
+    const strict = await runCli(dir, ["check", "--strict"]);
+    assertEquals(strict.code, 1, strict.stderr);
+  });
+  await withCycleProject(async (dir) => {
+    for (const [name, source] of Object.entries(DUPLICATE_TYPE_FILES)) {
+      await Deno.writeTextFile(join(dir, name), source);
+    }
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 1, result.stderr);
+    assertStringIncludes(result.stdout, "duplicate-type [error] failed");
+  });
+});
+
+Deno.test("check-all-skipped: an off rule is absent and an unrunnable active rule is named", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "duplicate-code [error] skipped — needs a child runner");
+    assertEquals(result.stdout.indexOf("magic-literals"), -1);
+  }, {
+    "duplicate-code": ["error", { groups: [{ name: "src", paths: ["src"], threshold: 10 }] }],
+  });
+});
+
+Deno.test("check-all-skipped-exit: a skipped rule contributes no exit failure", async () => {
+  await withCycleProject(async (dir) => {
+    await Deno.remove(join(dir, "src/a.ts"));
+    await Deno.remove(join(dir, "src/b.ts"));
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "duplicate-code [error] skipped — needs a child runner");
+  }, {
+    "duplicate-code": ["error", { groups: [{ name: "src", paths: ["src"], threshold: 10 }] }],
+  });
+});
+
+Deno.test("check-all-hosted: an active script rule appears as hosted with its command", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "project-check [warn] hosted — run deno task check:project");
+  });
+});
+
+Deno.test("check-all-spawned-skipped: duplicate-code is skipped with its reason", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check"]);
+    assertEquals(result.code, 0, result.stderr);
+    assertStringIncludes(result.stdout, "duplicate-code [error] skipped — needs a child runner");
+  }, {
+    "duplicate-code": ["error", { groups: [{ name: "src", paths: ["src"], threshold: 10 }] }],
+  });
+});
+
+Deno.test("check-all-sarif-refused: the aggregate with --format=sarif exits 2", async () => {
+  await withCycleProject(async (dir) => {
+    const result = await runCli(dir, ["check", "--format=sarif"]);
+    assertEquals(result.code, 2);
+    assertStringIncludes(result.stderr, "aggregate check does not produce SARIF");
   });
 });

@@ -14,7 +14,7 @@
  *   deno run --allow-read --allow-env src/cli/unslop.ts rules show <id> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts presets list|show <name> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts config validate|print [--resolved]|schema [--descriptor=]
- *   deno run --allow-read --allow-env src/cli/unslop.ts check --rule=<id> [--format=text|json|sarif]
+ *   deno run --allow-read --allow-env src/cli/unslop.ts check [--rule=<id>] [--format=text|json|sarif]
  *   deno run --allow-read --allow-write --allow-env --allow-run=deno,git src/cli/unslop.ts deno-policy --config= --out= [--packs=]
  *
  * Exit codes: 0 success, 1 invalid file content, 2 usage or unsupported operation.
@@ -60,7 +60,7 @@ const USAGE = [
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
   "  unslop deno-policy --config=<file> --out=<dir> [--packs=typescript[,deno]]",
   "  unslop health [--format=text|json] [--descriptor=<entry>] [--root=<dir>]",
-  "  unslop check --rule=<id> [--format=text|json|sarif] [--strict] [--descriptor=<entry>] [--plugin=<entry>]",
+  "  unslop check [--rule=<id>] [--format=text|json|sarif] [--strict] [--descriptor=<entry>] [--plugin=<entry>]",
   "  unslop report [--format=table|json|markdown|sarif] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
