@@ -136,10 +136,18 @@ function validateSemantics(baseline: ICycleBaseline): void {
         1,
       );
     }
-    const sorted = [...cycle.files].sort((left, right) => left.localeCompare(right));
+    const sorted = [...cycle.files].sort();
     const unique = new Set(cycle.files).size === cycle.files.length;
     if (!unique || sorted.some((file, index) => file !== cycle.files[index])) {
       throw new CycleBaselineError(`The import-cycle baseline files of '${cycle.id}' must be sorted and unique.`, 1);
+    }
+  }
+  for (const entry of baseline.allowed_unresolved) {
+    if (!isRepoRelative(entry.from)) {
+      throw new CycleBaselineError(
+        `The import-cycle baseline allowlist names a file that is not ${INSIDE_MESSAGE}: '${entry.from}'.`,
+        1,
+      );
     }
   }
 }
@@ -171,9 +179,19 @@ export function serializeCycleBaseline(baseline: ICycleBaseline): string {
     allowed_unresolved: [...baseline.allowed_unresolved].sort(compareUnresolved),
     cycles: [...baseline.cycles]
       .sort((left, right) => left.id.localeCompare(right.id))
-      .map((cycle) => ({ id: cycle.id, kind: cycle.kind, files: [...cycle.files] })),
+      .map((cycle) => ({ id: cycle.id, kind: cycle.kind, files: [...cycle.files].sort() })),
   };
-  return `${JSON.stringify(document, null, 2)}\n`;
+  if (document.cycles.length > MAX_CYCLE_BASELINE_CYCLES) {
+    throw new CycleBaselineError(
+      `The import-cycle baseline holds more than ${MAX_CYCLE_BASELINE_CYCLES} cycles.`,
+      1,
+    );
+  }
+  const text = `${JSON.stringify(document, null, 2)}\n`;
+  if (new TextEncoder().encode(text).length > MAX_CYCLE_BASELINE_BYTES) {
+    throw new CycleBaselineError(`The import-cycle baseline exceeds ${MAX_CYCLE_BASELINE_BYTES} bytes.`, 1);
+  }
+  return text;
 }
 
 /** True when a cycle reaches a gate root, or when no root is configured. A test-only cycle stays advisory. */

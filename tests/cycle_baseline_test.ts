@@ -510,3 +510,62 @@ Deno.test("cycle-report-cause: the text report names the parse count and every c
     assertStringIncludes(text.stdout, "src/broken.ts could not be parsed");
   });
 });
+
+Deno.test("cycle-baseline-round-trip-case: a member set that crosses the locale order round-trips", () => {
+  const baseline: ICycleBaseline = {
+    version: CYCLE_BASELINE_VERSION,
+    allowed_unresolved: [],
+    cycles: [{ id: CYCLE_ID, kind: "runtime", files: ["src/Zeta.ts", "src/alpha.ts"] }],
+  };
+  const parsed = parseCycleBaseline(serializeCycleBaseline(baseline));
+  assertEquals(parsed.cycles[0].files, ["src/Zeta.ts", "src/alpha.ts"]);
+});
+
+Deno.test("cycle-baseline-write-limit: an over-count or oversized write is refused and leaves no file", async () => {
+  await withTempDir(async (root) => {
+    const finding = (index: number): ICycleFinding => ({
+      id: `cyc-${String(index).padStart(16, "0")}`,
+      kind: "runtime",
+      files: [`src/f${index}.ts`],
+      edges: [],
+      path: [`src/f${index}.ts`],
+      path_truncated: false,
+      size: 1,
+      edge_count: 0,
+    });
+    const analysisOf = (count: number): ICycleAnalysis => ({
+      cycles: Array.from({ length: count }, (_, index) => finding(index)),
+      totals: { runtime_sccs: count, type_only_sccs: 0, mixed_sccs: 0, files: count, edges: 0, largest_files: 1 },
+      graph: {
+        complete: true,
+        code_files: count,
+        runtime_edges: 0,
+        type_edges: 0,
+        unresolved: 0,
+        unresolved_refs: [],
+        parse_errors: [],
+        parse_error_count: 0,
+        nonliteral_dynamic: 0,
+      },
+    });
+    await assertRejects(
+      () => saveCycleBaseline(root, "over_count.json", buildCycleBaseline(analysisOf(MAX_CYCLE_BASELINE_CYCLES + 1))),
+      CycleBaselineError,
+      "cycles",
+    );
+    await assertRejects(
+      () => saveCycleBaseline(root, "over_bytes.json", buildCycleBaseline(analysisOf(MAX_CYCLE_BASELINE_CYCLES))),
+      CycleBaselineError,
+      "bytes",
+    );
+    assertEquals(await Deno.lstat(join(root, "over_count.json")).catch(() => null), null);
+    assertEquals(await Deno.lstat(join(root, "over_bytes.json")).catch(() => null), null);
+  });
+});
+
+Deno.test("cycle-baseline-allowlist-path: an allowlist source outside the root is rejected", () => {
+  const escaped = rawOf({
+    allowed_unresolved: [{ specifier: "./missing.ts", from: "../../etc/passwd", reason: "Probe." }],
+  });
+  assertThrows(() => parseCycleBaseline(JSON.stringify(escaped)), "inside the project root");
+});
