@@ -73,7 +73,17 @@ function oneCycleAnalysis(): ICycleAnalysis {
       edges: 2,
       largest_files: 2,
     },
-    graph: { complete: true, code_files: 2, runtime_edges: 2, type_edges: 0, unresolved: 0, unresolved_refs: [] },
+    graph: {
+      complete: true,
+      code_files: 2,
+      runtime_edges: 2,
+      type_edges: 0,
+      unresolved: 0,
+      unresolved_refs: [],
+      parse_errors: [],
+      parse_error_count: 0,
+      nonliteral_dynamic: 0,
+    },
   };
 }
 
@@ -424,7 +434,17 @@ Deno.test("cycle-baseline-gate-roots: a cycle that reaches production gates, a t
   const analysis: ICycleAnalysis = {
     cycles: [production, testOnly],
     totals: { runtime_sccs: 2, type_only_sccs: 0, mixed_sccs: 0, files: 4, edges: 4, largest_files: 2 },
-    graph: { complete: true, code_files: 4, runtime_edges: 4, type_edges: 0, unresolved: 0, unresolved_refs: [] },
+    graph: {
+      complete: true,
+      code_files: 4,
+      runtime_edges: 4,
+      type_edges: 0,
+      unresolved: 0,
+      unresolved_refs: [],
+      parse_errors: [],
+      parse_error_count: 0,
+      nonliteral_dynamic: 0,
+    },
   };
   const baseline: ICycleBaseline = {
     version: CYCLE_BASELINE_VERSION,
@@ -440,4 +460,40 @@ Deno.test("cycle-baseline-gate-roots: a cycle that reaches production gates, a t
   const withoutBaselineEntry = compareToBaseline(analysis, { ...baseline, cycles: [] }, options);
   assertEquals(withoutBaselineEntry.added.map((cycle) => cycle.id), [production.id]);
   assertEquals(withoutBaselineEntry.passed, false);
+});
+
+Deno.test("cycle-gate-parse-error: an unparsable source file fails the gate and is named", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    await Deno.writeTextFile(join(dir, "src/broken.ts"), "export function broken( {\n");
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    const report = JSON.parse((await runCli(dir, ["--format=json"], ["run", "-A", CLI])).stdout) as {
+      graph: { complete: boolean; parse_error_count: number; nonliteral_dynamic: number };
+    };
+    assertEquals(report.graph.parse_error_count, 1);
+    assertEquals(report.graph.complete, false);
+    const gated = await runCli(dir, ["--fail-on-new", "--fail-on-stale"], ["run", "-A", CLI]);
+    assertEquals(gated.code, FAILURE_EXIT);
+    assertStringIncludes(gated.stderr, "parse error");
+    assertStringIncludes(gated.stderr, "src/broken.ts");
+  });
+});
+
+Deno.test("cycle-gate-nonliteral: a computed dynamic import fails the gate and is named", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    await Deno.writeTextFile(
+      join(dir, "src/dyn.ts"),
+      'const name = "./b.ts";\nexport const loaded = await import(name);\n',
+    );
+    assertEquals((await runCli(dir, ["--update-baseline"], ["run", "-A", CLI])).code, 0);
+    const report = JSON.parse((await runCli(dir, ["--format=json"], ["run", "-A", CLI])).stdout) as {
+      graph: { parse_error_count: number; nonliteral_dynamic: number };
+    };
+    assertEquals(report.graph.nonliteral_dynamic, 1);
+    assertEquals(report.graph.parse_error_count, 0);
+    const gated = await runCli(dir, ["--fail-on-new", "--fail-on-stale"], ["run", "-A", CLI]);
+    assertEquals(gated.code, FAILURE_EXIT);
+    assertStringIncludes(gated.stderr, "nonliteral dynamic");
+  });
 });

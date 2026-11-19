@@ -44,6 +44,9 @@ export interface ICycleGate {
   readonly changed: readonly IChangedCycle[];
   readonly stale: readonly ICycleBaselineEntry[];
   readonly unlisted_unresolved: readonly IUnresolvedRef[];
+  readonly parse_errors: readonly { readonly path: string; readonly message: string }[];
+  readonly parse_error_count: number;
+  readonly nonliteral_dynamic: number;
   readonly passed: boolean;
 }
 
@@ -349,7 +352,9 @@ export function compareToBaseline(
   );
   const uncatalogued = analysis.graph.unresolved > analysis.graph.unresolved_refs.length;
   const incomplete = unlisted_unresolved.length > 0 || uncatalogued ||
-    analysis.graph.unresolved > baseline.allowed_unresolved.length;
+    analysis.graph.unresolved > baseline.allowed_unresolved.length ||
+    analysis.graph.parse_error_count > 0 ||
+    analysis.graph.nonliteral_dynamic > 0;
   const cyclesPassed = !options.failOnNew || (added.length === 0 && changed.length === 0);
   const stalePassed = !options.failOnStale || stale.length === 0;
   return {
@@ -358,6 +363,9 @@ export function compareToBaseline(
     changed,
     stale,
     unlisted_unresolved,
+    parse_errors: analysis.graph.parse_errors,
+    parse_error_count: analysis.graph.parse_error_count,
+    nonliteral_dynamic: analysis.graph.nonliteral_dynamic,
     passed: cyclesPassed && stalePassed && !incomplete,
   };
 }

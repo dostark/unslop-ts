@@ -309,6 +309,9 @@ function analysisOf(count: number): ICycleAnalysis {
       type_edges: 0,
       unresolved: 0,
       unresolved_refs: [],
+      parse_errors: [],
+      parse_error_count: 0,
+      nonliteral_dynamic: 0,
     },
   };
 }

@@ -57,9 +57,11 @@ needs both a runtime path and a type path, so it can loop at runtime but needs a
 
 **Output.** The text report counts runtime, type-only, and mixed cycles, then lists each finding with its members,
 its shortest path, and every internal edge. The JSON report carries the same data under `version`, `truncated`,
-`totals`, `graph`, and `cycles`. `graph.complete` is false when an unresolved specifier or a parse failure can hide
-an edge; the report then names each unresolved reference, bounded to the first 100. Each cycle has a stable
-`cyc-` id that hashes the sorted member paths, so a line move keeps the id and a change of membership changes it.
+`totals`, `graph`, and `cycles`. `graph.complete` is false when an unresolved specifier, a source file that fails to
+parse, or a computed dynamic import can hide an edge. The report names each cause: the unresolved references (bounded
+to the first 100), the parse failures (bounded to the first 20), and the computed dynamic import count. The gate fails
+on any of them. Each cycle has a stable `cyc-` id that hashes the sorted member paths, so a line move keeps the id and
+a change of membership changes it.
 
 `--format=sarif` writes SARIF 2.1.0 with one `unslop/import-cycle` result per cycle. A runtime cycle is an
 `error`, a mixed cycle a `warning`, and a type-only cycle a `note`. Each result locates every member file and

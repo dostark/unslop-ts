@@ -68,12 +68,22 @@ export interface IUnresolvedRef {
   readonly specifier: string;
 }
 
+/** One source file that failed to parse, so its edges are missing from the graph. */
+export interface ICycleParseError {
+  readonly path: string;
+  readonly message: string;
+}
+
 /** The evidence the analysis reports about its own graph. */
 export interface ICycleGraphInfo {
   readonly complete: boolean;
   readonly code_files: number;
   readonly unresolved: number;
   readonly unresolved_refs: readonly IUnresolvedRef[];
+  /** The first `MAX_REPORTED_PARSE_ERRORS` files that failed to parse. */
+  readonly parse_errors: readonly ICycleParseError[];
+  readonly parse_error_count: number;
+  readonly nonliteral_dynamic: number;
 }
 
 /** The options of one analysis. */
@@ -104,6 +114,9 @@ export interface ICycleAnalysis {
     readonly type_edges: number;
     readonly unresolved: number;
     readonly unresolved_refs: readonly IUnresolvedRef[];
+    readonly parse_errors: readonly ICycleParseError[];
+    readonly parse_error_count: number;
+    readonly nonliteral_dynamic: number;
   };
 }
 
@@ -127,6 +140,9 @@ export const DEFAULT_MIN_CYCLE_FILES = 2;
 
 /** The node cap of a stored canonical path. The member list is never capped. */
 const DEFAULT_MAX_PATH_NODES = 64;
+
+/** The parse failures the graph block lists, so a broken tree cannot grow the report. */
+export const MAX_REPORTED_PARSE_ERRORS = 20;
 
 /** One adjacency built from an edge selection. */
 interface IAdjacency {
@@ -404,6 +420,9 @@ export function analyzeCycles(
       type_edges: edgeKeys("type"),
       unresolved: graphInfo.unresolved,
       unresolved_refs: graphInfo.unresolved_refs,
+      parse_errors: graphInfo.parse_errors,
+      parse_error_count: graphInfo.parse_error_count,
+      nonliteral_dynamic: graphInfo.nonliteral_dynamic,
     },
   };
 }

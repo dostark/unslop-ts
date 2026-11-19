@@ -13,7 +13,15 @@ import { buildHealthGraph, parseHealthFile } from "../src/report/mod.ts";
 import type { IParsedHealthFile } from "../src/report/parse.ts";
 import { analyzeCycles, type ICycleEdge, type ICycleGraphInfo } from "../src/rules/whole_tree/import_cycles.ts";
 
-const EMPTY_GRAPH: ICycleGraphInfo = { complete: true, code_files: 10, unresolved: 0, unresolved_refs: [] };
+const EMPTY_GRAPH: ICycleGraphInfo = {
+  complete: true,
+  code_files: 10,
+  unresolved: 0,
+  unresolved_refs: [],
+  parse_errors: [],
+  parse_error_count: 0,
+  nonliteral_dynamic: 0,
+};
 
 /** The default analysis options. */
 const OPTIONS = { minFiles: 2, includeSelf: false, includeTypeOnly: true };

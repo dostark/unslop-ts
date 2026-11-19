@@ -20,7 +20,9 @@ import {
   couplingSignalOf,
   DEFAULT_MIN_CYCLE_FILES,
   type ICycleAnalysis,
+  type ICycleGraphInfo,
   type ICycleOptions,
+  MAX_REPORTED_PARSE_ERRORS,
   runtimeCyclesOf,
 } from "../rules/whole_tree/import_cycles.ts";
 import { checkManifestRepository } from "../rules/whole_tree/unused_files_manifest.ts";
@@ -578,14 +580,30 @@ async function parseSnapshot(input: IScanInput): Promise<ISnapshot> {
   };
 }
 
-/** The full cycle analysis of one measured graph, with the evidence the report names. */
-function cycleAnalysisOf(graph: IHealthGraph, codeFiles: number): ICycleAnalysis {
-  return analyzeCycles(graph.edges, {
-    complete: graph.complete,
+/** The graph evidence that the cycle analysis and the gate both read. */
+function cycleGraphInfoOf(
+  graph: IHealthGraph,
+  codeFiles: number,
+  errors: readonly IHealthError[],
+): ICycleGraphInfo {
+  return {
+    complete: graph.complete && errors.length === 0,
     code_files: codeFiles,
     unresolved: graph.limitations.unresolved,
     unresolved_refs: graph.limitations.unresolved_refs,
-  }, DEFAULT_CYCLE_OPTIONS);
+    parse_errors: errors.slice(0, MAX_REPORTED_PARSE_ERRORS),
+    parse_error_count: errors.length,
+    nonliteral_dynamic: graph.limitations.nonliteral_dynamic,
+  };
+}
+
+/** The full cycle analysis of one measured graph, with the evidence the report names. */
+function cycleAnalysisOf(
+  graph: IHealthGraph,
+  codeFiles: number,
+  errors: readonly IHealthError[],
+): ICycleAnalysis {
+  return analyzeCycles(graph.edges, cycleGraphInfoOf(graph, codeFiles, errors), DEFAULT_CYCLE_OPTIONS);
 }
 
 /** The import cycle analysis of one repository, over the snapshot and graph that the health report reads. */
@@ -598,12 +616,7 @@ export async function collectCycleAnalysis(
     includeSelf: options.includeSelf,
   });
   // A parse failure can hide an edge, so it counts as an incomplete graph.
-  return analyzeCycles(graph.edges, {
-    complete: graph.complete && errors.length === 0,
-    code_files: parsed.size,
-    unresolved: graph.limitations.unresolved,
-    unresolved_refs: graph.limitations.unresolved_refs,
-  }, options);
+  return analyzeCycles(graph.edges, cycleGraphInfoOf(graph, parsed.size, errors), options);
 }
 
 /** Every measured function of one root, with the failures and exclusions attributed. */
@@ -839,7 +852,7 @@ export async function collectHealth(input: ICollectHealthInput): Promise<IHealth
   const deadFiles = await deadFilesOf(input.rootPath, new Set(parsed.keys()));
   const coverageSummary = await coverageSummaryOf(input, coverage, parsed);
   const hotspotReport = await hotspotReportOf(input, parsed, facts);
-  const cycleAnalysis = cycleAnalysisOf(graph, parsed.size);
+  const cycleAnalysis = cycleAnalysisOf(graph, parsed.size, errors);
   const vitalSigns = vitalSignsOf(bands, functions, graph, parsed.size, cycleAnalysis);
   const scoreReport = await scoreReportOf(
     input,

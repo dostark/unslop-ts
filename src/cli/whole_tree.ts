@@ -579,6 +579,8 @@ function gateSummaryOf(gate: ICycleGate): JsonValue {
     changed: gate.changed,
     stale: gate.stale.map((cycle) => ({ id: cycle.id, files: cycle.files })),
     unlisted_unresolved: gate.unlisted_unresolved,
+    parse_error_count: gate.parse_error_count,
+    nonliteral_dynamic: gate.nonliteral_dynamic,
     passed: gate.passed,
   });
 }
@@ -627,6 +629,14 @@ function printCycleGate(gate: ICycleGate): void {
   for (const reference of gate.unlisted_unresolved) {
     console.error(
       `  UNRESOLVED ${reference.from} imports '${reference.specifier}'; add it to allowed_unresolved with a reason`,
+    );
+  }
+  for (const error of gate.parse_errors) {
+    console.error(`  INCOMPLETE parse error in ${error.path}; the graph may hide a cycle`);
+  }
+  if (gate.nonliteral_dynamic > 0) {
+    console.error(
+      `  INCOMPLETE ${gate.nonliteral_dynamic} nonliteral dynamic import(s); the graph may hide a cycle`,
     );
   }
   console.error(gate.passed ? "✅ import-cycle gate passed" : "❌ import-cycle gate failed");

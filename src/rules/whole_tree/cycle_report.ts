@@ -86,11 +86,14 @@ function cycleSummaryLines(analysis: ICycleAnalysis): string[] {
     return lines;
   }
   lines.push(
-    `Graph incomplete · ${graph.unresolved} unresolved reference(s); the gate cannot certify a cycle-free run.`,
+    `Graph incomplete · ${graph.unresolved} unresolved reference(s) · ` +
+      `${graph.parse_error_count} parse error(s) · ${graph.nonliteral_dynamic} computed dynamic import(s); ` +
+      `the gate cannot certify a cycle-free run.`,
   );
   for (const reference of graph.unresolved_refs) {
     lines.push(`  ${reference.from} imports '${reference.specifier}'`);
   }
+  for (const error of graph.parse_errors) lines.push(`  ${error.path} could not be parsed`);
   return lines;
 }
 
