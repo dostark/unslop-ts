@@ -497,3 +497,16 @@ Deno.test("cycle-gate-nonliteral: a computed dynamic import fails the gate and i
     assertStringIncludes(gated.stderr, "nonliteral dynamic");
   });
 });
+
+Deno.test("cycle-report-cause: the text report names the parse count and every cause", async () => {
+  await withTempDir(async (dir) => {
+    await writeCycleProject(dir);
+    await Deno.writeTextFile(join(dir, "src/broken.ts"), "export function broken( {\n");
+    const text = await runCli(dir, [], ["run", "-A", CLI], { baseline: null });
+    assertEquals(text.code, 0);
+    assertStringIncludes(text.stdout, "1 parse error(s)");
+    assertStringIncludes(text.stdout, "0 unresolved reference(s)");
+    assertStringIncludes(text.stdout, "0 computed dynamic import(s)");
+    assertStringIncludes(text.stdout, "src/broken.ts could not be parsed");
+  });
+});
