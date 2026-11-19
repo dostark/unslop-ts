@@ -154,11 +154,31 @@ configuration that disabled a rule.
 | See what a preset enables           | `unslop presets show unslop:recommended`                                 |
 | Validate or print the configuration | `unslop config validate` / `unslop config print --resolved`              |
 | Measure the project                 | `unslop health`                                                          |
+| Run the configured checks           | `unslop check`                                                           |
 | Check per-rule coverage             | `unslop report --format=markdown src`                                    |
 | Convert a version 1 catalog         | `unslop migrate --descriptor=<entry> --from=<v1> --out=<path>`           |
 
 Read commands and dry runs need no write permission. A real edit, a migration, or `unslop report`
 needs the write or run permission the [Command line](reference/cli.md) page lists.
+
+### Run checks
+
+`unslop check` runs the whole-tree checks from the compiled catalog. A bare run prints one row per active check and
+a summary; `--rule=<id>` runs one check. `--select`, `--profile`, `--category`, `--level` and `--exclude` narrow the
+aggregate, and an unknown token is a usage error. `--strict` promotes a failed warning-level rule to exit `1`; a
+check's own `--fail` changes what that check reports, not the rule-level exit policy.
+
+```sh
+deno task unslop check
+deno task unslop check --rule=import-cycles --format=json
+deno task unslop check --category=imports --level=error
+```
+
+`--format=json` writes an envelope with `version`, `descriptor`, `passed` and one row per active rule; each row
+carries `id`, `level`, `ran`, `passed`, `findings`, `summary` and `report`, where `report` is the check's own
+document or `null`. `--format=sarif` works only for a single `--rule=import-cycles` run. A script rule appears as
+`hosted` with its command and is never executed; a plugin rule stays on `unslop report`. Every flag, the permission
+surface and the exit policy are in [Command line](reference/cli.md#run-checks).
 
 ## 6. Read and act on a finding
 

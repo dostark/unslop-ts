@@ -28,6 +28,86 @@ migration, or any command that locks, stages, and writes files. The read task gr
 because the CLI imports trusted project code with its own permissions. `deno task cli:write` is the
 equivalent write-enabled CLI alias.
 
+### Run checks
+
+`unslop check` runs the configured whole-tree checks in process. A bare `unslop check` runs every active check;
+`--rule=<id>` runs one. The in-process set is `constant-restatement`, `unused-exports`, `unused-files`,
+`optional-params`, `duplicate-code`, `magic-literals`, `duplicate-type`, `duplicate-constant` and `import-cycles`.
+
+The aggregate lists an active `script` rule as `hosted` beside its command and never runs it. A `plugin` rule keeps
+`unslop report`, and naming one on `check` is a usage error. A check that cannot run is named with its reason
+(`needs a child runner` for `duplicate-code` in the aggregate; `no settings` when a future model leaves a section
+absent), never silently omitted. A skipped or hosted row does not fail the run.
+
+| Flag                    | Effect                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--rule=<id>`           | Run one configured whole-tree rule instead of the aggregate.                                                   |
+| `--format=text\|json`   | Write the text report or the JSON envelope. The aggregate refuses `sarif`.                                     |
+| `--format=sarif`        | Single rule only, and only for `import-cycles`. Any other SARIF run exits `2`.                                 |
+| `--strict`              | Promote a failed warn-level rule to exit `1`. The run-level promotion is separate from a check's own `--fail`. |
+| `--fail`                | The check's own flag, forwarded unchanged. It changes what the check reports, not the rule-level exit policy.  |
+| `--select=<tokens>`     | Select rules by id or tag with the same vocabulary as `rules list`. Cannot combine with `--profile`.           |
+| `--profile=<name>`      | Select the named profile.                                                                                      |
+| `--category=<category>` | Keep one rule category.                                                                                        |
+| `--level=error\|warn`   | Keep one effective rule level.                                                                                 |
+| `--exclude=<token>`     | Drop a rule id, bare key or `tag:<tag>`; repeatable.                                                           |
+| `--include-parked`      | Refused: parked state belongs to plugin rules, which use `unslop report`.                                      |
+| `--descriptor=<entry>`  | Load the project descriptor without importing the plugin.                                                      |
+| `--plugin=<entry>`      | Load the project from a local plugin entry.                                                                    |
+| `--catalog=<path>`      | Accepted for compatibility and ignored; the compiled project catalog is the input.                             |
+
+The filters compose in this order: drop `off` rules, apply the selection, apply the category and level, apply the
+exclusions. An unknown id, tag, category or level exits `2` with the known values.
+
+The JSON envelope is:
+
+```json
+{
+  "version": 1,
+  "descriptor": "demo",
+  "passed": false,
+  "rules": [
+    {
+      "id": "import-cycles",
+      "level": "warn",
+      "ran": true,
+      "passed": false,
+      "findings": 1,
+      "summary": "1 runtime cycle(s)",
+      "report": { "version": 1, "cycles": [] }
+    },
+    {
+      "id": "project-check",
+      "level": "warn",
+      "ran": false,
+      "passed": true,
+      "findings": 0,
+      "summary": "run deno task check:project",
+      "report": null
+    }
+  ]
+}
+```
+
+`report` is the check's own document, or `null` when the check has no JSON. `passed` is false when any run rule
+failed, including a warning-level rule; the exit code applies the level.
+
+Permissions: the whole-tree checks are read-only and need `--allow-read --allow-env`. `duplicate-code` starts jscpd
+through `npx`, so a named single-rule run also needs `--allow-run=node` and a Node.js runtime or a warm npm cache.
+`optional-params --staged` runs `deno lint`, so it also needs `--allow-run=deno`. `--update-baseline` and
+`optional-params --fix` write files and need `--allow-write`.
+
+Exit codes: `0` when every run rule passes, or only warning-level rules fail; `1` when an error-level rule fails,
+or a warning-level rule fails under `--strict`; `2` for a usage error, an unsupported format, a refused rule, or a
+filter token the command does not know.
+
+```sh
+deno task unslop check --rule=import-cycles
+deno task unslop check --select=tag:imports --format=json
+deno task unslop check --category=magic-values --level=error
+deno task unslop check --exclude=duplicate-type --strict
+```
+
 ### Get the `unslop` command
 
 The package publishes a module, not a binary. While the registry release is pending, install the

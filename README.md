@@ -79,6 +79,22 @@ deno install --global --name unslop --allow-read --allow-env jsr:@dostark/unslop
 - [Security](SECURITY.md) — reporting and trust model.
 - [Changelog](CHANGELOG.md) — released changes.
 
+## Running checks
+
+`unslop check` runs the configured whole-tree checks from the compiled catalog. With no `--rule` it runs every
+active check and prints one row per rule plus a summary; `--rule=<id>` runs one. `--select`, `--profile`,
+`--category`, `--level` and `--exclude` narrow the aggregate. `--strict` promotes a failed warning-level rule to a
+non-zero exit; a check's own `--fail` stays a check flag. `--format=json` keeps each check's own document under
+`report`, and SARIF is a single-rule format for `import-cycles`.
+
+```sh
+deno task unslop check
+deno task unslop check --rule=import-cycles --format=json
+deno task unslop check --select=tag:imports --strict
+```
+
+See [Command line](docs/reference/cli.md) for every flag, the envelope and the exit policy.
+
 ## Import-cycle reporting
 
 `import-cycles` reports every strongly connected component of the import graph: its member files, its internal
