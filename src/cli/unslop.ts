@@ -1,7 +1,7 @@
 /**
  * @module UnslopCli
  * @path src/cli/unslop.ts
- * @description The `unslop` read CLI: rule queries, preset expansion, and configuration validation and printing.
+ * @description The `unslop` read CLI: rule queries, preset expansion, configuration printing, and configured checks.
  * @architectural-layer Tooling
  * @dependencies [@std/path]
  * @related-files [src/cli/project_loader.ts, src/cli/rules_read.ts, src/cli/presets.ts, src/cli/config_read.ts]
@@ -14,6 +14,7 @@
  *   deno run --allow-read --allow-env src/cli/unslop.ts rules show <id> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts presets list|show <name> [--format=]
  *   deno run --allow-read --allow-env src/cli/unslop.ts config validate|print [--resolved]|schema [--descriptor=]
+ *   deno run --allow-read --allow-env src/cli/unslop.ts check --rule=<id> [--format=text|json|sarif]
  *   deno run --allow-read --allow-write --allow-env --allow-run=deno,git src/cli/unslop.ts deno-policy --config= --out= [--packs=]
  *
  * Exit codes: 0 success, 1 invalid file content, 2 usage or unsupported operation.
@@ -27,6 +28,7 @@ import { renderEslintFragment, renderOxlintFragment, toHostConfig } from "../con
 import { parseFormat, parseReportFormat, print, printError } from "./output.ts";
 import { loadConfigDescriptor, loadProject, readAndCompile, readConfigObject } from "./project_loader.ts";
 import { buildDenoPolicy, DenoPolicyError } from "./commands/deno_policy.ts";
+import { runCheck } from "./commands/check.ts";
 import { runHealth } from "./commands/health.ts";
 import { runMigrate } from "./commands/migrate.ts";
 import { renderReport, reportExitCode, runReport } from "./commands/report.ts";
@@ -58,6 +60,7 @@ const USAGE = [
   "  unslop migrate --descriptor=<entry> --from=<v1> --out=<path> [--layout-out=<path>]",
   "  unslop deno-policy --config=<file> --out=<dir> [--packs=typescript[,deno]]",
   "  unslop health [--format=text|json] [--descriptor=<entry>] [--root=<dir>]",
+  "  unslop check --rule=<id> [--format=text|json|sarif] [--strict] [--descriptor=<entry>] [--plugin=<entry>]",
   "  unslop report [--format=table|json|markdown|sarif] [--out=<path>] [--descriptor=<entry>] [--plugin=<entry>] [--select=<tokens>|--profile=<name>] [--] <paths>",
   "",
   "Every command accepts --plugin=<entry> to select a local plugin entry explicitly.",
@@ -375,6 +378,7 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "config") return await configCommand(rest);
     if (command === "migrate") return await migrateCommand(rest);
     if (command === "deno-policy") return await denoPolicyCommand(rest);
+    if (command === "check") return await runCheck(rest);
     if (command === "report") return await reportCommand(rest);
     if (command === "health") return await runHealth(rest);
     throw new CliError(USAGE_EXIT, `${command === undefined ? "" : `unknown command '${command}'\n`}${USAGE}`);

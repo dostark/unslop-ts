@@ -8,7 +8,14 @@
  */
 
 import { fromFileUrl, join } from "@std/path";
+import type { JsonValue } from "../../src/engine/catalog.ts";
 import { runDeno } from "./demo_project.ts";
+
+/** One per-test change to the written project. */
+export interface ICliProjectOptions {
+  /** Rule settings that replace or extend the fixture's own. */
+  readonly rules?: Readonly<Record<string, JsonValue>>;
+}
 
 /** The absolute path of the CLI entry that the tests spawn. */
 export const CLI_PATH = fromFileUrl(new URL("../../src/cli/unslop.ts", import.meta.url));
@@ -109,7 +116,10 @@ function projectDenoConfig(engineUrl: string, zodSpecifier: string, plugins: rea
 }
 
 /** Writes the project, runs `body` in it, and removes it. */
-export async function withCliProject(body: (dir: string) => Promise<void>): Promise<void> {
+export async function withCliProject(
+  body: (dir: string) => Promise<void>,
+  options: ICliProjectOptions = {},
+): Promise<void> {
   const dir = await Deno.makeTempDir({ prefix: "unslop_cli_" });
   try {
     await Deno.mkdir(join(dir, "examples"));
@@ -121,7 +131,8 @@ export async function withCliProject(body: (dir: string) => Promise<void>): Prom
     );
     await Deno.writeTextFile(join(dir, "examples", "unslop.project.ts"), DESCRIPTOR_SOURCE);
     await Deno.writeTextFile(join(dir, "examples", "lint_plugin.ts"), PLUGIN_SOURCE);
-    await Deno.writeTextFile(join(dir, CONFIG_PATH), JSON.stringify(CONFIG, null, 2));
+    const config = { ...CONFIG, rules: { ...CONFIG.rules, ...options.rules } };
+    await Deno.writeTextFile(join(dir, CONFIG_PATH), JSON.stringify(config, null, 2));
     await body(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });
